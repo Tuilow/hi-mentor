@@ -9,19 +9,19 @@ public sealed class EnrollmentTests
     [Fact]
     public void Create_ShouldHaveActiveStatus()
     {
-        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), 10);
+        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), "Curso de Adestramento");
         enrollment.Status.Should().Be(EnrollmentStatus.Active);
-        enrollment.ProgressPercent.Should().Be(0);
+        enrollment.ProgressPercentage.Should().Be(0);
     }
 
     [Fact]
     public void TrackLessonProgress_At100Percent_ShouldCompleteLesson()
     {
         var lessonId = Guid.NewGuid();
-        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), 1);
-        enrollment.TrackLessonProgress(lessonId, 100, 100);
+        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), "Curso de Adestramento");
+        enrollment.TrackLessonProgress(lessonId, 100, 100, totalLessons: 2);
 
-        var progress = enrollment.LessonProgress.First(p => p.LessonId == lessonId);
+        var progress = enrollment.LessonsProgress.First(p => p.LessonId == lessonId);
         progress.IsCompleted.Should().BeTrue();
     }
 
@@ -29,8 +29,8 @@ public sealed class EnrollmentTests
     public void TrackLessonProgress_AllLessonsComplete_ShouldMarkEnrollmentAsCompleted()
     {
         var lessonId = Guid.NewGuid();
-        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), 1);
-        enrollment.TrackLessonProgress(lessonId, 100, 100);
+        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), "Curso de Adestramento");
+        enrollment.TrackLessonProgress(lessonId, 100, 100, totalLessons: 1);
 
         enrollment.Status.Should().Be(EnrollmentStatus.Completed);
         enrollment.CompletedAt.Should().NotBeNull();

@@ -1,3 +1,4 @@
+using BCrypt.Net;
 using DogMaster.Domain.Common.Abstractions;
 
 namespace DogMaster.Domain.Contexts.Identity.ValueObjects;

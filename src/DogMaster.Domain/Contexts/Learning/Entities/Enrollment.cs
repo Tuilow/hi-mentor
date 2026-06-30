@@ -15,7 +15,7 @@ public sealed class Enrollment : AggregateRoot
     public DateTime EnrolledAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
 
-    public IReadOnlyCollection<LessonProgress> LessonProgress => _lessonProgress.AsReadOnly();
+    public IReadOnlyCollection<LessonProgress> LessonsProgress => _lessonProgress.AsReadOnly();
 
     private Enrollment() { }
 

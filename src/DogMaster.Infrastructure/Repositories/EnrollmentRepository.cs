@@ -9,7 +9,7 @@ public sealed class EnrollmentRepository(ApplicationDbContext context) : IEnroll
 {
     public async Task<Enrollment?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         await context.Enrollments
-            .Include(e => e.LessonProgress)
+            .Include(e => e.LessonsProgress)
             .FirstOrDefaultAsync(e => e.Id == id, ct);
 
     public async Task<IEnumerable<Enrollment>> GetAllAsync(CancellationToken ct = default) =>
@@ -23,7 +23,7 @@ public sealed class EnrollmentRepository(ApplicationDbContext context) : IEnroll
 
     public async Task<Enrollment?> GetByUserAndCourseAsync(Guid userId, Guid courseId, CancellationToken ct = default) =>
         await context.Enrollments
-            .Include(e => e.LessonProgress)
+            .Include(e => e.LessonsProgress)
             .FirstOrDefaultAsync(e => e.UserId == userId && e.CourseId == courseId, ct);
 
     public async Task<bool> IsEnrolledAsync(Guid userId, Guid courseId, CancellationToken ct = default) =>
@@ -31,7 +31,7 @@ public sealed class EnrollmentRepository(ApplicationDbContext context) : IEnroll
 
     public async Task<IEnumerable<Enrollment>> GetByUserAsync(Guid userId, CancellationToken ct = default) =>
         await context.Enrollments
-            .Include(e => e.LessonProgress)
+            .Include(e => e.LessonsProgress)
             .Where(e => e.UserId == userId)
             .ToListAsync(ct);
 }

@@ -11,7 +11,7 @@ public sealed class GetEnrollmentProgressQueryHandler(IEnrollmentRepository enro
         var enrollment = await enrollmentRepository.GetByUserAndCourseAsync(request.UserId, request.CourseId, ct);
         if (enrollment is null) return null;
 
-        var progress = enrollment.LessonProgress.Select(p => new LessonProgressResponse(
+        var progress = enrollment.LessonsProgress.Select(p => new LessonProgressResponse(
             p.LessonId, p.WatchedSeconds, p.IsCompleted, p.CompletedAt, p.LastWatchedAt));
 
         return new EnrollmentProgressResponse(

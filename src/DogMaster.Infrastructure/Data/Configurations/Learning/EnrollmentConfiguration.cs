@@ -17,7 +17,7 @@ public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollmen
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
         builder.Property(e => e.ProgressPercentage).HasPrecision(5, 2);
 
-        builder.HasMany(e => e.LessonProgress)
+        builder.HasMany(e => e.LessonsProgress)
             .WithOne()
             .HasForeignKey(p => p.EnrollmentId)
             .OnDelete(DeleteBehavior.Cascade);
