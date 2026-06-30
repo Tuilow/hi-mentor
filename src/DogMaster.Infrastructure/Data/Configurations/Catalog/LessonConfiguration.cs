@@ -12,10 +12,10 @@ public sealed class LessonConfiguration : IEntityTypeConfiguration<Lesson>
         builder.HasKey(l => l.Id);
         builder.Property(l => l.Title).HasMaxLength(300).IsRequired();
         builder.Property(l => l.Description).HasMaxLength(2000);
-        builder.Property(l => l.CloudflareVideoId).HasMaxLength(200);
+        builder.Property(l => l.VideoId);           // FK nullable para Streaming.Video
         builder.Property(l => l.DurationSeconds).HasDefaultValue(0);
         builder.Property(l => l.Order).IsRequired();
-        builder.Property(l => l.IsFree).HasDefaultValue(false);
+        builder.Property(l => l.IsPreview).HasDefaultValue(false);
         builder.Property(l => l.CreatedAt).IsRequired();
         builder.Property(l => l.UpdatedAt).IsRequired();
 
@@ -37,8 +37,10 @@ public sealed class LessonAttachmentConfiguration : IEntityTypeConfiguration<Les
     {
         builder.ToTable("lesson_attachments", "catalog");
         builder.HasKey(a => a.Id);
-        builder.Property(a => a.FileName).HasMaxLength(300).IsRequired();
-        builder.Property(a => a.Url).HasMaxLength(1000).IsRequired();
+        builder.Property(a => a.Title).HasMaxLength(300).IsRequired();
+        builder.Property(a => a.FileUrl).HasMaxLength(1000).IsRequired();
+        builder.Property(a => a.FileType).HasMaxLength(100);
+        builder.Property(a => a.FileSizeBytes);
         builder.Property(a => a.CreatedAt).IsRequired();
         builder.Property(a => a.UpdatedAt).IsRequired();
     }

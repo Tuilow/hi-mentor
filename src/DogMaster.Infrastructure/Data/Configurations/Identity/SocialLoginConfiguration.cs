@@ -12,7 +12,7 @@ public sealed class SocialLoginConfiguration : IEntityTypeConfiguration<SocialLo
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Provider).HasMaxLength(50).IsRequired();
         builder.Property(s => s.ExternalId).HasMaxLength(200).IsRequired();
-        builder.Property(s => s.Email).HasMaxLength(300);
+        builder.Property(s => s.ExternalEmail).HasMaxLength(300);
         builder.HasIndex(s => new { s.Provider, s.ExternalId }).IsUnique();
         builder.Property(s => s.CreatedAt).IsRequired();
         builder.Property(s => s.UpdatedAt).IsRequired();

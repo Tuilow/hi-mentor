@@ -12,7 +12,6 @@ public sealed class LessonProgressConfiguration : IEntityTypeConfiguration<Lesso
         builder.HasKey(p => p.Id);
         builder.HasIndex(p => new { p.EnrollmentId, p.LessonId }).IsUnique();
         builder.Property(p => p.WatchedSeconds).HasDefaultValue(0);
-        builder.Property(p => p.TotalSeconds).HasDefaultValue(0);
         builder.Property(p => p.IsCompleted).HasDefaultValue(false);
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.UpdatedAt).IsRequired();

@@ -19,6 +19,9 @@ public sealed class User : AggregateRoot
     public string? PasswordResetToken { get; private set; }
     public DateTime? PasswordResetTokenExpiresAt { get; private set; }
 
+    public bool IsEmailConfirmed => EmailConfirmedAt.HasValue;
+    public DateTime? PasswordResetTokenExpiry => PasswordResetTokenExpiresAt;
+
     public UserProfile Profile { get; private set; } = null!;
     public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
     public IReadOnlyCollection<SocialLogin> SocialLogins => _socialLogins.AsReadOnly();

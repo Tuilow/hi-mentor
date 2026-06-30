@@ -12,7 +12,7 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.HasKey(r => r.Id);
         builder.Property(r => r.Token).HasMaxLength(256).IsRequired();
         builder.HasIndex(r => r.Token).IsUnique();
-        builder.Property(r => r.IpAddress).HasMaxLength(45);
+        builder.Property(r => r.CreatedByIp).HasMaxLength(45);
         builder.Property(r => r.ReplacedByToken).HasMaxLength(256);
         builder.Property(r => r.ExpiresAt).IsRequired();
         builder.Property(r => r.CreatedAt).IsRequired();

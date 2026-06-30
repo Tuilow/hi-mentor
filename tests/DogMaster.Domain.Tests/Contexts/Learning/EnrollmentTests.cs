@@ -1,6 +1,7 @@
 using DogMaster.Domain.Contexts.Learning.Entities;
 using DogMaster.Domain.Contexts.Learning.Enums;
 using FluentAssertions;
+using Xunit;
 
 namespace DogMaster.Domain.Tests.Contexts.Learning;
 

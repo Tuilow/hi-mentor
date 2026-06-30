@@ -1,6 +1,8 @@
 using DogMaster.Domain.Contexts.Catalog.Entities;
 using DogMaster.Domain.Contexts.Catalog.Enums;
 using FluentAssertions;
+using System;
+using Xunit;
 
 namespace DogMaster.Domain.Tests.Contexts.Catalog;
 
@@ -10,12 +12,10 @@ public sealed class CourseTests
     public void Create_WithValidData_ShouldCreateDraftCourse()
     {
         var course = Course.Create(
-            "Fundamentos do Adestramento",
-            "curso-fundamentos",
-            "Aprenda desde o início",
-            "Conteúdo completo",
-            CourseLevel.Beginner,
-            Guid.NewGuid());
+            instructorId: Guid.NewGuid(),
+            title: "Fundamentos do Adestramento",
+            description: "Aprenda técnicas de adestramento do zero",
+            level: CourseLevel.Beginner);
 
         course.Title.Should().Be("Fundamentos do Adestramento");
         course.Status.Should().Be(CourseStatus.Draft);
@@ -26,8 +26,10 @@ public sealed class CourseTests
     public void Publish_WithoutModules_ShouldThrow()
     {
         var course = Course.Create(
-            "Curso vazio", "curso-vazio", "Desc", "Full",
-            CourseLevel.Beginner, Guid.NewGuid());
+            instructorId: Guid.NewGuid(),
+            title: "Curso vazio",
+            description: "Descrição do curso",
+            level: CourseLevel.Beginner);
 
         var act = () => course.Publish();
         act.Should().Throw<InvalidOperationException>()

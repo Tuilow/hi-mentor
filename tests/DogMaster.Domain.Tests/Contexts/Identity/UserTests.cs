@@ -1,6 +1,7 @@
 using DogMaster.Domain.Contexts.Identity.Entities;
 using DogMaster.Domain.Contexts.Identity.Enums;
 using FluentAssertions;
+using Xunit;
 
 namespace DogMaster.Domain.Tests.Contexts.Identity;
 

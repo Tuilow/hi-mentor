@@ -11,8 +11,7 @@ public sealed class VideoConfiguration : IEntityTypeConfiguration<Video>
     {
         builder.ToTable("videos", "streaming");
         builder.HasKey(v => v.Id);
-        builder.Property(v => v.Title).HasMaxLength(500).IsRequired();
-        builder.Property(v => v.CloudflareVideoId).HasMaxLength(200).IsRequired();
+        builder.Property(v => v.CloudflareVideoId).HasMaxLength(200);
         builder.Property(v => v.Status).HasConversion<string>()
             .HasDefaultValue(VideoStatus.Processing);
         builder.HasIndex(v => v.CloudflareVideoId).IsUnique();
