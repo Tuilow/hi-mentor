@@ -1,0 +1,45 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/settings.json
+*.DotSettings.user
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Node.js
+node_modules/
+.next/
+.nuxt/
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# Docker
+.docker/
+
+# Database
+*.sql.bak
+
+# Certificates
+*.pfx
+*.pem
+
+# macOS
+.DS_Store
+
+# JetBrains
+.idea/
+*.iml
+
+# Secrets
+**/appsettings.Production.json
+**/appsettings.Staging.json

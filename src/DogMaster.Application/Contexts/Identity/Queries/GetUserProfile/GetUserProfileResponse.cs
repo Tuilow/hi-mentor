@@ -1,0 +1,16 @@
+namespace DogMaster.Application.Contexts.Identity.Queries.GetUserProfile;
+
+public sealed record GetUserProfileResponse(
+    Guid Id,
+    string Email,
+    string FirstName,
+    string LastName,
+    string FullName,
+    string? AvatarUrl,
+    string? Phone,
+    DateOnly? BirthDate,
+    string? Bio,
+    string Role,
+    string Status,
+    DateTime CreatedAt
+);

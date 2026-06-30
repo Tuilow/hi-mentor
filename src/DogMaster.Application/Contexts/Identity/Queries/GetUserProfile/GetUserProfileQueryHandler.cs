@@ -1,0 +1,21 @@
+using DogMaster.Application.Common.Exceptions;
+using DogMaster.Domain.Contexts.Identity.Interfaces;
+using MediatR;
+
+namespace DogMaster.Application.Contexts.Identity.Queries.GetUserProfile;
+
+public sealed class GetUserProfileQueryHandler(IUserRepository userRepository)
+    : IRequestHandler<GetUserProfileQuery, GetUserProfileResponse>
+{
+    public async Task<GetUserProfileResponse> Handle(GetUserProfileQuery request, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(request.UserId, ct)
+            ?? throw new NotFoundException("Usuário", request.UserId);
+
+        return new GetUserProfileResponse(
+            user.Id, user.Email.Value,
+            user.Profile.FirstName, user.Profile.LastName, user.Profile.FullName,
+            user.Profile.AvatarUrl, user.Profile.Phone, user.Profile.BirthDate,
+            user.Profile.Bio, user.Role.ToString(), user.Status.ToString(), user.CreatedAt);
+    }
+}
