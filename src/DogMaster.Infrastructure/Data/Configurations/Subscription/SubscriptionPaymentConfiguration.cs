@@ -12,9 +12,17 @@ public sealed class SubscriptionPaymentConfiguration : IEntityTypeConfiguration<
         builder.HasKey(p => p.Id);
         builder.Property(p => p.AsaasPaymentId).HasMaxLength(100).IsRequired();
         builder.HasIndex(p => p.AsaasPaymentId).IsUnique();
-        builder.Property(p => p.Status).HasConversion<string>().IsRequired();
-        builder.Property(p => p.Method).HasConversion<string>();
-        builder.Property(p => p.Amount).HasColumnType("numeric(10,2)").IsRequired();
+        builder.Property(p => p.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
+        builder.Property(p => p.Method).HasConversion<string>().HasMaxLength(50);
+        builder.OwnsOne(p => p.Amount, money =>
+        {
+            money.Property(m => m.Amount).HasColumnName("amount")
+                .HasColumnType("numeric(10,2)").IsRequired();
+            money.Property(m => m.Currency).HasColumnName("currency")
+                .HasMaxLength(3).IsRequired();
+        });
+        builder.Property(p => p.DueDate).IsRequired();
+        builder.Property(p => p.PaidAt);
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.UpdatedAt).IsRequired();
     }

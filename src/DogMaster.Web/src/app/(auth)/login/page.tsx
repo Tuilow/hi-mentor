@@ -30,7 +30,7 @@ export default function LoginPage() {
       const res = await authApi.login(data);
       localStorage.setItem('access_token', res.data.accessToken);
       localStorage.setItem('refresh_token', res.data.refreshToken);
-      toast.success('Login realizado com sucesso!');
+      toast.success('Bem-vindo de volta!');
       router.push('/dashboard');
     } catch {
       toast.error('E-mail ou senha incorretos.');
@@ -40,43 +40,53 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
+      {/* Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+                      w-96 h-96 bg-brand-700/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">🐕 DogMaster Pro</h1>
-          <p className="text-gray-500 mt-2">Entre na sua conta</p>
+          <Link href="/" className="inline-block">
+            <h1 className="text-2xl font-bold gradient-text">🐕 DogMaster Pro</h1>
+          </Link>
+          <p className="text-zinc-400 mt-2 text-sm">Entre na sua conta</p>
         </div>
 
-        <div className="card">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="card border-zinc-800">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+              <label className="block text-sm font-medium text-zinc-300 mb-1.5">E-mail</label>
               <input {...register('email')} type="email" placeholder="seu@email.com"
                 className="input-field" />
-              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+              {errors.email && <p className="text-red-400 text-xs mt-1.5">{errors.email.message}</p>}
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-zinc-300">Senha</label>
+                <Link href="/esqueci-senha" className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
+                  Esqueceu a senha?
+                </Link>
+              </div>
               <input {...register('password')} type="password" placeholder="••••••••"
                 className="input-field" />
-              {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+              {errors.password && <p className="text-red-400 text-xs mt-1.5">{errors.password.message}</p>}
             </div>
-            <div className="flex justify-end">
-              <Link href="/esqueci-senha" className="text-sm text-brand-600 hover:underline">
-                Esqueceu a senha?
-              </Link>
-            </div>
-            <button type="submit" disabled={loading} className="btn-primary w-full">
+
+            <button type="submit" disabled={loading} className="btn-primary w-full py-3">
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
-            Não tem conta?{' '}
-            <Link href="/registro" className="text-brand-600 font-medium hover:underline">
-              Cadastre-se grátis
-            </Link>
-          </p>
+          <div className="divider mt-6 pt-6">
+            <p className="text-center text-sm text-zinc-500">
+              Não tem conta?{' '}
+              <Link href="/registro" className="text-brand-400 font-medium hover:text-brand-300 transition-colors">
+                Cadastre-se grátis
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

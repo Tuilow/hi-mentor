@@ -7,9 +7,21 @@ import { Course } from '@/types';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
+const levelLabel: Record<string, string> = {
+  Beginner: 'Iniciante',
+  Intermediate: 'Intermediário',
+  Advanced: 'Avançado',
+};
+
+const levelColor: Record<string, string> = {
+  Beginner: 'badge-green',
+  Intermediate: 'badge-purple',
+  Advanced: 'bg-pink-950 text-pink-400 border border-pink-900 badge',
+};
+
 export default function CoursesPage() {
   const [search, setSearch] = useState('');
-  const [level, setLevel] = useState('');
+  const [level,  setLevel]  = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['courses', search, level],
@@ -19,10 +31,11 @@ export default function CoursesPage() {
   const enroll = async (courseId: string) => {
     try {
       await enrollmentsApi.enroll(courseId);
-      toast.success('Matrícula realizada com sucesso!');
-    } catch (e: any) {
-      if (e.response?.status === 402)
-        toast.error('É necessário ter uma assinatura ativa para se matricular.');
+      toast.success('Matrícula realizada!');
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 402)
+        toast.error('Você precisa de uma assinatura ativa.');
       else
         toast.error('Erro ao realizar matrícula.');
     }
@@ -30,17 +43,24 @@ export default function CoursesPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Cursos</h1>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-zinc-100">Cursos</h1>
+        <p className="text-zinc-400 mt-1">Explore nosso catálogo de cursos de adestramento.</p>
+      </div>
 
       {/* Filtros */}
-      <div className="flex gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar cursos..."
-          className="input-field max-w-sm"
+          className="input-field sm:max-w-xs"
         />
-        <select value={level} onChange={e => setLevel(e.target.value)} className="input-field max-w-xs">
+        <select
+          value={level}
+          onChange={e => setLevel(e.target.value)}
+          className="input-field sm:max-w-[180px]"
+        >
           <option value="">Todos os níveis</option>
           <option value="Beginner">Iniciante</option>
           <option value="Intermediate">Intermediário</option>
@@ -48,34 +68,59 @@ export default function CoursesPage() {
         </select>
       </div>
 
-      {isLoading && <p className="text-gray-500">Carregando cursos...</p>}
+      {isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1,2,3,4,5,6].map(i => (
+            <div key={i} className="card border-zinc-800 animate-pulse">
+              <div className="w-full h-40 bg-zinc-800 rounded-lg mb-4" />
+              <div className="h-4 bg-zinc-800 rounded w-1/3 mb-3" />
+              <div className="h-5 bg-zinc-800 rounded w-3/4 mb-2" />
+              <div className="h-4 bg-zinc-800 rounded w-full" />
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {!isLoading && data?.items?.length === 0 && (
+        <div className="text-center py-16 text-zinc-500">
+          <p className="text-4xl mb-4">📚</p>
+          <p className="text-lg font-medium">Nenhum curso encontrado</p>
+          <p className="text-sm mt-1">Tente ajustar os filtros de busca.</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {data?.items?.map((course: Course) => (
-          <div key={course.id} className="card hover:shadow-md transition-shadow">
-            {course.thumbnailUrl && (
+          <div key={course.id}
+            className="card border-zinc-800 hover:border-zinc-700 transition-all duration-200 flex flex-col">
+            {course.thumbnailUrl ? (
               <img src={course.thumbnailUrl} alt={course.title}
                 className="w-full h-40 object-cover rounded-lg mb-4" />
+            ) : (
+              <div className="w-full h-40 bg-zinc-800 rounded-lg mb-4 flex items-center justify-center text-4xl">
+                🐕
+              </div>
             )}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs bg-brand-50 text-brand-700 px-2 py-1 rounded font-medium">
-                {course.level === 'Beginner' ? 'Iniciante' :
-                 course.level === 'Intermediate' ? 'Intermediário' : 'Avançado'}
+
+            <div className="flex items-center gap-2 mb-3">
+              <span className={levelColor[course.level] || 'badge-purple'}>
+                {levelLabel[course.level] ?? course.level}
               </span>
-              {course.isFree && (
-                <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded font-medium">Grátis</span>
-              )}
+              {course.isFree && <span className="badge-green">Grátis</span>}
             </div>
-            <h3 className="font-semibold text-gray-900 mb-1">{course.title}</h3>
-            <p className="text-sm text-gray-500 mb-4 line-clamp-2">{course.shortDescription}</p>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">{course.totalLessons} aulas</span>
+
+            <h3 className="font-semibold text-zinc-100 mb-1 line-clamp-2">{course.title}</h3>
+            <p className="text-sm text-zinc-400 mb-4 line-clamp-2 flex-1">{course.shortDescription}</p>
+
+            <div className="flex items-center justify-between mt-auto pt-4 border-t border-zinc-800">
+              <span className="text-xs text-zinc-500">{course.totalLessons} aulas</span>
               {course.isEnrolled ? (
-                <Link href={`/cursos/${course.slug}`} className="text-sm text-brand-600 font-medium hover:underline">
+                <Link href={`/cursos/${course.slug}`}
+                  className="text-sm text-brand-400 font-medium hover:text-brand-300 transition-colors">
                   Continuar →
                 </Link>
               ) : (
-                <button onClick={() => enroll(course.id)} className="text-sm btn-primary py-2 px-4">
+                <button onClick={() => enroll(course.id)} className="btn-primary text-xs py-1.5 px-4">
                   Matricular
                 </button>
               )}
