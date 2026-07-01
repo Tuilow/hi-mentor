@@ -58,20 +58,26 @@ public sealed class ApplicationDbContext(
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
-        // Dispara Domain Events antes de salvar
+        // Salva primeiro — domain events são disparados depois para que handlers
+        // possam consultar as entidades já persistidas no banco.
+        var result = await base.SaveChangesAsync(ct);
         await DispatchDomainEventsAsync(ct);
-        return await base.SaveChangesAsync(ct);
+        return result;
     }
 
     private async Task DispatchDomainEventsAsync(CancellationToken ct)
     {
-        var aggregates = ChangeTracker.Entries<AggregateRoot>()
+        // Coleta e limpa ANTES de publicar para evitar re-dispatch em SaveChanges recursivo
+        var events = ChangeTracker.Entries<AggregateRoot>()
             .Where(e => e.Entity.DomainEvents.Any())
             .Select(e => e.Entity)
+            .SelectMany(a =>
+            {
+                var domainEvents = a.DomainEvents.ToList();
+                a.ClearDomainEvents();
+                return domainEvents;
+            })
             .ToList();
-
-        var events = aggregates.SelectMany(a => a.DomainEvents).ToList();
-        aggregates.ForEach(a => a.ClearDomainEvents());
 
         foreach (var domainEvent in events)
             await mediator.Publish(domainEvent, ct);

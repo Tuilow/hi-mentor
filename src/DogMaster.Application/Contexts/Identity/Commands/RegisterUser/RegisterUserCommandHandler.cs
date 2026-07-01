@@ -21,13 +21,13 @@ public sealed class RegisterUserCommandHandler(
             throw new DuplicateEmailException(request.Email);
 
         var user = User.Register(request.Email, request.Password, request.FirstName, request.LastName);
-        await userRepository.AddAsync(user, ct);
 
-        // Gera refresh token
+        // Gera refresh token ANTES do AddAsync para EF Core rastrear tudo em uma única unidade
         var refreshTokenStr = jwtService.GenerateRefreshToken();
         var refreshTokenExpires = DateTime.UtcNow.AddDays(30);
         user.AddRefreshToken(refreshTokenStr, refreshTokenExpires);
 
+        await userRepository.AddAsync(user, ct);
         await uow.SaveChangesAsync(ct);
 
         // E-mail de confirmação (assíncrono, não bloqueia resposta)

@@ -28,7 +28,8 @@ public sealed class LoginUserCommandHandler(
         var refreshTokenStr = jwtService.GenerateRefreshToken();
         var refreshTokenExpires = DateTime.UtcNow.AddDays(30);
         user.AddRefreshToken(refreshTokenStr, refreshTokenExpires, request.IpAddress);
-        userRepository.Update(user);
+        // User já rastreado (carregado via Include) — DetectChanges em SaveChanges
+        // marca o novo RefreshToken como Added e os revogados como Modified.
         await uow.SaveChangesAsync(ct);
 
         var accessToken = jwtService.GenerateAccessToken(user);
