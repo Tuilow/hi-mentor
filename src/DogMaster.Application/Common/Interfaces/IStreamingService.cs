@@ -14,10 +14,15 @@ public interface IStreamingService
     /// </summary>
     Task<DirectUploadResult> GetDirectUploadUrlAsync(CancellationToken ct = default);
 
-    /// <summary>Retorna signed URL de reprodução (JWT Cloudflare) válida por expirationMinutes.</summary>
-    Task<string> GetSignedPlaybackUrlAsync(string cloudflareVideoId,
-        int expirationMinutes = 60, CancellationToken ct = default);
+    /// <summary>
+    /// Gera URL de playback assinada com JWT (expira em expirationMinutes).
+    /// Se StreamSigningKey não estiver configurado, retorna URL pública (modo dev).
+    /// </summary>
+    Task<string> GetSignedPlaybackUrlAsync(
+        string cloudflareVideoId,
+        int expirationMinutes = 60,
+        CancellationToken ct = default);
 
-    /// <summary>Deleta vídeo do Cloudflare Stream.</summary>
+    /// <summary>Remove o vídeo do Cloudflare Stream.</summary>
     Task DeleteVideoAsync(string cloudflareVideoId, CancellationToken ct = default);
 }

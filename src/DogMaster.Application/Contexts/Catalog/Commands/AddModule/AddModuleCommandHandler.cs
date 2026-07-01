@@ -15,7 +15,11 @@ public sealed class AddModuleCommandHandler(
             ?? throw new NotFoundException("Curso", request.CourseId);
 
         var module = course.AddModule(request.Title, request.Description);
-        courseRepository.Update(course);
+
+        // Registra explicitamente como Added — evita DbUpdateConcurrencyException
+        // (DetectChanges marcaria como Modified por causa do Guid.NewGuid() no Id)
+        await courseRepository.AddModuleAsync(module, ct);
+
         await uow.SaveChangesAsync(ct);
         return module.Id;
     }

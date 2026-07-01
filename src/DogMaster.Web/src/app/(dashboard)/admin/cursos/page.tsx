@@ -224,18 +224,16 @@ export default function AdminCursosPage() {
 
   // ─── Queries ───────────────────────────────────────────────────────────────
 
-  const { data: courses = [], isLoading } = useQuery<CourseItem[]>({
+  const { data: courses = [], isLoading, error: coursesError } = useQuery<CourseItem[]>({
     queryKey: ['admin-courses'],
-    queryFn: () => coursesApi.list({ pageSize: 50 }).then(r => r.data.items ?? r.data),
+    queryFn: () => api.get('/admin/courses').then(r => r.data),
   });
 
   const { data: courseDetail } = useQuery({
     queryKey: ['admin-course-detail', expandedCourse],
     queryFn: async () => {
       if (!expandedCourse) return null;
-      const course = courses.find(c => c.id === expandedCourse);
-      if (!course) return null;
-      return coursesApi.getBySlug(course.slug).then(r => r.data);
+      return api.get(`/admin/courses/${expandedCourse}`).then(r => r.data);
     },
     enabled: !!expandedCourse,
   });
@@ -245,7 +243,13 @@ export default function AdminCursosPage() {
   const createCourse = useMutation({
     mutationFn: (data: CreateCourseData) => adminApi.createCourse(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-courses'] }); setShowCourseForm(false); toast.success('Curso criado!'); },
-    onError: () => toast.error('Erro ao criar curso.'),
+    onError: (e: unknown) => {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 403 || status === 401)
+        toast.error('Sem permissão. Certifique-se de estar logado como Admin ou Instrutor.');
+      else
+        toast.error('Erro ao criar curso. Verifique os dados e tente novamente.');
+    },
   });
 
   const addModule = useMutation({
@@ -302,6 +306,14 @@ export default function AdminCursosPage() {
         <div className="space-y-3">
           {[1,2,3].map(i => <div key={i} className="card border-zinc-800 animate-pulse h-16" />)}
         </div>
+      ) : coursesError ? (
+        <div className="card border-red-900/40 bg-red-950/20 text-center py-12">
+          <p className="text-red-400 font-medium">Erro ao carregar cursos</p>
+          <p className="text-xs text-zinc-500 mt-2">
+            {String((coursesError as { response?: { data?: { title?: string } } })?.response?.data?.title ?? coursesError)}
+          </p>
+          <p className="text-xs text-zinc-600 mt-1">Verifique se a API está rodando e reinicie-a.</p>
+        </div>
       ) : courses.length === 0 ? (
         <div className="card border-zinc-800 text-center py-12">
           <BookOpen className="w-10 h-10 mx-auto text-zinc-600 mb-3" />
@@ -323,6 +335,16 @@ export default function AdminCursosPage() {
                   }
                   <span className="font-medium text-zinc-100">{course.title}</span>
                   <Badge color="zinc">{course.level}</Badge>
+                  {(course as unknown as { status?: string }).status === 'Draft' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-900/40">
+                      Rascunho
+                    </span>
+                  )}
+                  {(course as unknown as { status?: string }).status === 'Published' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-950/60 text-green-400 border border-green-900/40">
+                      Publicado
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => publishCourse.mutate(course.id)}

@@ -36,6 +36,26 @@ public sealed class CourseRepository(ApplicationDbContext context) : ICourseRepo
     public async Task<bool> SlugExistsAsync(string slug, CancellationToken ct = default) =>
         await context.Courses.AnyAsync(c => c.Slug == slug, ct);
 
+    public async Task<IEnumerable<Course>> ListAllForAdminAsync(CancellationToken ct = default) =>
+        await context.Courses
+            .Include(c => c.Modules)
+            .ThenInclude(m => m.Lessons)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync(ct);
+
+    /// <summary>
+    /// Registra o Module explicitamente como Added no DbContext.
+    /// Necessário porque DetectChanges marca entidades filhas com Guid novo como Modified.
+    /// </summary>
+    public async Task AddModuleAsync(Module module, CancellationToken ct = default) =>
+        await context.Modules.AddAsync(module, ct);
+
+    /// <summary>
+    /// Registra a Lesson explicitamente como Added no DbContext.
+    /// </summary>
+    public async Task AddLessonAsync(Lesson lesson, CancellationToken ct = default) =>
+        await context.Lessons.AddAsync(lesson, ct);
+
     public async Task<(IEnumerable<Course> Items, int Total)> ListPublishedAsync(
         CourseLevel? level, string? search, int page, int pageSize, CancellationToken ct = default)
     {

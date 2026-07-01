@@ -1,3 +1,5 @@
+using DogMaster.Application.Contexts.Catalog.Queries.GetCourseByIdAdmin;
+using DogMaster.Application.Contexts.Catalog.Queries.ListCoursesAdmin;
 using DogMaster.Application.Contexts.Identity.Commands.PromoteUser;
 using DogMaster.Domain.Contexts.Identity.Enums;
 using MediatR;
@@ -35,6 +37,22 @@ public sealed class AdminController(ISender sender) : ControllerBase
 
         await sender.Send(new PromoteUserCommand(userId, role), ct);
         return Ok(new { message = $"Usuário {userId} promovido para {role}." });
+    }
+
+    /// <summary>Lista todos os cursos (Draft + Published + Archived) para o painel admin.</summary>
+    [HttpGet("courses")]
+    public async Task<IActionResult> ListAllCourses(CancellationToken ct)
+    {
+        var courses = await sender.Send(new ListCoursesAdminQuery(), ct);
+        return Ok(courses);
+    }
+
+    /// <summary>Retorna detalhes completos de um curso (incluindo Draft) pelo ID.</summary>
+    [HttpGet("courses/{courseId:guid}")]
+    public async Task<IActionResult> GetCourseDetail(Guid courseId, CancellationToken ct)
+    {
+        var course = await sender.Send(new GetCourseByIdAdminQuery(courseId), ct);
+        return Ok(course);
     }
 }
 

@@ -18,7 +18,10 @@ public sealed class AddLessonCommandHandler(
             ?? throw new NotFoundException("Módulo", request.ModuleId);
 
         var lesson = module.AddLesson(request.Title, request.Description, request.IsPreview);
-        courseRepository.Update(course);
+
+        // Registra explicitamente como Added — evita DbUpdateConcurrencyException
+        await courseRepository.AddLessonAsync(lesson, ct);
+
         await uow.SaveChangesAsync(ct);
         return lesson.Id;
     }

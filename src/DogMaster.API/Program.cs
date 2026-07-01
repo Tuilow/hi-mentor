@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using DogMaster.Application;
 using DogMaster.Infrastructure;
 using DogMaster.Infrastructure.Data;
@@ -14,7 +15,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(opt =>
+    {
+        // Permite enviar/receber enums como string ("Beginner") além de inteiro
+        opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        opt.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 // ─── SWAGGER ─────────────────────────────────────────────────────────────────
