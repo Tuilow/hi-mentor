@@ -40,7 +40,8 @@ async function uploadVideoToCloudflare(
   return new Promise((resolve, reject) => {
     const upload = new tus.Upload(file, {
       uploadUrl,
-      chunkSize: 50 * 1024 * 1024, // 50 MB por chunk
+      uploadLengthDeferred: true,          // mock pré-cria URL sem saber o tamanho
+      chunkSize: 50 * 1024 * 1024,         // 50 MB por chunk
       retryDelays: [0, 3000, 5000, 10000],
       metadata: { filename: file.name, filetype: file.type },
       onError: reject,
@@ -112,11 +113,12 @@ function VideoUploader({ courseId, moduleId, lessonId, onDone }: VideoUploaderPr
       setPhase('done');
       toast.success('Vídeo enviado e vinculado à aula!');
       setTimeout(onDone, 1200);
-    } catch (err) {
+    } catch (err: unknown) {
       setPhase('idle');
       setProgress(0);
-      toast.error('Erro no upload. Verifique as configurações do Cloudflare.');
-      console.error(err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Erro no upload: ${msg}`);
+      console.error('[VideoUpload] erro:', err);
     }
   };
 
@@ -209,7 +211,7 @@ function VideoUploader({ courseId, moduleId, lessonId, onDone }: VideoUploaderPr
 
 interface CourseItem { id: string; title: string; slug: string; level: string; status?: string; }
 interface ModuleItem { id: string; title: string; description?: string; }
-interface LessonItem { id: string; title: string; isPreview: boolean; videoId?: string; }
+interface LessonItem { id: string; title: string; isPreview: boolean; hasVideo: boolean; }
 
 export default function AdminCursosPage() {
   const qc = useQueryClient();
@@ -399,7 +401,7 @@ export default function AdminCursosPage() {
                               <Video className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
                               <span className="text-sm text-zinc-300 flex-1">{lesson.title}</span>
                               {lesson.isPreview && <Badge color="green">Preview</Badge>}
-                              {lesson.videoId
+                              {lesson.hasVideo
                                 ? <Badge color="brand">Vídeo ✓</Badge>
                                 : (
                                   <button

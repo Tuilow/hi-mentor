@@ -53,14 +53,22 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Add("User-Agent", "DogMasterPro/1.0");
         });
 
-        // ─── Cloudflare Stream HTTP Client ────────────────────────────────────
-        services.AddHttpClient<IStreamingService, CloudflareStreamService>(client =>
+        // ─── Cloudflare Stream HTTP Client (ou Mock) ────────────────────────────
+        var cloudfareMock = configuration.GetValue<bool>("Cloudflare:MockMode");
+        if (cloudfareMock)
         {
-            client.BaseAddress = new Uri("https://api.cloudflare.com");
-            var apiToken = configuration["Cloudflare:ApiToken"];
-            if (!string.IsNullOrWhiteSpace(apiToken))
-                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiToken}");
-        });
+            services.AddScoped<IStreamingService, MockStreamingService>();
+        }
+        else
+        {
+            services.AddHttpClient<IStreamingService, CloudflareStreamService>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.cloudflare.com");
+                var apiToken = configuration["Cloudflare:ApiToken"];
+                if (!string.IsNullOrWhiteSpace(apiToken))
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiToken}");
+            });
+        }
 
         return services;
     }

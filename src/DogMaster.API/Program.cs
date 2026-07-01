@@ -93,7 +93,11 @@ builder.Services.AddCors(opt =>
                 ?? ["http://localhost:3000"])
             .AllowAnyMethod()
             .AllowAnyHeader()
-            .AllowCredentials());
+            .AllowCredentials()
+            // Expõe headers do protocolo TUS para o tus-js-client leer no browser
+            .WithExposedHeaders(
+                "Tus-Resumable", "Tus-Version", "Tus-Max-Size",
+                "Upload-Offset", "Upload-Length", "Location"));
 });
 
 // ─── HEALTH CHECKS ────────────────────────────────────────────────────────────
