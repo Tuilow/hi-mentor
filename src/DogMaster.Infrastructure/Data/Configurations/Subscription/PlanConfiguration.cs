@@ -12,9 +12,14 @@ public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
         builder.ToTable("plans", "subscription");
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Name).HasMaxLength(100).IsRequired();
-        builder.Property(p => p.Slug).HasMaxLength(100).IsRequired();
-        builder.HasIndex(p => p.Slug).IsUnique();
+        builder.Property(p => p.Slug)
+            .HasMaxLength(100).IsRequired()
+            .HasConversion(s => s.Value, v => Slug.Create(v));
+        builder.HasIndex(p => p.Slug)
+            .IsUnique()
+            .HasFilter(null);
         builder.Property(p => p.Description).HasMaxLength(500);
+        builder.Property(p => p.AsaasPlanId).HasMaxLength(100);
 
         builder.OwnsOne(p => p.Price, price =>
         {
