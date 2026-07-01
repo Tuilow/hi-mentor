@@ -1,0 +1,20 @@
+# Banco de dados
+DB_PASSWORD=strong_password_here
+
+# JWT (min. 32 caracteres)
+JWT_SECRET=your_super_secret_jwt_key_here_minimum_32_chars
+
+# Cloudflare Stream e R2
+CF_ACCOUNT_ID=your_cloudflare_account_id
+CF_API_TOKEN=your_cloudflare_api_token
+CF_STREAM_SIGNING_KEY=your_cloudflare_stream_signing_key
+
+# Asaas Pagamentos
+ASAAS_API_KEY=your_asaas_api_key
+ASAAS_WEBHOOK_SECRET=your_asaas_webhook_secret
+
+# E-mail (Mailgun, SendGrid, etc.)
+EMAIL_HOST=smtp.mailgun.org
+EMAIL_PORT=587
+EMAIL_USERNAME=postmaster@mg.seudominio.com.br
+EMAIL_PASSWORD=your_email_password

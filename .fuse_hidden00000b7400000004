@@ -1,0 +1,11 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "src\\DogMaster.API\\DogMaster.API.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

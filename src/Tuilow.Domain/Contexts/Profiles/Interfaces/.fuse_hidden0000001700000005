@@ -1,0 +1,9 @@
+using Tuilow.Domain.Common.Interfaces;
+using Tuilow.Domain.Contexts.LearnerProfile.Entities;
+
+namespace Tuilow.Domain.Contexts.LearnerProfile.Interfaces;
+
+public interface ILearnerProfileRepository : IRepository<LearnerProfile>
+{
+    Task<IEnumerable<LearnerProfile>> GetByUserAsync(Guid userId, CancellationToken ct = default);
+}
