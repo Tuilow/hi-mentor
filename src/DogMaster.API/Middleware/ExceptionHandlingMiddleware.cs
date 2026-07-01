@@ -31,6 +31,7 @@ public sealed class ExceptionHandlingMiddleware(
             NotFoundException nfe => (404, nfe.Message, (Dictionary<string, object>?)null),
             UnauthorizedException ue => (401, ue.Message, (Dictionary<string, object>?)null),
             ForbiddenException fe => (403, fe.Message, (Dictionary<string, object>?)null),
+            BusinessException be => (422, be.Message, (Dictionary<string, object>?)null),
             InvalidOperationException ioe => (422, ioe.Message, (Dictionary<string, object>?)null),
             _ => (500, "Ocorreu um erro interno. Tente novamente mais tarde.", (Dictionary<string, object>?)null)
         };

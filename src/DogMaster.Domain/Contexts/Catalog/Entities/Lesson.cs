@@ -37,6 +37,12 @@ public sealed class Lesson : Entity
         Touch();
     }
 
+    /// <summary>Marca aula como preview gratuito — visível sem assinatura.</summary>
+    public void SetAsPreview() { IsPreview = true; Touch(); }
+
+    /// <summary>Marca aula como conteúdo pago — exige assinatura ativa.</summary>
+    public void SetAsPaid() { IsPreview = false; Touch(); }
+
     public LessonAttachment AddAttachment(string title, string fileUrl, string? fileType = null, long? size = null)
     {
         var attachment = LessonAttachment.Create(Id, title, fileUrl, fileType, size);

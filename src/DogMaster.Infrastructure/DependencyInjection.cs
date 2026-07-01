@@ -3,6 +3,7 @@ using DogMaster.Domain.Contexts.Catalog.Interfaces;
 using DogMaster.Domain.Contexts.DogProfile.Interfaces;
 using DogMaster.Domain.Contexts.Identity.Interfaces;
 using DogMaster.Domain.Contexts.Learning.Interfaces;
+using DogMaster.Domain.Contexts.Streaming.Interfaces;
 using DogMaster.Domain.Contexts.Subscription.Interfaces;
 using DogMaster.Domain.Common.Interfaces;
 using DogMaster.Infrastructure.Data;
@@ -35,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
         services.AddScoped<IDogRepository, DogRepository>();
+        services.AddScoped<IVideoRepository, VideoRepository>();
 
         // Services
         services.AddScoped<IJwtService, JwtService>();
@@ -48,6 +50,8 @@ public static class DependencyInjection
             var baseUrl = configuration["Asaas:BaseUrl"] ?? "https://sandbox.asaas.com";
             client.BaseAddress = new Uri(baseUrl);
             client.DefaultRequestHeaders.Add("access_token", configuration["Asaas:ApiKey"]);
+            // Asaas exige User-Agent em todas as requisições
+            client.DefaultRequestHeaders.Add("User-Agent", "DogMasterPro/1.0");
         });
 
         // Cloudflare Stream HTTP Client

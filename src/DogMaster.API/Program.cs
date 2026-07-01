@@ -126,7 +126,7 @@ app.MapHealthChecks("/health");
     if (app.Environment.IsDevelopment())
         await db.Database.MigrateAsync();
 
-    await DogMaster.Infrastructure.Data.DbSeeder.SeedAsync(db, seedLogger);
+    await DogMaster.Infrastructure.Data.DbSeeder.SeedAsync(db, seedLogger, builder.Configuration);
 }
 
 app.Run();

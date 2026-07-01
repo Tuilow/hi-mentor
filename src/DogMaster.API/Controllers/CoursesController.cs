@@ -4,6 +4,7 @@ using DogMaster.Application.Contexts.Catalog.Commands.CreateCourse;
 using DogMaster.Application.Contexts.Catalog.Commands.PublishCourse;
 using DogMaster.Application.Contexts.Catalog.Queries.GetCourseBySlug;
 using DogMaster.Application.Contexts.Catalog.Queries.ListCourses;
+using DogMaster.Application.Contexts.Streaming.Queries.GetLessonPlayUrl;
 using DogMaster.Application.Common.Interfaces;
 using DogMaster.Domain.Contexts.Catalog.Enums;
 using MediatR;
@@ -75,5 +76,18 @@ public sealed class CoursesController(ISender sender, ICurrentUserService curren
     {
         await sender.Send(new PublishCourseCommand(courseId, currentUser.UserId!.Value), ct);
         return Ok(new { message = "Curso publicado com sucesso." });
+    }
+
+    /// <summary>
+    /// Retorna URL de playback para uma aula.
+    /// Preview → URL pública Cloudflare (sem autenticação).
+    /// Pago → exige assinatura ativa; retorna URL JWT assinada (expira em 4h).
+    /// </summary>
+    [HttpGet("{courseId:guid}/lessons/{lessonId:guid}/play")]
+    public async Task<IActionResult> GetLessonPlayUrl(Guid courseId, Guid lessonId, CancellationToken ct)
+    {
+        var result = await sender.Send(
+            new GetLessonPlayUrlQuery(courseId, lessonId, currentUser.UserId), ct);
+        return Ok(result);
     }
 }

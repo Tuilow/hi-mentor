@@ -17,7 +17,7 @@ public sealed class CloudflareStreamService(
         ?? throw new InvalidOperationException("Cloudflare:AccountId não configurado.");
     private readonly string _streamSigningKey = configuration["Cloudflare:StreamSigningKey"] ?? "";
 
-    public async Task<string> GetDirectUploadUrlAsync(CancellationToken ct = default)
+    public async Task<DirectUploadResult> GetDirectUploadUrlAsync(CancellationToken ct = default)
     {
         var response = await httpClient.PostAsync(
             $"/client/v4/accounts/{_accountId}/stream/direct_upload",
@@ -27,8 +27,13 @@ public sealed class CloudflareStreamService(
 
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync(ct);
-        var doc = JsonDocument.Parse(content);
-        return doc.RootElement.GetProperty("result").GetProperty("uploadURL").GetString()!;
+        var doc    = JsonDocument.Parse(content);
+        var result = doc.RootElement.GetProperty("result");
+
+        var uid       = result.GetProperty("uid").GetString()!;
+        var uploadUrl = result.GetProperty("uploadURL").GetString()!;
+
+        return new DirectUploadResult(uid, uploadUrl);
     }
 
     public Task<string> GetSignedPlaybackUrlAsync(string cloudflareVideoId,

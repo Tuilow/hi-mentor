@@ -1,6 +1,9 @@
+using DogMaster.Domain.Contexts.Identity.Entities;
+using DogMaster.Domain.Contexts.Identity.Enums;
 using DogMaster.Domain.Contexts.Subscription.Entities;
 using DogMaster.Domain.Contexts.Subscription.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace DogMaster.Infrastructure.Data;
@@ -11,9 +14,58 @@ namespace DogMaster.Infrastructure.Data;
 /// </summary>
 public static class DbSeeder
 {
-    public static async Task SeedAsync(ApplicationDbContext db, ILogger logger)
+    public static async Task SeedAsync(
+        ApplicationDbContext db, ILogger logger, IConfiguration config)
     {
+        await SeedAdminAsync(db, logger, config);
         await SeedPlansAsync(db, logger);
+    }
+
+    /// <summary>
+    /// Cria o usuário administrador inicial a partir de appsettings:
+    ///   "AdminSeed": { "Email": "...", "Password": "...", "FirstName": "...", "LastName": "..." }
+    /// Se a seção não existir ou o e-mail já estiver cadastrado, não faz nada.
+    /// </summary>
+    private static async Task SeedAdminAsync(
+        ApplicationDbContext db, ILogger logger, IConfiguration config)
+    {
+        var section = config.GetSection("AdminSeed");
+        var email    = section["Email"];
+        var password = section["Password"];
+        var first    = section["FirstName"] ?? "Admin";
+        var last     = section["LastName"]  ?? "DogMaster";
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            logger.LogDebug("AdminSeed não configurado — pulando criação do admin.");
+            return;
+        }
+
+        var exists = await db.Users.AnyAsync(u => u.Email == email);
+        if (exists)
+        {
+            // Garante que o usuário existente tenha role Admin
+            var existing = await db.Users.FirstAsync(u => u.Email == email);
+            if (existing.Role != UserRole.Admin)
+            {
+                existing.Promote(UserRole.Admin);
+                db.Users.Update(existing);
+                await db.SaveChangesAsync();
+                logger.LogInformation("Usuário {Email} promovido para Admin.", email);
+            }
+            return;
+        }
+
+        logger.LogInformation("Criando usuário admin: {Email}", email);
+
+        var admin = User.Register(email, password, first, last);
+        admin.ConfirmEmail(admin.EmailConfirmationToken!); // já confirma e-mail
+        admin.Promote(UserRole.Admin);
+
+        await db.Users.AddAsync(admin);
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("Admin criado com sucesso: {Email}", email);
     }
 
     private static async Task SeedPlansAsync(ApplicationDbContext db, ILogger logger)

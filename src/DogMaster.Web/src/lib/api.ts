@@ -89,6 +89,8 @@ export const coursesApi = {
   list: (params?: ListCoursesParams) => api.get('/courses', { params }),
   getBySlug: (slug: string) => api.get(`/courses/${slug}`),
   create: (data: unknown) => api.post('/courses', data),
+  getLessonPlayUrl: (courseId: string, lessonId: string) =>
+    api.get(`/courses/${courseId}/lessons/${lessonId}/play`),
 };
 
 export const enrollmentsApi = {
