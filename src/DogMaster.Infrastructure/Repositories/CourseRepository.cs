@@ -31,7 +31,7 @@ public sealed class CourseRepository(ApplicationDbContext context) : ICourseRepo
         await context.Courses
             .Include(c => c.Modules)
             .ThenInclude(m => m.Lessons)
-            .FirstOrDefaultAsync(c => c.Slug == slug && c.Status == CourseStatus.Published, ct);
+            .FirstOrDefaultAsync(c => c.Slug == slug, ct); // sem filtro de status — permite acesso a rascunhos pelo player
 
     public async Task<bool> SlugExistsAsync(string slug, CancellationToken ct = default) =>
         await context.Courses.AnyAsync(c => c.Slug == slug, ct);

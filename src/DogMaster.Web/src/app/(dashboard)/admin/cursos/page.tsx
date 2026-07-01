@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { coursesApi, api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { Plus, ChevronDown, ChevronRight, Upload, Check, Loader2,
-         Video, BookOpen, Layers, Eye, EyeOff, X } from 'lucide-react';
+         Video, BookOpen, Layers, Eye, EyeOff, X, Play } from 'lucide-react';
+import Link from 'next/link';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -401,17 +402,25 @@ export default function AdminCursosPage() {
                               <Video className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
                               <span className="text-sm text-zinc-300 flex-1">{lesson.title}</span>
                               {lesson.isPreview && <Badge color="green">Preview</Badge>}
-                              {lesson.hasVideo
-                                ? <Badge color="brand">Vídeo ✓</Badge>
-                                : (
-                                  <button
-                                    onClick={() => setUploadTarget({ courseId: course.id, moduleId: mod.id, lessonId: lesson.id })}
-                                    className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 font-medium"
+                              {lesson.hasVideo ? (
+                                <div className="flex items-center gap-2">
+                                  <Badge color="brand">Vídeo ✓</Badge>
+                                  <Link
+                                    href={`/cursos/${course.slug}/${lesson.id}`}
+                                    className="text-xs text-zinc-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
+                                    title="Assistir aula"
                                   >
-                                    <Upload className="w-3 h-3" /> Upload
-                                  </button>
-                                )
-                              }
+                                    <Play className="w-3 h-3" /> Assistir
+                                  </Link>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setUploadTarget({ courseId: course.id, moduleId: mod.id, lessonId: lesson.id })}
+                                  className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 font-medium"
+                                >
+                                  <Upload className="w-3 h-3" /> Upload
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>

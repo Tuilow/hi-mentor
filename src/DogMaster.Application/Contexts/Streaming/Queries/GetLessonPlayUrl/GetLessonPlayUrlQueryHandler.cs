@@ -55,11 +55,12 @@ public sealed class GetLessonPlayUrlQueryHandler(
                 signedUrl, video.DurationSeconds, video.ThumbnailUrl);
         }
 
-        // 4. Preview — URL pública do Cloudflare Stream
-        var publicUrl = $"https://iframe.cloudflarestream.com/{video.CloudflareVideoId}";
+        // 4. Preview — delega ao streamingService (mock retorna vídeo de amostra; produção retorna URL pública)
+        var previewUrl = await streamingService.GetSignedPlaybackUrlAsync(
+            video.CloudflareVideoId, expirationMinutes: 240, ct);
 
         return new LessonPlayUrlResponse(
             lesson.Id, lesson.Title, true,
-            publicUrl, video.DurationSeconds, video.ThumbnailUrl);
+            previewUrl, video.DurationSeconds, video.ThumbnailUrl);
     }
 }
