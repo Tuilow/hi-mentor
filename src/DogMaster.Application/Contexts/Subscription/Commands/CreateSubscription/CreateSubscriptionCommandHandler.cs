@@ -36,6 +36,9 @@ public sealed class CreateSubscriptionCommandHandler(
         await subscriptionRepository.AddAsync(subscription, ct);
         await uow.SaveChangesAsync(ct);
 
-        return new CreateSubscriptionResponse(subscription.Id, asaasSubscription.Id);
+        // Busca o link de pagamento do primeiro charge gerado pelo Asaas
+        var paymentUrl = await paymentService.GetSubscriptionPaymentUrlAsync(asaasSubscription.Id, ct);
+
+        return new CreateSubscriptionResponse(subscription.Id, asaasSubscription.Id, paymentUrl);
     }
 }

@@ -11,6 +11,11 @@ public interface IPaymentService
 {
     Task<AsaasCustomerResponse> CreateOrGetCustomerAsync(AsaasCustomerRequest request, CancellationToken ct = default);
     Task<AsaasSubscriptionResponse> CreateSubscriptionAsync(AsaasSubscriptionRequest request, CancellationToken ct = default);
+    /// <summary>
+    /// Retorna o invoiceUrl do primeiro pagamento gerado pela assinatura.
+    /// O cliente acessa esse link para escolher PIX, cartão ou boleto.
+    /// </summary>
+    Task<string?> GetSubscriptionPaymentUrlAsync(string asaasSubscriptionId, CancellationToken ct = default);
     Task CancelSubscriptionAsync(string asaasSubscriptionId, CancellationToken ct = default);
     bool ValidateWebhookSignature(string payload, string signature);
 }

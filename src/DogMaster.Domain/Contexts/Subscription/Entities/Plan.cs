@@ -33,6 +33,7 @@ public sealed class Plan : AggregateRoot
         };
     }
 
+    public void SetDescription(string description) { Description = description?.Trim(); Touch(); }
     public void SetAsaasPlanId(string id) { AsaasPlanId = id; Touch(); }
     public void Deactivate() { IsActive = false; Touch(); }
 

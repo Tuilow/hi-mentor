@@ -34,12 +34,18 @@ public sealed class GoogleLoginCommandHandler(
             var existingByEmail = await userRepository.GetByEmailAsync(payload.Email, ct);
             if (existingByEmail is not null)
             {
-                existingByEmail.AddSocialLogin("Google", payload.Subject, payload.Email);
+                // Usuário já existe — vincula a conta Google.
+                // AddSocialLogin retorna null se o vínculo já existia.
+                var socialLogin = existingByEmail.AddSocialLogin("Google", payload.Subject, payload.Email);
+                if (socialLogin is not null)
+                    // Força EntityState.Added — sem isso EF Core gera UPDATE via DetectChanges
+                    await userRepository.AddSocialLoginAsync(socialLogin, ct);
                 user = existingByEmail;
-                userRepository.Update(user);
+                // NÃO chama Update(user) — usuário já está rastreado pelo DbContext
             }
             else
             {
+                // Novo usuário via Google — AddAsync rastreia o grafo inteiro como Added.
                 user = User.RegisterFromSocialLogin(
                     payload.Email,
                     payload.GivenName ?? "Usuário",
@@ -50,7 +56,9 @@ public sealed class GoogleLoginCommandHandler(
         }
 
         var refreshStr = jwtService.GenerateRefreshToken();
-        user.AddRefreshToken(refreshStr, DateTime.UtcNow.AddDays(30));
+        var newToken = user.AddRefreshToken(refreshStr, DateTime.UtcNow.AddDays(30));
+        // Força EntityState.Added — sem isso EF Core gera UPDATE via DetectChanges (Guid não-default)
+        await userRepository.AddRefreshTokenAsync(newToken, ct);
         await uow.SaveChangesAsync(ct);
 
         return new AuthTokens(

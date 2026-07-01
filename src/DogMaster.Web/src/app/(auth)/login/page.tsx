@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { authApi } from '@/lib/api';
 
 const schema = z.object({
@@ -19,6 +20,7 @@ type FormData = z.infer<typeof schema>;
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -39,6 +41,25 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      toast.error('Falha ao obter token do Google.');
+      return;
+    }
+    try {
+      setGoogleLoading(true);
+      const res = await authApi.googleLogin(credentialResponse.credential);
+      localStorage.setItem('access_token', res.data.accessToken);
+      localStorage.setItem('refresh_token', res.data.refreshToken);
+      toast.success('Bem-vindo!');
+      router.push('/dashboard');
+    } catch {
+      toast.error('Falha no login com Google. Tente novamente.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
       {/* Glow */}
@@ -54,6 +75,37 @@ export default function LoginPage() {
         </div>
 
         <div className="card border-zinc-800">
+          {/* Google Login */}
+          {googleLoading ? (
+            <div className="w-full py-3 flex items-center justify-center gap-2 rounded-lg
+                            border border-zinc-700 bg-zinc-800/50 text-zinc-400 text-sm">
+              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Conectando ao Google...
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => toast.error('Login com Google cancelado.')}
+                theme="filled_black"
+                size="large"
+                width="368"
+                text="signin_with"
+                locale="pt-BR"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-zinc-800" />
+            <span className="text-xs text-zinc-500">ou continue com e-mail</span>
+            <div className="flex-1 h-px bg-zinc-800" />
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1.5">E-mail</label>
@@ -65,7 +117,8 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-sm font-medium text-zinc-300">Senha</label>
-                <Link href="/esqueci-senha" className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
+                <Link href="/esqueci-senha"
+                  className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
                   Esqueceu a senha?
                 </Link>
               </div>
@@ -82,7 +135,8 @@ export default function LoginPage() {
           <div className="divider mt-6 pt-6">
             <p className="text-center text-sm text-zinc-500">
               Não tem conta?{' '}
-              <Link href="/registro" className="text-brand-400 font-medium hover:text-brand-300 transition-colors">
+              <Link href="/registro"
+                className="text-brand-400 font-medium hover:text-brand-300 transition-colors">
                 Cadastre-se grátis
               </Link>
             </p>

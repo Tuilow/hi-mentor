@@ -70,7 +70,8 @@ export interface Subscription {
   id: string;
   planName: string;
   status: string;
-  currentPeriodStart: string;
-  currentPeriodEnd: string;
+  price: number;
   billingCycle: string;
+  currentPeriodEnd: string;
+  isActive: boolean;
 }

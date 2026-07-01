@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { authApi } from '@/lib/api';
 
 const schema = z.object({
@@ -25,6 +26,7 @@ type FormData = z.infer<typeof schema>;
 export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -45,6 +47,25 @@ export default function RegisterPage() {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      toast.error('Falha ao obter token do Google.');
+      return;
+    }
+    try {
+      setGoogleLoading(true);
+      const res = await authApi.googleLogin(credentialResponse.credential);
+      localStorage.setItem('access_token', res.data.accessToken);
+      localStorage.setItem('refresh_token', res.data.refreshToken);
+      toast.success('Conta criada com Google!');
+      router.push('/dashboard');
+    } catch {
+      toast.error('Falha no cadastro com Google. Tente novamente.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4 py-12">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
@@ -59,6 +80,37 @@ export default function RegisterPage() {
         </div>
 
         <div className="card border-zinc-800">
+          {/* Google Signup */}
+          {googleLoading ? (
+            <div className="w-full py-3 flex items-center justify-center gap-2 rounded-lg
+                            border border-zinc-700 bg-zinc-800/50 text-zinc-400 text-sm">
+              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Conectando ao Google...
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => toast.error('Cadastro com Google cancelado.')}
+                theme="filled_black"
+                size="large"
+                width="368"
+                text="signup_with"
+                locale="pt-BR"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-zinc-800" />
+            <span className="text-xs text-zinc-500">ou cadastre-se com e-mail</span>
+            <div className="flex-1 h-px bg-zinc-800" />
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>

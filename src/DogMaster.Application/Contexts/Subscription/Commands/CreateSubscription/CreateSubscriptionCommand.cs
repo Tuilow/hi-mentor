@@ -12,4 +12,8 @@ public sealed record CreateSubscriptionCommand(
     string? Phone = null
 ) : IRequest<CreateSubscriptionResponse>;
 
-public sealed record CreateSubscriptionResponse(Guid SubscriptionId, string AsaasSubscriptionId);
+public sealed record CreateSubscriptionResponse(
+    Guid SubscriptionId,
+    string AsaasSubscriptionId,
+    string? PaymentUrl   // invoiceUrl do Asaas — onde o cliente paga via PIX/cartão/boleto
+);

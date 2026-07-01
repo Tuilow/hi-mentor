@@ -128,13 +128,15 @@ public sealed class User : AggregateRoot
     public RefreshToken? GetActiveRefreshToken(string token) =>
         _refreshTokens.SingleOrDefault(t => t.Token == token && t.IsActive);
 
-    public void AddSocialLogin(string provider, string externalId, string? email = null)
+    public SocialLogin? AddSocialLogin(string provider, string externalId, string? email = null)
     {
         if (_socialLogins.Any(s => s.Provider == provider && s.ExternalId == externalId))
-            return;
+            return null;
 
-        _socialLogins.Add(SocialLogin.Create(Id, provider, externalId, email));
+        var socialLogin = SocialLogin.Create(Id, provider, externalId, email);
+        _socialLogins.Add(socialLogin);
         Touch();
+        return socialLogin;
     }
 
     public void Promote(UserRole role)

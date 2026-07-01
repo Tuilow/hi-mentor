@@ -117,12 +117,16 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-// ─── AUTO-MIGRATION (DEV) ─────────────────────────────────────────────────────
-if (app.Environment.IsDevelopment())
+// ─── AUTO-MIGRATION + SEED ────────────────────────────────────────────────────
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await db.Database.MigrateAsync();
+    var seedLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    if (app.Environment.IsDevelopment())
+        await db.Database.MigrateAsync();
+
+    await DogMaster.Infrastructure.Data.DbSeeder.SeedAsync(db, seedLogger);
 }
 
 app.Run();

@@ -27,9 +27,9 @@ public sealed class LoginUserCommandHandler(
 
         var refreshTokenStr = jwtService.GenerateRefreshToken();
         var refreshTokenExpires = DateTime.UtcNow.AddDays(30);
-        user.AddRefreshToken(refreshTokenStr, refreshTokenExpires, request.IpAddress);
-        // User já rastreado (carregado via Include) — DetectChanges em SaveChanges
-        // marca o novo RefreshToken como Added e os revogados como Modified.
+        var newToken = user.AddRefreshToken(refreshTokenStr, refreshTokenExpires, request.IpAddress);
+        // Força tracking como Added — sem isso EF Core gera UPDATE (Guid não-default)
+        await userRepository.AddRefreshTokenAsync(newToken, ct);
         await uow.SaveChangesAsync(ct);
 
         var accessToken = jwtService.GenerateAccessToken(user);

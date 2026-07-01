@@ -46,4 +46,14 @@ public sealed class UserRepository(ApplicationDbContext context) : IUserReposito
             .Include(u => u.Profile)
             .Include(u => u.RefreshTokens)
             .FirstOrDefaultAsync(u => u.RefreshTokens.Any(r => r.Token == token), ct);
+
+    // Força tracking como EntityState.Added para RefreshTokens criados em memória.
+    // EF Core marca entidades com Guid não-default encontradas via DetectChanges como Modified,
+    // o que gera UPDATE em vez de INSERT → DbUpdateConcurrencyException.
+    public async Task AddRefreshTokenAsync(RefreshToken token, CancellationToken ct = default) =>
+        await context.RefreshTokens.AddAsync(token, ct);
+
+    // Mesmo padrão para SocialLogin — Guid.NewGuid() causaria Modified via DetectChanges.
+    public async Task AddSocialLoginAsync(SocialLogin socialLogin, CancellationToken ct = default) =>
+        await context.SocialLogins.AddAsync(socialLogin, ct);
 }
