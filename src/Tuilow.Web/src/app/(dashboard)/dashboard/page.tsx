@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authApi, subscriptionsApi } from '@/lib/api';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 const quickActions = [
   { href: '/cursos',  icon: '📚', title: 'Explorar Cursos', desc: 'Encontre o curso ideal para você',   color: 'from-blue-50 to-blue-100/60' },
@@ -11,7 +13,9 @@ const quickActions = [
 ];
 
 export default function DashboardPage() {
-  const { data: user } = useQuery({
+  const [becomingCreator, setBecomingCreator] = useState(false);
+
+  const { data: user, refetch: refetchUser } = useQuery({
     queryKey: ['user-profile'],
     queryFn: () => authApi.me().then(r => r.data),
   });
@@ -20,6 +24,33 @@ export default function DashboardPage() {
     queryKey: ['my-subscription'],
     queryFn: () => subscriptionsApi.getMySubscription().then(r => r.data).catch(() => null),
   });
+
+  const isCreator = user?.roles?.includes('Creator') || user?.roles?.includes('Admin');
+
+  const handleBecomeCreator = async () => {
+    setBecomingCreator(true);
+    try {
+      await authApi.becomeCreator();
+
+      // O token de acesso atual não tem o claim de role "Creator" — busca um novo token
+      // (refresh-token já regenera os claims a partir dos roles atuais do usuário no banco).
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        const { data } = await authApi.refreshToken(refreshToken);
+        localStorage.setItem('access_token', data.accessToken);
+        localStorage.setItem('refresh_token', data.refreshToken);
+      }
+
+      await refetchUser();
+      toast.success('Você agora é um criador de conteúdo! Veja "Gerenciar Cursos" no menu.');
+
+      // Recarrega para o menu lateral (que também busca /auth/me de forma independente) atualizar.
+      setTimeout(() => window.location.reload(), 1200);
+    } catch {
+      toast.error('Não foi possível ativar o modo criador. Tente novamente.');
+      setBecomingCreator(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -51,6 +82,25 @@ export default function DashboardPage() {
               Válido até {new Date(subscription.currentPeriodEnd).toLocaleDateString('pt-BR')}
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Become a Creator banner — plataforma aberta: qualquer pessoa pode publicar cursos */}
+      {!isCreator && (
+        <div className="card border-violet-100 bg-violet-50/60 mb-8 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-semibold text-gray-800">Quer publicar seus próprios cursos?</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Torne-se um criador Tuilow: sem mensalidade, sem aprovação. Você só paga uma comissão quando vende.
+            </p>
+          </div>
+          <button
+            onClick={handleBecomeCreator}
+            disabled={becomingCreator}
+            className="btn-primary whitespace-nowrap flex-shrink-0 disabled:opacity-60"
+          >
+            {becomingCreator ? 'Ativando...' : 'Tornar-se criador 🎬'}
+          </button>
         </div>
       )}
 

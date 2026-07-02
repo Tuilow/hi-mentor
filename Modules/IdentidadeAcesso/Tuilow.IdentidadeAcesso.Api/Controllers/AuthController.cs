@@ -1,3 +1,4 @@
+using Tuilow.IdentidadeAcesso.Application.Commands.BecomeCreator;
 using Tuilow.IdentidadeAcesso.Application.Commands.ConfirmEmail;
 using Tuilow.IdentidadeAcesso.Application.Commands.ForgotPassword;
 using Tuilow.IdentidadeAcesso.Application.Commands.GoogleLogin;
@@ -81,5 +82,20 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
         var userId = currentUser.UserId!.Value;
         var profile = await sender.Send(new GetUserProfileQuery(userId), ct);
         return Ok(profile);
+    }
+
+    /// <summary>
+    /// Auto-promoção: o próprio usuário autenticado se torna um Creator, sem depender de
+    /// aprovação de um Admin — plataforma aberta, qualquer pessoa pode publicar cursos.
+    /// Não remove o role Student existente (multi-role). O token de acesso atual não é
+    /// atualizado automaticamente: chame /auth/refresh-token em seguida para obter um novo
+    /// access token já com o claim de role "Creator".
+    /// </summary>
+    [HttpPost("become-creator")]
+    [Authorize]
+    public async Task<IActionResult> BecomeCreator(CancellationToken ct)
+    {
+        await sender.Send(new BecomeCreatorCommand(currentUser.UserId!.Value), ct);
+        return Ok(new { message = "Você agora é um criador de conteúdo no Tuilow! 🎬" });
     }
 }

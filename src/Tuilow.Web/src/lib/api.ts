@@ -83,6 +83,9 @@ export const authApi = {
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
   confirmEmail: (token: string) => api.post('/auth/confirm-email', { token }),
   me: () => api.get('/auth/me'),
+  // Auto-promoção a Creator (plataforma aberta — sem aprovação de Admin).
+  becomeCreator: () => api.post('/auth/become-creator'),
+  refreshToken: (refreshToken: string) => api.post('/auth/refresh-token', { refreshToken }),
 };
 
 export const coursesApi = {

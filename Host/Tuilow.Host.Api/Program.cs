@@ -34,8 +34,12 @@ builder.Services.AddPayoutModule();
 
 // ─── DATABASE ──────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
+{
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default"),
-        npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public")));
+        npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public"));
+
+    
+});
 
 builder.Services.AddScoped<Tuilow.SharedKernel.Application.Interfaces.IUnitOfWork>(
     sp => sp.GetRequiredService<AppDbContext>());
@@ -125,7 +129,12 @@ builder.Services.AddCors(opt =>
                 ?? ["http://localhost:3000"])
             .AllowAnyMethod()
             .AllowAnyHeader()
-            .AllowCredentials());
+            .AllowCredentials()
+            // Necessário para o protocolo TUS (upload resumível de vídeo): sem expor esses
+            // headers, o cliente JS (tus-js-client) não consegue ler Upload-Offset/Upload-Length
+            // da resposta e falha com "failed to resume upload".
+            .WithExposedHeaders("Upload-Offset", "Upload-Length", "Upload-Defer-Length",
+                "Tus-Resumable", "Tus-Version", "Tus-Max-Size", "Location"));
 });
 
 // ─── HEALTH CHECKS ────────────────────────────────────────────────────────────

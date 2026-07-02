@@ -20,6 +20,10 @@ public static class DependencyInjection
         var cloudflareMock = configuration.GetValue<bool>("Cloudflare:MockMode");
         if (cloudflareMock)
         {
+            // MockStreamingService usa IHttpContextAccessor para montar a URL de upload a
+            // partir da requisição atual (scheme+host+porta reais) — registro é idempotente
+            // mesmo que outro módulo já tenha chamado AddHttpContextAccessor().
+            services.AddHttpContextAccessor();
             services.AddScoped<IStreamingService, MockStreamingService>();
         }
         else
