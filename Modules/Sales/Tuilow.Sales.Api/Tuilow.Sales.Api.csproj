@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tuilow.Sales.Api</RootNamespace>
+    <!-- Sdk normal (não Sdk.Web) — mesmo padrão dos demais módulos. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tuilow.Sales.Application\Tuilow.Sales.Application.csproj" />
+    <ProjectReference Include="..\Tuilow.Sales.Infrastructure\Tuilow.Sales.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

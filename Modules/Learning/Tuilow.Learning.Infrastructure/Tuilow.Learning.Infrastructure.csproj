@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tuilow.Learning.Infrastructure</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tuilow.Learning.Application\Tuilow.Learning.Application.csproj" />
+    <!-- Acoplamento legítimo: verificação de acesso pago consulta o módulo Sales (assinaturas). -->
+    <ProjectReference Include="..\..\Sales\Tuilow.Sales.Domain\Tuilow.Sales.Domain.csproj" />
+  </ItemGroup>
+</Project>

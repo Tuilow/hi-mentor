@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tuilow.Learning.Application</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tuilow.Learning.Domain\Tuilow.Learning.Domain.csproj" />
+    <!-- Acoplamento legítimo: matrícula depende do agregado Course (Catalog) — mesmo padrão do código original. -->
+    <ProjectReference Include="..\..\Catalog\Tuilow.Catalog.Domain\Tuilow.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />
+  </ItemGroup>
+</Project>

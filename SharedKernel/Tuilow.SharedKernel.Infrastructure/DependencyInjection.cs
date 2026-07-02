@@ -1,5 +1,6 @@
 using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.SharedKernel.Infrastructure.Clock;
+using Tuilow.SharedKernel.Infrastructure.Email;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Tuilow.SharedKernel.Infrastructure;
@@ -10,6 +11,7 @@ public static class DependencyInjection
     public static IServiceCollection AddSharedKernel(this IServiceCollection services)
     {
         services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<IEmailService, EmailService>();
         return services;
     }
 }
