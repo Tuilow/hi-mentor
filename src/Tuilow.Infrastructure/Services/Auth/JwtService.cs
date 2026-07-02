@@ -27,9 +27,13 @@ public sealed class JwtService(IConfiguration configuration) : IJwtService
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email.Value),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new(ClaimTypes.Role, user.Role.ToString()),
             new("firstName", user.Profile.FirstName),
         };
+
+        // Multi-role: um claim ClaimTypes.Role por role atribuído ao usuário.
+        // ASP.NET Core avalia [Authorize(Roles = "X")] com OR entre múltiplos claims do mesmo tipo.
+        foreach (var role in user.Roles)
+            claims.Add(new Claim(ClaimTypes.Role, role.Name));
 
         var token = new JwtSecurityToken(
             issuer: _issuer,

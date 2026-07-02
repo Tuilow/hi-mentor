@@ -3,15 +3,15 @@ using Tuilow.Domain.Common.Interfaces;
 using Tuilow.Domain.Contexts.Identity.Interfaces;
 using MediatR;
 
-namespace Tuilow.Application.Contexts.Identity.Commands.PromoteUser;
+namespace Tuilow.Application.Contexts.Identity.Commands.RemoveRole;
 
-public sealed class PromoteUserCommandHandler(
+public sealed class RemoveRoleCommandHandler(
     IUserRepository userRepository,
     IRoleRepository roleRepository,
     IUnitOfWork uow
-) : IRequestHandler<PromoteUserCommand>
+) : IRequestHandler<RemoveRoleCommand>
 {
-    public async Task Handle(PromoteUserCommand request, CancellationToken ct)
+    public async Task Handle(RemoveRoleCommand request, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(request.TargetUserId, ct)
             ?? throw new NotFoundException("Usuário", request.TargetUserId);
@@ -20,13 +20,9 @@ public sealed class PromoteUserCommandHandler(
             ?? throw new NotFoundException("Role", request.RoleName);
 
         // NÃO chama userRepository.Update(user) — o usuário já está rastreado pelo
-        // DbContext (veio de GetByIdAsync na mesma unit of work). Chamar Update()
-        // forçaria o novo UserRoleAssignment (Guid não-default) para Modified em vez
-        // de Added, gerando UPDATE de 0 linhas → DbUpdateConcurrencyException.
-        var assignment = user.AssignRole(role);
-        if (assignment is not null)
-            await userRepository.AddUserRoleAssignmentAsync(assignment, ct);
-
+        // DbContext; remover um item da coleção rastreada já é detectado automaticamente
+        // pelo DetectChanges como exclusão do vínculo.
+        user.RemoveRole(role.Id);
         await uow.SaveChangesAsync(ct);
     }
 }

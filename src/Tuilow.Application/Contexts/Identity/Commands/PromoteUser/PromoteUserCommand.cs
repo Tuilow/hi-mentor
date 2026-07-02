@@ -1,12 +1,12 @@
-using Tuilow.Domain.Contexts.Identity.Enums;
 using MediatR;
 
 namespace Tuilow.Application.Contexts.Identity.Commands.PromoteUser;
 
 /// <summary>
-/// Altera o role de um usuário. Apenas Admin pode executar.
+/// Atribui um role a um usuário (multi-role: não remove os roles existentes).
+/// Apenas Admin pode executar. Use RemoveRoleCommand para revogar um role.
 /// </summary>
 public sealed record PromoteUserCommand(
     Guid TargetUserId,
-    UserRole NewRole
+    string RoleName
 ) : IRequest;

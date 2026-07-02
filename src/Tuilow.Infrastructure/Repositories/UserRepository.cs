@@ -12,10 +12,14 @@ public sealed class UserRepository(ApplicationDbContext context) : IUserReposito
             .Include(u => u.Profile)
             .Include(u => u.RefreshTokens)
             .Include(u => u.SocialLogins)
+            .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Id == id, ct);
 
     public async Task<IEnumerable<User>> GetAllAsync(CancellationToken ct = default) =>
-        await context.Users.Include(u => u.Profile).ToListAsync(ct);
+        await context.Users
+            .Include(u => u.Profile)
+            .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
+            .ToListAsync(ct);
 
     public async Task AddAsync(User entity, CancellationToken ct = default) =>
         await context.Users.AddAsync(entity, ct);
@@ -28,6 +32,7 @@ public sealed class UserRepository(ApplicationDbContext context) : IUserReposito
             .Include(u => u.Profile)
             .Include(u => u.RefreshTokens)
             .Include(u => u.SocialLogins)
+            .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Email == email.Trim().ToLowerInvariant(), ct);
 
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken ct = default) =>
@@ -38,6 +43,7 @@ public sealed class UserRepository(ApplicationDbContext context) : IUserReposito
             .Include(u => u.Profile)
             .Include(u => u.SocialLogins)
             .Include(u => u.RefreshTokens)
+            .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.SocialLogins.Any(
                 s => s.Provider == provider && s.ExternalId == externalId), ct);
 
@@ -45,6 +51,7 @@ public sealed class UserRepository(ApplicationDbContext context) : IUserReposito
         await context.Users
             .Include(u => u.Profile)
             .Include(u => u.RefreshTokens)
+            .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.RefreshTokens.Any(r => r.Token == token), ct);
 
     // Força tracking como EntityState.Added para RefreshTokens criados em memória.
@@ -56,4 +63,9 @@ public sealed class UserRepository(ApplicationDbContext context) : IUserReposito
     // Mesmo padrão para SocialLogin — Guid.NewGuid() causaria Modified via DetectChanges.
     public async Task AddSocialLoginAsync(SocialLogin socialLogin, CancellationToken ct = default) =>
         await context.SocialLogins.AddAsync(socialLogin, ct);
+
+    // Mesmo padrão para UserRoleAssignment — sem isso, atribuir um role a um usuário
+    // já rastreado (ex.: PromoteUserCommand) gera UPDATE (0 linhas afetadas) em vez de INSERT.
+    public async Task AddUserRoleAssignmentAsync(UserRoleAssignment assignment, CancellationToken ct = default) =>
+        await context.UserRoleAssignments.AddAsync(assignment, ct);
 }

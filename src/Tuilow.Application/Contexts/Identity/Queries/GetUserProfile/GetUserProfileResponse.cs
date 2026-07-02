@@ -10,7 +10,7 @@ public sealed record GetUserProfileResponse(
     string? Phone,
     DateOnly? BirthDate,
     string? Bio,
-    string Role,
+    IReadOnlyList<string> Roles,
     string Status,
     DateTime CreatedAt
 );

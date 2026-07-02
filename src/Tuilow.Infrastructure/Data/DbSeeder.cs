@@ -17,8 +17,28 @@ public static class DbSeeder
     public static async Task SeedAsync(
         ApplicationDbContext db, ILogger logger, IConfiguration config)
     {
+        await SeedRolesAsync(db, logger);
         await SeedAdminAsync(db, logger, config);
         await SeedPlansAsync(db, logger);
+    }
+
+    /// <summary>
+    /// Garante que os roles padrão do sistema existam (Student, Creator, Admin, ChannelMember).
+    /// Idempotente — só cria os que ainda não existem.
+    /// </summary>
+    private static async Task SeedRolesAsync(ApplicationDbContext db, ILogger logger)
+    {
+        var existingNames = await db.Roles.Select(r => r.Name).ToListAsync();
+
+        foreach (var name in RoleNames.All)
+        {
+            if (existingNames.Contains(name)) continue;
+
+            db.Roles.Add(Role.Create(name));
+            logger.LogInformation("Role seed criado: {Role}", name);
+        }
+
+        await db.SaveChangesAsync();
     }
 
     /// <summary>
@@ -41,15 +61,25 @@ public static class DbSeeder
             return;
         }
 
+        var adminRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == RoleNames.Admin)
+            ?? throw new InvalidOperationException("Role Admin não encontrado — SeedRolesAsync deveria ter criado.");
+
         var exists = await db.Users.AnyAsync(u => u.Email == email);
         if (exists)
         {
             // Garante que o usuário existente tenha role Admin
-            var existing = await db.Users.FirstAsync(u => u.Email == email);
-            if (existing.Role != UserRole.Admin)
+            var existing = await db.Users
+                .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
+                .FirstAsync(u => u.Email == email);
+
+            if (!existing.HasRole(RoleNames.Admin))
             {
-                existing.Promote(UserRole.Admin);
-                db.Users.Update(existing);
+                // NÃO chama db.Users.Update(existing) — mesmo motivo do PromoteUserCommandHandler:
+                // forçaria o novo UserRoleAssignment para Modified em vez de Added.
+                var assignment = existing.AssignRole(adminRole);
+                if (assignment is not null)
+                    await db.UserRoleAssignments.AddAsync(assignment);
+
                 await db.SaveChangesAsync();
                 logger.LogInformation("Usuário {Email} promovido para Admin.", email);
             }
@@ -58,9 +88,8 @@ public static class DbSeeder
 
         logger.LogInformation("Criando usuário admin: {Email}", email);
 
-        var admin = User.Register(email, password, first, last);
+        var admin = User.Register(email, password, first, last, adminRole);
         admin.ConfirmEmail(admin.EmailConfirmationToken!); // já confirma e-mail
-        admin.Promote(UserRole.Admin);
 
         await db.Users.AddAsync(admin);
         await db.SaveChangesAsync();

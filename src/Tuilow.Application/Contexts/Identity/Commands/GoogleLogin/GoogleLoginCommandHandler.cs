@@ -3,6 +3,7 @@ using Tuilow.Application.Common.Interfaces;
 using Tuilow.Application.Common.Models;
 using Tuilow.Domain.Common.Interfaces;
 using Tuilow.Domain.Contexts.Identity.Entities;
+using Tuilow.Domain.Contexts.Identity.Enums;
 using Tuilow.Domain.Contexts.Identity.Interfaces;
 using Google.Apis.Auth;
 using MediatR;
@@ -11,6 +12,7 @@ namespace Tuilow.Application.Contexts.Identity.Commands.GoogleLogin;
 
 public sealed class GoogleLoginCommandHandler(
     IUserRepository userRepository,
+    IRoleRepository roleRepository,
     IUnitOfWork uow,
     IJwtService jwtService
 ) : IRequestHandler<GoogleLoginCommand, AuthTokens>
@@ -46,11 +48,12 @@ public sealed class GoogleLoginCommandHandler(
             else
             {
                 // Novo usuário via Google — AddAsync rastreia o grafo inteiro como Added.
+                var studentRole = await roleRepository.GetByNameAsync(RoleNames.Student, ct);
                 user = User.RegisterFromSocialLogin(
                     payload.Email,
                     payload.GivenName ?? "Usuário",
                     payload.FamilyName ?? string.Empty,
-                    "Google", payload.Subject);
+                    "Google", payload.Subject, studentRole);
                 await userRepository.AddAsync(user, ct);
             }
         }

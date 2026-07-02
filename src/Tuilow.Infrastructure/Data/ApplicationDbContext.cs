@@ -21,6 +21,8 @@ public sealed class ApplicationDbContext(
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<SocialLogin> SocialLogins => Set<SocialLogin>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<UserRoleAssignment> UserRoleAssignments => Set<UserRoleAssignment>();
 
     // Catalog
     public DbSet<Course> Courses => Set<Course>();

@@ -2,6 +2,7 @@ using Tuilow.Application.Common.Interfaces;
 using Tuilow.Application.Common.Models;
 using Tuilow.Domain.Common.Interfaces;
 using Tuilow.Domain.Contexts.Identity.Entities;
+using Tuilow.Domain.Contexts.Identity.Enums;
 using Tuilow.Domain.Contexts.Identity.Exceptions;
 using Tuilow.Domain.Contexts.Identity.Interfaces;
 using MediatR;
@@ -10,6 +11,7 @@ namespace Tuilow.Application.Contexts.Identity.Commands.RegisterUser;
 
 public sealed class RegisterUserCommandHandler(
     IUserRepository userRepository,
+    IRoleRepository roleRepository,
     IUnitOfWork uow,
     IJwtService jwtService,
     IEmailService emailService
@@ -20,7 +22,10 @@ public sealed class RegisterUserCommandHandler(
         if (await userRepository.ExistsByEmailAsync(request.Email, ct))
             throw new DuplicateEmailException(request.Email);
 
-        var user = User.Register(request.Email, request.Password, request.FirstName, request.LastName);
+        // Todo novo usuário nasce com o role padrão Student (multi-role: outros
+        // roles como Creator/ChannelMember são adicionados depois, sem remover este).
+        var studentRole = await roleRepository.GetByNameAsync(RoleNames.Student, ct);
+        var user = User.Register(request.Email, request.Password, request.FirstName, request.LastName, studentRole);
 
         // Gera refresh token ANTES do AddAsync para EF Core rastrear tudo em uma única unidade
         var refreshTokenStr = jwtService.GenerateRefreshToken();

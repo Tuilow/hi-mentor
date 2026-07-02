@@ -20,10 +20,6 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(u => u.Email).IsUnique().HasDatabaseName("ix_users_email");
 
-        builder.Property(u => u.Role)
-            .HasConversion<string>()
-            .HasMaxLength(50);
-
         builder.Property(u => u.Status)
             .HasConversion<string>()
             .HasMaxLength(50);
@@ -50,6 +46,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey(s => s.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(u => u.UserRoleAssignments)
+            .WithOne()
+            .HasForeignKey(ur => ur.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Ignore(u => u.Roles);
         builder.Ignore(u => u.DomainEvents);
     }
 }

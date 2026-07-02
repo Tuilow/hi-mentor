@@ -1,6 +1,7 @@
 using Tuilow.Application.Contexts.Catalog.Queries.GetCourseByIdAdmin;
 using Tuilow.Application.Contexts.Catalog.Queries.ListCoursesAdmin;
 using Tuilow.Application.Contexts.Identity.Commands.PromoteUser;
+using Tuilow.Application.Contexts.Identity.Commands.RemoveRole;
 using Tuilow.Domain.Contexts.Identity.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -18,25 +19,35 @@ namespace Tuilow.API.Controllers;
 public sealed class AdminController(ISender sender) : ControllerBase
 {
     /// <summary>
-    /// Altera o role de um usuário (Student / Instructor / Admin).
+    /// Atribui um role a um usuário. Multi-role: não remove os roles existentes
+    /// (ex.: um usuário pode acumular Student + Creator).
     /// </summary>
     /// <remarks>
     /// Exemplo de body:
-    ///   { "newRole": "Admin" }
-    ///   { "newRole": "Instructor" }
-    ///   { "newRole": "Student" }
+    ///   { "roleName": "Admin" }
+    ///   { "roleName": "Creator" }
+    ///   { "roleName": "Student" }
+    ///   { "roleName": "ChannelMember" }
     /// </remarks>
     [HttpPatch("users/{userId:guid}/role")]
-    public async Task<IActionResult> ChangeUserRole(
+    public async Task<IActionResult> AssignUserRole(
         Guid userId,
         [FromBody] ChangeRoleRequest request,
         CancellationToken ct)
     {
-        if (!Enum.TryParse<UserRole>(request.NewRole, ignoreCase: true, out var role))
-            return BadRequest(new { message = $"Role inválido. Use: Student, Instructor ou Admin." });
+        if (!RoleNames.IsValid(request.RoleName))
+            return BadRequest(new { message = $"Role inválido. Use um de: {string.Join(", ", RoleNames.All)}." });
 
-        await sender.Send(new PromoteUserCommand(userId, role), ct);
-        return Ok(new { message = $"Usuário {userId} promovido para {role}." });
+        await sender.Send(new PromoteUserCommand(userId, request.RoleName), ct);
+        return Ok(new { message = $"Role {request.RoleName} atribuído ao usuário {userId}." });
+    }
+
+    /// <summary>Revoga um role de um usuário.</summary>
+    [HttpDelete("users/{userId:guid}/role/{roleName}")]
+    public async Task<IActionResult> RemoveUserRole(Guid userId, string roleName, CancellationToken ct)
+    {
+        await sender.Send(new RemoveRoleCommand(userId, roleName), ct);
+        return Ok(new { message = $"Role {roleName} removido do usuário {userId}." });
     }
 
     /// <summary>Lista todos os cursos (Draft + Published + Archived) para o painel admin.</summary>
@@ -56,4 +67,4 @@ public sealed class AdminController(ISender sender) : ControllerBase
     }
 }
 
-public sealed record ChangeRoleRequest(string NewRole);
+public sealed record ChangeRoleRequest(string RoleName);

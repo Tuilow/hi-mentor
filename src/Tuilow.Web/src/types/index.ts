@@ -4,12 +4,15 @@ export interface AuthTokens {
   expiresIn: number;
 }
 
+export type RoleName = 'Student' | 'Creator' | 'Admin' | 'ChannelMember';
+
 export interface UserProfile {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
-  role: 'Student' | 'Instructor' | 'Admin';
+  // Multi-role: um usuário pode ter vários roles simultâneos (ex.: Student + Creator).
+  roles: RoleName[];
   isEmailConfirmed: boolean;
   avatarUrl?: string;
 }

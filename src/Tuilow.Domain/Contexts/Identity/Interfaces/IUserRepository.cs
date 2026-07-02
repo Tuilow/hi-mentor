@@ -11,4 +11,5 @@ public interface IUserRepository : IRepository<User>
     Task<User?> GetByRefreshTokenAsync(string token, CancellationToken ct = default);
     Task AddRefreshTokenAsync(RefreshToken token, CancellationToken ct = default);
     Task AddSocialLoginAsync(SocialLogin login, CancellationToken ct = default);
+    Task AddUserRoleAssignmentAsync(UserRoleAssignment assignment, CancellationToken ct = default);
 }

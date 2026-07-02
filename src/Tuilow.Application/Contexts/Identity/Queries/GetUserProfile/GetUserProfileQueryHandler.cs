@@ -16,6 +16,6 @@ public sealed class GetUserProfileQueryHandler(IUserRepository userRepository)
             user.Id, user.Email.Value,
             user.Profile.FirstName, user.Profile.LastName, user.Profile.FullName,
             user.Profile.AvatarUrl, user.Profile.Phone, user.Profile.BirthDate,
-            user.Profile.Bio, user.Role.ToString(), user.Status.ToString(), user.CreatedAt);
+            user.Profile.Bio, user.Roles.Select(r => r.Name).ToList(), user.Status.ToString(), user.CreatedAt);
     }
 }
