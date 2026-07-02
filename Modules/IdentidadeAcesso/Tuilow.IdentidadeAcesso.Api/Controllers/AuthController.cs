@@ -9,6 +9,7 @@ using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 
 namespace Tuilow.IdentidadeAcesso.Api.Controllers;
 
