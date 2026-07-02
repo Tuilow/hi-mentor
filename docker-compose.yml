@@ -4,7 +4,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: src/Tuilow.API/Dockerfile
+      dockerfile: Host/Tuilow.Host.Api/Dockerfile
     image: tuilow-api:latest
     container_name: tuilow_api
     ports:

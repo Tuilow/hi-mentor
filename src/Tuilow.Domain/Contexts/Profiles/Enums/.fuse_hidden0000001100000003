@@ -1,3 +1,0 @@
-namespace Tuilow.Domain.Contexts.LearnerProfile.Enums;
-
-public enum ProficiencyLevel { Beginner, Intermediate, Advanced, Expert }
