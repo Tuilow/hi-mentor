@@ -13,7 +13,7 @@ namespace Tuilow.Catalog.Api.Controllers;
 [ApiController]
 [Route("api/v1/admin/courses")]
 [Produces("application/json")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Creator,Admin")]
 public sealed class AdminCoursesController(ISender sender) : ControllerBase
 {
     /// <summary>Lista todos os cursos (qualquer status) para o painel admin.</summary>
