@@ -13,6 +13,7 @@ public static class DependencyInjection
     public static IServiceCollection AddSalesInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<ICoursePurchaseRepository, CoursePurchaseRepository>();
 
         services.AddHttpClient<IPaymentService, AsaasPaymentService>(client =>
         {

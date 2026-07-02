@@ -6,6 +6,8 @@ using LearningEntities = Tuilow.Learning.Domain.Entities;
 using JourneyEntities = Tuilow.Journey.Domain.Entities;
 using SalesEntities = Tuilow.Sales.Domain.Entities;
 using StreamingEntities = Tuilow.Streaming.Domain.Entities;
+using FinanceEntities = Tuilow.Finance.Domain.Entities;
+using PayoutEntities = Tuilow.Payout.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -61,6 +63,18 @@ public sealed class AppDbContext(
     // Streaming
     public DbSet<StreamingEntities.Video> Videos => Set<StreamingEntities.Video>();
 
+    // Sales — compra avulsa de curso (modelo principal de monetização)
+    public DbSet<SalesEntities.CoursePurchase> CoursePurchases => Set<SalesEntities.CoursePurchase>();
+
+    // Finance — comissão da plataforma e carteira do criador
+    public DbSet<FinanceEntities.PlatformFeeConfiguration> PlatformFeeConfigurations => Set<FinanceEntities.PlatformFeeConfiguration>();
+    public DbSet<FinanceEntities.CreatorWallet> CreatorWallets => Set<FinanceEntities.CreatorWallet>();
+    public DbSet<FinanceEntities.WalletTransaction> WalletTransactions => Set<FinanceEntities.WalletTransaction>();
+
+    // Payout — saques do criador (ciclo de 15 dias)
+    public DbSet<PayoutEntities.PayoutRequest> PayoutRequests => Set<PayoutEntities.PayoutRequest>();
+    public DbSet<PayoutEntities.PayoutTransaction> PayoutTransactions => Set<PayoutEntities.PayoutTransaction>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -83,6 +97,15 @@ public sealed class AppDbContext(
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(Streaming.Infrastructure.Data.Configurations.VideoConfiguration).Assembly);
+
+        // CoursePurchaseConfiguration vive no mesmo assembly de Sales.Infrastructure (PlanConfiguration
+        // acima) — não precisa de outra chamada a ApplyConfigurationsFromAssembly.
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(Finance.Infrastructure.Data.Configurations.CreatorWalletConfiguration).Assembly);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(Payout.Infrastructure.Data.Configurations.PayoutRequestConfiguration).Assembly);
 
         modelBuilder.HasDefaultSchema("public");
     }

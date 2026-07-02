@@ -23,12 +23,13 @@ public sealed class EnrollStudentCommandHandler(
         if (await enrollmentRepository.IsEnrolledAsync(request.UserId, request.CourseId, ct))
             throw new InvalidOperationException("Aluno já está matriculado neste curso.");
 
-        // Verifica acesso: curso gratuito OU assinatura ativa (Sales)
+        // Verifica acesso: curso gratuito OU compra confirmada deste curso específico
+        // (ou assinatura ativa legada — ver SalesCourseAccessChecker).
         if (!course.IsFree)
         {
-            var hasAccess = await accessChecker.HasActivePaidAccessAsync(request.UserId, ct);
+            var hasAccess = await accessChecker.HasActivePaidAccessAsync(request.UserId, request.CourseId, ct);
             if (!hasAccess)
-                throw new UnauthorizedException("Você precisa de uma assinatura ativa para acessar este curso.");
+                throw new UnauthorizedException("Você precisa comprar este curso para acessá-lo.");
         }
 
         var enrollment = Enrollment.Create(request.UserId, request.CourseId, course.Title);

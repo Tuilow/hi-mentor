@@ -136,6 +136,39 @@ public sealed class AsaasPaymentService(
         return new AsaasSubscriptionResponse(id, status);
     }
 
+    // ─── Charge (pagamento único — compra avulsa de curso) ─────────────────────
+
+    public async Task<AsaasChargeResponse> CreateChargeAsync(AsaasChargeRequest request, CancellationToken ct = default)
+    {
+        var payload = new
+        {
+            customer          = request.CustomerId,
+            billingType       = "UNDEFINED", // Cliente escolhe PIX / Cartão / Boleto na hora do pagamento
+            value             = request.Value,
+            dueDate           = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"),
+            description       = request.Description,
+            externalReference = request.ExternalReference
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        logger.LogDebug("Asaas CreateCharge payload: {Json}", json);
+
+        var response = await httpClient.PostAsync("/api/v3/payments",
+            new StringContent(json, Encoding.UTF8, "application/json"), ct);
+
+        if (!response.IsSuccessStatusCode)
+            await ThrowAsaasErrorAsync(response, "CreateCharge", ct);
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        var doc = JsonDocument.Parse(content);
+        var id     = doc.RootElement.GetProperty("id").GetString()!;
+        var status = doc.RootElement.GetProperty("status").GetString()!;
+        var invoiceUrl = doc.RootElement.TryGetProperty("invoiceUrl", out var invoiceUrlEl) ? invoiceUrlEl.GetString() : null;
+
+        logger.LogInformation("Cobrança avulsa Asaas criada: {Id} [{Status}]", id, status);
+        return new AsaasChargeResponse(id, status, invoiceUrl);
+    }
+
     // ─── Payment URL ──────────────────────────────────────────────────────────
 
     public async Task<string?> GetSubscriptionPaymentUrlAsync(

@@ -2,6 +2,7 @@ using Tuilow.IdentidadeAcesso.Domain.Entities;
 using Tuilow.IdentidadeAcesso.Domain.Enums;
 using Tuilow.Sales.Domain.Entities;
 using Tuilow.Sales.Domain.Enums;
+using Tuilow.Finance.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,7 @@ public static class DbSeeder
         await SeedRolesAsync(db, logger);
         await SeedAdminAsync(db, logger, config);
         await SeedPlansAsync(db, logger);
+        await SeedPlatformFeeConfigurationAsync(db, logger, config);
     }
 
     /// <summary>Garante que os roles padrão do sistema existam (Student, Creator, Admin, ChannelMember).</summary>
@@ -128,5 +130,31 @@ public static class DbSeeder
         await db.SaveChangesAsync();
 
         logger.LogInformation("Plans seeded: Básico (R$29,90/mês), Pro (R$59,90/mês), Expert (R$499,90/ano).");
+    }
+
+    /// <summary>
+    /// Garante que exista um percentual de comissão da plataforma configurado desde o primeiro
+    /// start (10% por padrão — configurável depois via PUT /api/v1/admin/finance/fee, nunca
+    /// fixo em código). Sem isso, o sistema ainda funciona (o handler de comissão usa um
+    /// fallback), mas o admin não veria nenhuma configuração explícita no painel.
+    ///   "FinanceSeed": { "DefaultPlatformFeePercentage": 10 }  (opcional, em appsettings)
+    /// </summary>
+    private static async Task SeedPlatformFeeConfigurationAsync(AppDbContext db, ILogger logger, IConfiguration config)
+    {
+        if (await db.PlatformFeeConfigurations.AnyAsync()) return;
+
+        var percentage = config.GetValue<decimal?>("FinanceSeed:DefaultPlatformFeePercentage") ?? 10m;
+
+        var adminUserId = await db.Users
+            .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
+            .Where(u => u.UserRoleAssignments.Any(ur => ur.Role.Name == RoleNames.Admin))
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+
+        var feeConfig = PlatformFeeConfiguration.Create(percentage, adminUserId, "Configuração inicial (seed).");
+        await db.PlatformFeeConfigurations.AddAsync(feeConfig);
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("Percentual de comissão da plataforma inicializado em {Percentage}%.", percentage);
     }
 }

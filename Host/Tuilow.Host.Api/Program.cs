@@ -7,6 +7,8 @@ using Tuilow.Learning.Api;
 using Tuilow.Journey.Api;
 using Tuilow.Sales.Api;
 using Tuilow.Streaming.Api;
+using Tuilow.Finance.Api;
+using Tuilow.Payout.Api;
 using Tuilow.Host.Api.Data;
 using Tuilow.Host.Api.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -24,6 +26,10 @@ builder.Services.AddLearningModule();
 builder.Services.AddJourneyModule();
 builder.Services.AddSalesModule(builder.Configuration);
 builder.Services.AddStreamingModule(builder.Configuration);
+// Novo modelo de negócio (venda avulsa de curso + comissão da plataforma): Finance precisa
+// ser registrado antes de Payout, que depende de ICreatorWalletRepository (Finance.Domain).
+builder.Services.AddFinanceModule();
+builder.Services.AddPayoutModule();
 // Próximo módulo migrado entra aqui (ex.: Channel/Growth quando tiverem domínio real).
 
 // ─── DATABASE ──────────────────────────────────────────────────────────────────
@@ -46,6 +52,8 @@ builder.Services.AddControllers()
     .AddApplicationPart(typeof(Tuilow.Journey.Api.Controllers.LearnerProfilesController).Assembly)
     .AddApplicationPart(typeof(Tuilow.Sales.Api.Controllers.SubscriptionsController).Assembly)
     .AddApplicationPart(typeof(Tuilow.Streaming.Api.Controllers.VideosController).Assembly)
+    .AddApplicationPart(typeof(Tuilow.Finance.Api.Controllers.FinanceController).Assembly)
+    .AddApplicationPart(typeof(Tuilow.Payout.Api.Controllers.PayoutsController).Assembly)
     .AddJsonOptions(opt =>
     {
         opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -60,7 +68,7 @@ builder.Services.AddSwaggerGen(opt =>
     {
         Title = "Tuilow API (Host modular)",
         Version = "v1",
-        Description = "Composição dos módulos Tuilow — IdentidadeAcesso, Catalog, Learning, Journey, Sales e Streaming migrados. Só Channel/Growth seguem como stub.",
+        Description = "Composição dos módulos Tuilow — IdentidadeAcesso, Catalog, Learning, Journey, Sales, Streaming, Finance e Payout. Plataforma aberta a criadores: sem mensalidade, comissão retida apenas sobre vendas de curso. Só Channel/Growth seguem como stub.",
         Contact = new OpenApiContact { Name = "Tuilow", Email = "api@tuilow.com.br" }
     });
 
