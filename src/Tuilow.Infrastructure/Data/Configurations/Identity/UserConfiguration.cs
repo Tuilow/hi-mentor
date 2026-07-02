@@ -51,6 +51,15 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey(ur => ur.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // O campo é "_userRoles" mas a propriedade é "UserRoleAssignments" — os nomes não
+        // batem com a convenção de auto-detecção de backing field do EF Core. Sem isto, o EF
+        // tenta materializar Include() chamando Add() no wrapper de _userRoles.AsReadOnly(),
+        // que lança NotSupportedException("Collection is read-only"). Aponta explicitamente
+        // para o campo real para a fixup de navegação usar reflection sobre ele, não a propriedade.
+        builder.Navigation(u => u.UserRoleAssignments)
+            .HasField("_userRoles")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.Ignore(u => u.Roles);
         builder.Ignore(u => u.DomainEvents);
     }
