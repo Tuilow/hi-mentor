@@ -27,5 +27,6 @@
     <ProjectReference Include="..\..\Modules\Learning\Tuilow.Learning.Api\Tuilow.Learning.Api.csproj" />
     <ProjectReference Include="..\..\Modules\Journey\Tuilow.Journey.Api\Tuilow.Journey.Api.csproj" />
     <ProjectReference Include="..\..\Modules\Sales\Tuilow.Sales.Api\Tuilow.Sales.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Streaming\Tuilow.Streaming.Api\Tuilow.Streaming.Api.csproj" />
   </ItemGroup>
 </Project>

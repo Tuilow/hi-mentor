@@ -1,0 +1,38 @@
+using Tuilow.Streaming.Application.Interfaces;
+using Tuilow.Streaming.Domain.Interfaces;
+using Tuilow.Streaming.Infrastructure.Repositories;
+using Tuilow.Streaming.Infrastructure.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Tuilow.Streaming.Infrastructure;
+
+public static class DependencyInjection
+{
+    /// <summary>
+    /// Registra repositório e o serviço de streaming (Cloudflare real ou Mock local,
+    /// conforme Cloudflare:MockMode). Chamar no Host.
+    /// </summary>
+    public static IServiceCollection AddStreamingInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IVideoRepository, VideoRepository>();
+
+        var cloudflareMock = configuration.GetValue<bool>("Cloudflare:MockMode");
+        if (cloudflareMock)
+        {
+            services.AddScoped<IStreamingService, MockStreamingService>();
+        }
+        else
+        {
+            services.AddHttpClient<IStreamingService, CloudflareStreamService>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.cloudflare.com");
+                var apiToken = configuration["Cloudflare:ApiToken"];
+                if (!string.IsNullOrWhiteSpace(apiToken))
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiToken}");
+            });
+        }
+
+        return services;
+    }
+}

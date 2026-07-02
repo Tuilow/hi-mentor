@@ -14,9 +14,9 @@ namespace Tuilow.Catalog.Api.Controllers;
 
 /// <summary>
 /// Endpoints públicos/instrutor do catálogo de cursos.
-/// NOTA: o endpoint de playback de aula (GetLessonPlayUrl) permanece temporariamente no
-/// Tuilow.API legado, pois depende do contexto Streaming (Cloudflare), ainda não migrado.
-/// Migrar junto quando o módulo Streaming for portado.
+/// NOTA: o endpoint de playback de aula (GetLessonPlayUrl) vive em
+/// Tuilow.Streaming.Api.Controllers.LessonPlaybackController (mesma rota, para não quebrar
+/// o frontend) — depende do contexto Streaming, que fica em módulo separado.
 /// </summary>
 [ApiController]
 [Route("api/v1/courses")]

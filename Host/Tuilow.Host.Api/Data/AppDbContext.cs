@@ -5,6 +5,7 @@ using CatalogEntities = Tuilow.Catalog.Domain.Entities;
 using LearningEntities = Tuilow.Learning.Domain.Entities;
 using JourneyEntities = Tuilow.Journey.Domain.Entities;
 using SalesEntities = Tuilow.Sales.Domain.Entities;
+using StreamingEntities = Tuilow.Streaming.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,11 +16,12 @@ namespace Tuilow.Host.Api.Data;
 /// ApplyConfigurationsFromAssembly (não via referência direta de tipo) — assim o Host
 /// não precisa conhecer os detalhes internos de cada módulo, só a lista de assemblies.
 ///
-/// IMPORTANTE (transição): IdentidadeAcesso, Catalog, Learning, Journey e Sales já foram
-/// migrados para a nova estrutura. Só Streaming (vídeo/Cloudflare) ainda vive no Tuilow.API
-/// antigo (src/Tuilow.API) enquanto não é migrado (ver RELATORIO_REBRANDING / próxima fase).
-/// Os dois hosts (antigo e este) apontam para bancos diferentes até a migração terminar —
-/// não rode os dois contra o mesmo banco de dev ao mesmo tempo, ou rode o antigo até tudo migrar.
+/// IMPORTANTE (transição): todos os módulos de plataforma com código real já foram migrados
+/// (IdentidadeAcesso, Catalog, Learning, Journey, Sales, Streaming). Restam só Channel e Growth,
+/// que são contextos novos sem código legado (ainda stubs). O Tuilow.API antigo (src/Tuilow.API)
+/// pode ser desligado depois que os dois lados forem validados lado a lado — ver Task #18.
+/// Os dois hosts apontam para bancos diferentes (tuilow_dev vs tuilow_modular_dev); não rode os
+/// dois contra o mesmo banco de dev ao mesmo tempo.
 /// </summary>
 public sealed class AppDbContext(
     DbContextOptions<AppDbContext> options,
@@ -56,6 +58,9 @@ public sealed class AppDbContext(
     public DbSet<SalesEntities.Subscription> Subscriptions => Set<SalesEntities.Subscription>();
     public DbSet<SalesEntities.SubscriptionPayment> SubscriptionPayments => Set<SalesEntities.SubscriptionPayment>();
 
+    // Streaming
+    public DbSet<StreamingEntities.Video> Videos => Set<StreamingEntities.Video>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -75,6 +80,9 @@ public sealed class AppDbContext(
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(Sales.Infrastructure.Data.Configurations.PlanConfiguration).Assembly);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(Streaming.Infrastructure.Data.Configurations.VideoConfiguration).Assembly);
 
         modelBuilder.HasDefaultSchema("public");
     }
