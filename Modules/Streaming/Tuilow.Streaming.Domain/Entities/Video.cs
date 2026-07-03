@@ -21,9 +21,18 @@ public sealed class Video : AggregateRoot
     public string? ExternalId { get; private set; }
     public string? Title { get; private set; }
 
+    /// <summary>
+    /// Produto ao qual este vídeo pertence (passo 2 do assistente é sempre executado com o
+    /// produto já criado no passo 1). Permite recarregar "meus vídeos deste produto ainda não
+    /// vinculados a uma aula" ao reabrir o assistente — sem isso, um vídeo enviado/importado
+    /// ficava só na memória da página e "sumia" se o criador saísse e voltasse ao assistente
+    /// antes de vinculá-lo a uma aula no passo 3.
+    /// </summary>
+    public Guid? CourseId { get; private set; }
+
     private Video() { }
 
-    public static Video Create() => new();
+    public static Video Create(Guid? courseId = null) => new() { CourseId = courseId };
 
     /// <summary>
     /// Vídeo importado de uma plataforma externa via URL — não passa pelo Cloudflare Stream,
@@ -34,7 +43,7 @@ public sealed class Video : AggregateRoot
     /// </summary>
     public static Video CreateFromExternal(
         VideoSource source, string externalUrl, string? externalId,
-        string? title, int? durationSeconds, string? thumbnailUrl)
+        string? title, int? durationSeconds, string? thumbnailUrl, Guid? courseId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(externalUrl);
 
@@ -48,7 +57,8 @@ public sealed class Video : AggregateRoot
             ThumbnailUrl = thumbnailUrl,
             Status = VideoStatus.Ready,
             IsProtected = false, // conteúdo já público/hospedado fora da plataforma
-            ReadyAt = DateTime.UtcNow
+            ReadyAt = DateTime.UtcNow,
+            CourseId = courseId
         };
         return video;
     }

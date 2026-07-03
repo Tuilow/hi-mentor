@@ -114,10 +114,11 @@ export const coursesApi = {
 };
 
 export const videosApi = {
-  getUploadUrl: () => api.post('/videos/upload-url', {}),
+  getUploadUrl: (courseId: string) => api.post('/videos/upload-url', { courseId }),
   linkVideo: (videoId: string, data: { courseId: string; moduleId: string; lessonId: string; isPreview?: boolean }) =>
     api.post(`/videos/${videoId}/link-lesson`, data),
-  importExternal: (url: string) => api.post('/videos/import', { url }),
+  importExternal: (courseId: string, url: string) => api.post('/videos/import', { courseId, url }),
+  listByCourse: (courseId: string) => api.get(`/videos/by-course/${courseId}`),
 };
 
 export const materialsApi = {

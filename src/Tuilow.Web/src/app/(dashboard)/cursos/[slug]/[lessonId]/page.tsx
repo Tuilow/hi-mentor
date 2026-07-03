@@ -15,6 +15,30 @@ interface PlayUrlResponse {
   thumbnailUrl?: string;
 }
 
+/**
+ * Vídeos importados (YouTube/Vimeo/Drive/...) chegam do backend com a URL ORIGINAL colada pelo
+ * criador (ex.: https://www.youtube.com/watch?v=abc123) — essa URL não é um arquivo de vídeo e
+ * não funciona numa tag <video src="...">, precisa virar uma URL de EMBED (iframe) própria da
+ * plataforma. Cloudflare Stream já vem pronto para iframe (ver checagem abaixo); os demais
+ * precisam dessa conversão no front. Retorna null quando não há embed conhecido (Dropbox/
+ * OneDrive não têm formato de embed de vídeo universal sem uma chamada de API adicional) — nesse
+ * caso mostramos um link para abrir o vídeo na plataforma original em vez de tentar embutir.
+ */
+function toEmbedUrl(url: string): string | null {
+  const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
+  if (youtubeMatch) return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+
+  const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveMatch) return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+
+  if (url.includes('cloudflarestream.com') || url.includes('videodelivery.net')) return url;
+
+  return null;
+}
+
 interface CourseDetail {
   id: string;
   title: string;
@@ -136,25 +160,42 @@ export default function LessonPlayerPage() {
           {!isPaywalled && !isLoading && playData && (
             <>
               <div className="w-full aspect-video rounded-xl overflow-hidden bg-black">
-                {playData.playbackUrl.includes('cloudflarestream.com') ? (
-                  // Player Cloudflare Stream (produção)
-                  <iframe
-                    src={playData.playbackUrl}
-                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
-                    allowFullScreen
-                    className="w-full h-full border-0"
-                    title={playData.title}
-                  />
-                ) : (
-                  // Player HTML5 — vídeo local (mock mode)
-                  <video
-                    src={playData.playbackUrl}
-                    controls
-                    autoPlay
-                    className="w-full h-full"
-                    title={playData.title}
-                  />
-                )}
+                {(() => {
+                  const embedUrl = toEmbedUrl(playData.playbackUrl);
+                  if (embedUrl) {
+                    // YouTube/Vimeo/Drive/Cloudflare Stream — todos tocam via iframe de embed
+                    return (
+                      <iframe
+                        src={embedUrl}
+                        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+                        allowFullScreen
+                        className="w-full h-full border-0"
+                        title={playData.title}
+                      />
+                    );
+                  }
+                  if (playData.playbackUrl.includes('dropbox.com') || playData.playbackUrl.includes('onedrive') || playData.playbackUrl.includes('1drv.ms')) {
+                    // Sem formato de embed universal — abre na plataforma original
+                    return (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-gray-300">
+                        <p className="text-sm">Este vídeo está hospedado externamente.</p>
+                        <a href={playData.playbackUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                          Abrir vídeo ↗
+                        </a>
+                      </div>
+                    );
+                  }
+                  // Arquivo de vídeo direto (upload — Cloudflare Stream real ou mock local)
+                  return (
+                    <video
+                      src={playData.playbackUrl}
+                      controls
+                      autoPlay
+                      className="w-full h-full"
+                      title={playData.title}
+                    />
+                  );
+                })()}
               </div>
 
               {/* Título e badge */}

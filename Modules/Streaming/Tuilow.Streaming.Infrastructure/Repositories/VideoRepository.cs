@@ -23,4 +23,10 @@ public sealed class VideoRepository(DbContext context) : IVideoRepository
 
     public async Task<Video?> GetByCloudflareIdAsync(string cloudflareVideoId, CancellationToken ct = default) =>
         await context.Set<Video>().FirstOrDefaultAsync(v => v.CloudflareVideoId == cloudflareVideoId, ct);
+
+    public async Task<IEnumerable<Video>> ListByCourseAsync(Guid courseId, CancellationToken ct = default) =>
+        await context.Set<Video>()
+            .Where(v => v.CourseId == courseId)
+            .OrderByDescending(v => v.CreatedAt)
+            .ToListAsync(ct);
 }

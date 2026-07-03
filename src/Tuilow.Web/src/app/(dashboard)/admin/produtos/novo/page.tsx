@@ -70,6 +70,18 @@ function ProductWizard() {
   const [checklist, setChecklist] = useState<PublicationChecklist | null>(null);
   const [publishing, setPublishing] = useState(false);
 
+  // Recarrega os vídeos já enviados/importados para este produto sempre que o courseId estiver
+  // disponível — sem isso, sair e voltar ao assistente antes de vincular o vídeo a uma aula
+  // (passo 3) fazia a lista "sumir" (ela só existia na memória da página).
+  useEffect(() => {
+    if (!courseId) return;
+    videosApi.listByCourse(courseId).then(({ data }) => {
+      setVideos(data.map((v: { videoId: string; title: string | null; source: string; durationSeconds: number | null }) => ({
+        videoId: v.videoId, title: v.title ?? '(sem título)', source: v.source, durationSeconds: v.durationSeconds,
+      })));
+    }).catch(() => { /* melhor deixar a lista vazia do que travar o assistente */ });
+  }, [courseId]);
+
   // Hidrata o assistente ao editar um rascunho existente
   useEffect(() => {
     if (!existingCourseId) return;
@@ -154,10 +166,10 @@ function ProductWizard() {
 
   // ─── Passo 2 ────────────────────────────────────────────────────────────
   const handleImportVideo = async () => {
-    if (!importUrl.trim()) return;
+    if (!importUrl.trim() || !courseId) return;
     setImporting(true);
     try {
-      const { data } = await videosApi.importExternal(importUrl.trim());
+      const { data } = await videosApi.importExternal(courseId, importUrl.trim());
       setVideos(v => [...v, {
         videoId: data.videoId, title: data.title ?? importUrl, source: data.source,
         durationSeconds: data.durationSeconds,
@@ -172,9 +184,10 @@ function ProductWizard() {
   };
 
   const handleUploadVideo = async (file: File) => {
+    if (!courseId) return;
     setImporting(true);
     try {
-      const { data } = await videosApi.getUploadUrl();
+      const { data } = await videosApi.getUploadUrl(courseId);
       const tus = await import('tus-js-client');
       await new Promise<void>((resolve, reject) => {
         const upload = new tus.Upload(file, {

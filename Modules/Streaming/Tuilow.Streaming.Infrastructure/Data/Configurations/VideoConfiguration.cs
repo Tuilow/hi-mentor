@@ -20,6 +20,11 @@ public sealed class VideoConfiguration : IEntityTypeConfiguration<Video>
         builder.Property(v => v.ExternalId).HasColumnName("external_id").HasMaxLength(200);
         builder.Property(v => v.Title).HasColumnName("title").HasMaxLength(300);
 
+        // Produto ao qual o vídeo pertence — sem FK de verdade pro Course (Catalog é outro
+        // módulo), só um Guid solto + índice, mesmo padrão de Plan.CourseId (Sales).
+        builder.Property(v => v.CourseId).HasColumnName("course_id");
+        builder.HasIndex(v => v.CourseId).HasDatabaseName("ix_videos_course_id");
+
         builder.Property(v => v.CreatedAt).IsRequired();
         builder.Property(v => v.UpdatedAt).IsRequired();
         builder.Ignore(v => v.DomainEvents);

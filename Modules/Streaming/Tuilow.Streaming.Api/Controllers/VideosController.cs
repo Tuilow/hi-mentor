@@ -1,6 +1,7 @@
 using Tuilow.Streaming.Application.Commands.GetVideoUploadUrl;
 using Tuilow.Streaming.Application.Commands.ImportExternalVideo;
 using Tuilow.Streaming.Application.Commands.LinkVideoToLesson;
+using Tuilow.Streaming.Application.Queries.GetVideosByCourse;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -20,9 +21,9 @@ public sealed class VideosController(ISender sender, ICurrentUserService current
     /// </summary>
     [HttpPost("upload-url")]
     [Authorize(Roles = "Creator,Admin")]
-    public async Task<IActionResult> GetUploadUrl(CancellationToken ct)
+    public async Task<IActionResult> GetUploadUrl([FromBody] GetUploadUrlRequest request, CancellationToken ct)
     {
-        var result = await sender.Send(new GetVideoUploadUrlCommand(), ct);
+        var result = await sender.Send(new GetVideoUploadUrlCommand(request.CourseId, currentUser.UserId!.Value), ct);
         return Ok(result);
     }
 
@@ -38,7 +39,19 @@ public sealed class VideosController(ISender sender, ICurrentUserService current
     [Authorize(Roles = "Creator,Admin")]
     public async Task<IActionResult> Import([FromBody] ImportExternalVideoCommand command, CancellationToken ct)
     {
-        var result = await sender.Send(command, ct);
+        var result = await sender.Send(command with { InstructorId = currentUser.UserId!.Value }, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Vídeos já enviados/importados para este produto (vinculados a uma aula ou não) — usado
+    /// para reidratar o passo "Conteúdo" do assistente ao reabri-lo.
+    /// </summary>
+    [HttpGet("by-course/{courseId:guid}")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> GetByCourse(Guid courseId, CancellationToken ct)
+    {
+        var result = await sender.Send(new GetVideosByCourseQuery(courseId, currentUser.UserId!.Value), ct);
         return Ok(result);
     }
 
@@ -68,3 +81,5 @@ public sealed record LinkLessonRequest(
     Guid LessonId,
     bool IsPreview = false
 );
+
+public sealed record GetUploadUrlRequest(Guid CourseId);

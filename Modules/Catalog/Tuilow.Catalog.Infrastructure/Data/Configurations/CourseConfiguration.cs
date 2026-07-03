@@ -53,7 +53,13 @@ public sealed class CourseConfiguration : IEntityTypeConfiguration<Course>
             .HasColumnName("sales_page_benefits")
             .HasConversion(
                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>())
+                // Cursos que já existiam antes desta coluna ser criada ficam com NULL (ou string
+                // vazia) no banco até serem salvos de novo — JsonSerializer.Deserialize lança
+                // exceção para ambos os casos ("input does not contain any JSON tokens"), então
+                // tratamos como lista vazia em vez de deixar estourar ao carregar esses cursos.
+                v => string.IsNullOrEmpty(v)
+                    ? new List<string>()
+                    : JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>())
             .Metadata.SetValueComparer(new ValueComparer<List<string>>(
                 (a, b) => (a ?? new List<string>()).SequenceEqual(b ?? new List<string>()),
                 v => v.Aggregate(0, (hash, s) => HashCode.Combine(hash, s.GetHashCode())),

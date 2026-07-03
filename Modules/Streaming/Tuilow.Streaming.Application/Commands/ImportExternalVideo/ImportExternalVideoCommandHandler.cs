@@ -1,4 +1,6 @@
+using Tuilow.SharedKernel.Application.Exceptions;
 using Tuilow.SharedKernel.Application.Interfaces;
+using Tuilow.Catalog.Domain.Interfaces;
 using Tuilow.Streaming.Application.Interfaces;
 using Tuilow.Streaming.Domain.Entities;
 using Tuilow.Streaming.Domain.Interfaces;
@@ -9,16 +11,23 @@ namespace Tuilow.Streaming.Application.Commands.ImportExternalVideo;
 public sealed class ImportExternalVideoCommandHandler(
     IMediaImportService mediaImportService,
     IVideoRepository videoRepository,
+    ICourseRepository courseRepository,
     IUnitOfWork uow
 ) : IRequestHandler<ImportExternalVideoCommand, ImportExternalVideoResponse>
 {
     public async Task<ImportExternalVideoResponse> Handle(ImportExternalVideoCommand request, CancellationToken ct)
     {
+        var course = await courseRepository.GetByIdAsync(request.CourseId, ct)
+            ?? throw new NotFoundException("Curso", request.CourseId);
+
+        if (course.InstructorId != request.InstructorId)
+            throw new ForbiddenException("Apenas o criador pode importar vídeos para este produto.");
+
         var metadata = await mediaImportService.FetchMetadataAsync(request.Url, ct);
 
         var video = Video.CreateFromExternal(
             metadata.Source, metadata.ExternalUrl, metadata.ExternalId,
-            metadata.Title, metadata.DurationSeconds, metadata.ThumbnailUrl);
+            metadata.Title, metadata.DurationSeconds, metadata.ThumbnailUrl, request.CourseId);
 
         await videoRepository.AddAsync(video, ct);
         await uow.SaveChangesAsync(ct);
