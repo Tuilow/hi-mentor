@@ -10,5 +10,7 @@ public sealed record CourseListItemResponse(
     bool IsFree,
     string Level,
     int TotalDurationMinutes,
-    DateTime? PublishedAt
+    DateTime? PublishedAt,
+    string? Category,
+    string ProductType
 );

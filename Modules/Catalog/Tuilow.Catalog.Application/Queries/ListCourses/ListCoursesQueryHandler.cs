@@ -15,7 +15,7 @@ public sealed class ListCoursesQueryHandler(ICourseRepository courseRepository)
         var items = courses.Select(c => new CourseListItemResponse(
             c.Id, c.Title, c.Slug.Value, c.ShortDescription, c.ThumbnailUrl,
             c.Price.Amount, c.IsFree, c.Level.ToString(),
-            c.TotalDurationMinutes, c.PublishedAt));
+            c.TotalDurationMinutes, c.PublishedAt, c.Category, c.ProductType.ToString()));
 
         return new PagedList<CourseListItemResponse>(items, total, request.Page, request.PageSize);
     }

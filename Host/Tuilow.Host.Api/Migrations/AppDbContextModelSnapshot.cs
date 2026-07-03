@@ -29,6 +29,11 @@ namespace Tuilow.Host.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("category");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -44,8 +49,29 @@ namespace Tuilow.Host.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("ProductType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("product_type");
+
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SalesPageCtaText")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sales_page_cta_text");
+
+                    b.Property<string>("SalesPageHeadline")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("sales_page_headline");
+
+                    b.Property<string>("SalesPageSubheadline")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("sales_page_subheadline");
 
                     b.Property<string>("ShortDescription")
                         .HasMaxLength(500)
@@ -62,6 +88,11 @@ namespace Tuilow.Host.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("Subcategory")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("subcategory");
+
                     b.Property<string>("ThumbnailUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -74,6 +105,17 @@ namespace Tuilow.Host.Api.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("ViewCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("view_count");
+
+                    b.Property<string>("_salesPageBenefits")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sales_page_benefits");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Slug")
@@ -81,6 +123,41 @@ namespace Tuilow.Host.Api.Migrations
                         .HasDatabaseName("ix_courses_slug");
 
                     b.ToTable("courses", "catalog");
+                });
+
+            modelBuilder.Entity("Tuilow.Catalog.Domain.Entities.CourseFaqItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.ToTable("course_faq_items", "catalog");
                 });
 
             modelBuilder.Entity("Tuilow.Catalog.Domain.Entities.Lesson", b =>
@@ -236,6 +313,47 @@ namespace Tuilow.Host.Api.Migrations
                     b.HasIndex("CourseId");
 
                     b.ToTable("modules", "catalog");
+                });
+
+            modelBuilder.Entity("Tuilow.CreatorStudio.Domain.Entities.Lead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId")
+                        .HasDatabaseName("ix_leads_course_id");
+
+                    b.ToTable("leads", "creator_studio");
                 });
 
             modelBuilder.Entity("Tuilow.Finance.Domain.Entities.CreatorWallet", b =>
@@ -946,6 +1064,10 @@ namespace Tuilow.Host.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("CourseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("course_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -977,6 +1099,9 @@ namespace Tuilow.Host.Api.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CourseId")
+                        .HasDatabaseName("ix_plans_course_id");
 
                     b.HasIndex("Slug")
                         .IsUnique();
@@ -1140,6 +1265,16 @@ namespace Tuilow.Host.Api.Migrations
                     b.Property<int?>("DurationSeconds")
                         .HasColumnType("integer");
 
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("ExternalUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("external_url");
+
                     b.Property<bool>("IsProtected")
                         .HasColumnType("boolean");
 
@@ -1149,6 +1284,12 @@ namespace Tuilow.Host.Api.Migrations
                     b.Property<long?>("SizeBytes")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1156,6 +1297,11 @@ namespace Tuilow.Host.Api.Migrations
 
                     b.Property<string>("ThumbnailUrl")
                         .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("title");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1195,6 +1341,15 @@ namespace Tuilow.Host.Api.Migrations
                         });
 
                     b.Navigation("Price")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tuilow.Catalog.Domain.Entities.CourseFaqItem", b =>
+                {
+                    b.HasOne("Tuilow.Catalog.Domain.Entities.Course", null)
+                        .WithMany("FaqItems")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -1708,6 +1863,8 @@ namespace Tuilow.Host.Api.Migrations
 
             modelBuilder.Entity("Tuilow.Catalog.Domain.Entities.Course", b =>
                 {
+                    b.Navigation("FaqItems");
+
                     b.Navigation("Modules");
                 });
 

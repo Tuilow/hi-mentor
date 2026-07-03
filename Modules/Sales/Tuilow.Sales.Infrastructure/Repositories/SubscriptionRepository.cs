@@ -24,12 +24,26 @@ public sealed class SubscriptionRepository(DbContext context) : ISubscriptionRep
     public void Delete(SubscriptionEntity entity) => context.Set<SubscriptionEntity>().Remove(entity);
 
     public async Task<SubscriptionEntity?> GetActiveByUserAsync(Guid userId, CancellationToken ct = default) =>
-        await context.Set<SubscriptionEntity>()
-            .Include(s => s.Payments)
-            .Where(s => s.UserId == userId &&
-                (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Trial))
-            .OrderByDescending(s => s.CurrentPeriodEnd)
-            .FirstOrDefaultAsync(ct);
+        await (
+            from s in context.Set<SubscriptionEntity>().Include(s => s.Payments)
+            join p in context.Set<Plan>() on s.PlanId equals p.Id
+            where s.UserId == userId
+                && p.CourseId == null // só plano da plataforma — plano por produto não conta aqui
+                && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Trial)
+            orderby s.CurrentPeriodEnd descending
+            select s
+        ).FirstOrDefaultAsync(ct);
+
+    public async Task<SubscriptionEntity?> GetActiveByUserForCourseAsync(Guid userId, Guid courseId, CancellationToken ct = default) =>
+        await (
+            from s in context.Set<SubscriptionEntity>().Include(s => s.Payments)
+            join p in context.Set<Plan>() on s.PlanId equals p.Id
+            where s.UserId == userId
+                && p.CourseId == courseId
+                && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Trial)
+            orderby s.CurrentPeriodEnd descending
+            select s
+        ).FirstOrDefaultAsync(ct);
 
     public async Task<SubscriptionEntity?> GetByAsaasSubscriptionIdAsync(string asaasId, CancellationToken ct = default) =>
         await context.Set<SubscriptionEntity>()
@@ -40,7 +54,13 @@ public sealed class SubscriptionRepository(DbContext context) : ISubscriptionRep
         await context.Set<Plan>().Include(p => p.Features).FirstOrDefaultAsync(p => p.Id == planId, ct);
 
     public async Task<IEnumerable<Plan>> GetActivePlansAsync(CancellationToken ct = default) =>
-        await context.Set<Plan>().Include(p => p.Features).Where(p => p.IsActive).ToListAsync(ct);
+        await context.Set<Plan>().Include(p => p.Features).Where(p => p.IsActive && p.CourseId == null).ToListAsync(ct);
+
+    public async Task<IEnumerable<Plan>> GetPlansByCourseAsync(Guid courseId, CancellationToken ct = default) =>
+        await context.Set<Plan>().Include(p => p.Features).Where(p => p.CourseId == courseId).ToListAsync(ct);
+
+    public async Task AddPlanAsync(Plan plan, CancellationToken ct = default) =>
+        await context.Set<Plan>().AddAsync(plan, ct);
 
     /// <summary>
     /// Registra o SubscriptionPayment explicitamente como Added no DbContext.

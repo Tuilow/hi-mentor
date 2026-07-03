@@ -1,4 +1,5 @@
 using Tuilow.Sales.Application.Commands.CancelSubscription;
+using Tuilow.Sales.Application.Commands.CreateCourseSubscriptionPlan;
 using Tuilow.Sales.Application.Commands.CreateSubscription;
 using Tuilow.Sales.Application.Queries.GetUserSubscription;
 using Tuilow.Sales.Domain.Interfaces;
@@ -62,6 +63,31 @@ public sealed class SubscriptionsController(
     {
         await sender.Send(new CancelSubscriptionCommand(currentUser.UserId!.Value, request?.Reason), ct);
         return Ok(new { message = "Assinatura cancelada. Você terá acesso até o fim do período pago." });
+    }
+
+    /// <summary>Plano de assinatura do produto (se o criador tiver escolhido "Assinatura" no passo de preço).</summary>
+    [HttpGet("plans/by-course/{courseId:guid}")]
+    public async Task<IActionResult> GetPlansByCourse(Guid courseId, CancellationToken ct)
+    {
+        var plans = await subscriptionRepo.GetPlansByCourseAsync(courseId, ct);
+        return Ok(plans.Where(p => p.IsActive).Select(p => new
+        {
+            p.Id, p.Name, p.Description,
+            Price = p.Price.Amount,
+            BillingCycle = p.BillingCycle.ToString(),
+            p.TrialDays
+        }));
+    }
+
+    /// <summary>Define/atualiza o plano de assinatura do produto (passo 5 do assistente — opção "Assinatura").</summary>
+    [HttpPost("plans/by-course/{courseId:guid}")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> CreateCourseSubscriptionPlan(Guid courseId,
+        [FromBody] CreateCourseSubscriptionPlanCommand command, CancellationToken ct)
+    {
+        var planId = await sender.Send(
+            command with { CourseId = courseId, InstructorId = currentUser.UserId!.Value }, ct);
+        return Ok(new { id = planId });
     }
 }
 

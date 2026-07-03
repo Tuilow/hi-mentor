@@ -8,6 +8,7 @@ using SalesEntities = Tuilow.Sales.Domain.Entities;
 using StreamingEntities = Tuilow.Streaming.Domain.Entities;
 using FinanceEntities = Tuilow.Finance.Domain.Entities;
 using PayoutEntities = Tuilow.Payout.Domain.Entities;
+using CreatorStudioEntities = Tuilow.CreatorStudio.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -44,6 +45,7 @@ public sealed class AppDbContext(
     public DbSet<CatalogEntities.Lesson> Lessons => Set<CatalogEntities.Lesson>();
     public DbSet<CatalogEntities.LessonAttachment> LessonAttachments => Set<CatalogEntities.LessonAttachment>();
     public DbSet<CatalogEntities.LessonExercise> LessonExercises => Set<CatalogEntities.LessonExercise>();
+    public DbSet<CatalogEntities.CourseFaqItem> CourseFaqItems => Set<CatalogEntities.CourseFaqItem>();
 
     // Learning
     public DbSet<LearningEntities.Enrollment> Enrollments => Set<LearningEntities.Enrollment>();
@@ -74,6 +76,9 @@ public sealed class AppDbContext(
     // Payout — saques do criador (ciclo de 15 dias)
     public DbSet<PayoutEntities.PayoutRequest> PayoutRequests => Set<PayoutEntities.PayoutRequest>();
     public DbSet<PayoutEntities.PayoutTransaction> PayoutTransactions => Set<PayoutEntities.PayoutTransaction>();
+
+    // CreatorStudio — jornada guiada de criação de produtos (leads capturados na página de vendas)
+    public DbSet<CreatorStudioEntities.Lead> Leads => Set<CreatorStudioEntities.Lead>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -106,6 +111,9 @@ public sealed class AppDbContext(
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(Payout.Infrastructure.Data.Configurations.PayoutRequestConfiguration).Assembly);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(CreatorStudio.Infrastructure.Data.Configurations.LeadConfiguration).Assembly);
 
         modelBuilder.HasDefaultSchema("public");
     }

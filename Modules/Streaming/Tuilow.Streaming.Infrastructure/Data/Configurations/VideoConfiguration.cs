@@ -13,6 +13,13 @@ public sealed class VideoConfiguration : IEntityTypeConfiguration<Video>
         builder.Property(v => v.CloudflareVideoId).HasMaxLength(200);
         builder.Property(v => v.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
         builder.HasIndex(v => v.CloudflareVideoId).IsUnique();
+
+        // Importação externa (passo 2 do assistente).
+        builder.Property(v => v.Source).HasColumnName("source").HasConversion<string>().HasMaxLength(50).IsRequired();
+        builder.Property(v => v.ExternalUrl).HasColumnName("external_url").HasMaxLength(1000);
+        builder.Property(v => v.ExternalId).HasColumnName("external_id").HasMaxLength(200);
+        builder.Property(v => v.Title).HasColumnName("title").HasMaxLength(300);
+
         builder.Property(v => v.CreatedAt).IsRequired();
         builder.Property(v => v.UpdatedAt).IsRequired();
         builder.Ignore(v => v.DomainEvents);

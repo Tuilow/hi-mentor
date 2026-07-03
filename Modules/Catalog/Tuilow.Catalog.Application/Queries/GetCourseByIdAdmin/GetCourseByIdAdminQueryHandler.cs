@@ -21,9 +21,16 @@ public sealed class GetCourseByIdAdminQueryHandler(ICourseRepository courseRepos
                     l.Id, l.Title, l.Description, l.Order,
                     l.DurationSeconds, l.IsPreview, l.VideoId.HasValue))));
 
+        var faqItems = course.FaqItems
+            .OrderBy(f => f.Order)
+            .Select(f => new FaqItemResponse(f.Id, f.Question, f.Answer, f.Order));
+
         return new CourseDetailResponse(
             course.Id, course.Title, course.Slug.Value, course.Description,
             course.ShortDescription, course.ThumbnailUrl, course.Price.Amount, course.IsFree,
-            course.Level.ToString(), course.TotalDurationMinutes, course.PublishedAt, modules);
+            course.Level.ToString(), course.TotalDurationMinutes, course.PublishedAt, modules,
+            course.Status.ToString(), course.Category, course.Subcategory, course.ProductType.ToString(),
+            course.ViewCount, course.SalesPageHeadline, course.SalesPageSubheadline, course.SalesPageCtaText,
+            course.SalesPageBenefits, faqItems);
     }
 }

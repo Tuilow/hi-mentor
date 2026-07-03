@@ -106,6 +106,7 @@ public sealed class Subscription : AggregateRoot
     {
         BillingCycle.Monthly => from.AddMonths(1),
         BillingCycle.Quarterly => from.AddMonths(3),
+        BillingCycle.Semiannual => from.AddMonths(6),
         BillingCycle.Annual => from.AddYears(1),
         _ => from.AddMonths(1)
     };

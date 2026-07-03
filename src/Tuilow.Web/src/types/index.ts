@@ -47,7 +47,7 @@ export interface Plan {
   slug: string;
   description?: string;
   price: number;
-  billingCycle: 'Monthly' | 'Quarterly' | 'Annual';
+  billingCycle: 'Monthly' | 'Quarterly' | 'Semiannual' | 'Annual';
   trialDays: number;
   features: PlanFeature[];
 }
@@ -75,4 +75,118 @@ export interface Subscription {
   billingCycle: string;
   currentPeriodEnd: string;
   isActive: boolean;
+}
+
+// ─── Jornada Guiada de Criação de Produtos ─────────────────────────
+
+export type ProductStatus = 'Draft' | 'InReview' | 'Published' | 'Archived';
+export type ProductType = 'Course' | 'Ebook' | 'Bundle';
+
+export interface ProductListItem {
+  id: string;
+  name: string;
+  slug: string;
+  category?: string;
+  productType: ProductType;
+  status: ProductStatus;
+  createdAt: string;
+  totalSales: number;
+  revenueGenerated: number;
+}
+
+export interface VideoRef {
+  id: string;
+  hasVideo: boolean;
+}
+
+export interface LessonDetail {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  durationSeconds?: number;
+  isPreview: boolean;
+  hasVideo: boolean;
+}
+
+export interface ModuleDetail {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  lessons: LessonDetail[];
+}
+
+export interface FaqItem {
+  id?: string;
+  question: string;
+  answer: string;
+  order?: number;
+}
+
+export interface ProductDetail {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  shortDescription?: string;
+  thumbnailUrl?: string;
+  price: number;
+  isFree: boolean;
+  level: string;
+  totalDurationMinutes: number;
+  publishedAt?: string;
+  modules: ModuleDetail[];
+  status: ProductStatus;
+  category?: string;
+  subcategory?: string;
+  productType: ProductType;
+  viewCount: number;
+  salesPageHeadline?: string;
+  salesPageSubheadline?: string;
+  salesPageCtaText?: string;
+  salesPageBenefits: string[];
+  faqItems: FaqItem[];
+}
+
+export interface PublicationChecklist {
+  basicInfoFilled: boolean;
+  contentUploaded: boolean;
+  priceDefined: boolean;
+  salesPageCreated: boolean;
+  isComplete: boolean;
+}
+
+export interface ProductDashboard {
+  courseId: string;
+  productName: string;
+  views: number;
+  leads: number;
+  students: number;
+  sales: number;
+  revenue: number;
+  platformFee: number;
+  netRevenue: number;
+  platformFeePercentage: number;
+}
+
+export interface ProductCopySuggestion {
+  shortDescription: string;
+  fullDescription: string;
+  benefits: string[];
+  targetAudience: string;
+  callToAction: string;
+}
+
+export interface SalesPageFaqSuggestion {
+  question: string;
+  answer: string;
+}
+
+export interface SalesPageSuggestion {
+  headline: string;
+  subheadline: string;
+  benefits: string[];
+  faq: SalesPageFaqSuggestion[];
+  callToAction: string;
 }

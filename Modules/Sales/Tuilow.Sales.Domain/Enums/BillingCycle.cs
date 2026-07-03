@@ -1,3 +1,3 @@
 namespace Tuilow.Sales.Domain.Enums;
 
-public enum BillingCycle { Monthly, Quarterly, Annual }
+public enum BillingCycle { Monthly, Quarterly, Semiannual, Annual }

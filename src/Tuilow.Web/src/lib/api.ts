@@ -94,6 +94,61 @@ export const coursesApi = {
   create: (data: unknown) => api.post('/courses', data),
   getLessonPlayUrl: (courseId: string, lessonId: string) =>
     api.get(`/courses/${courseId}/lessons/${lessonId}/play`),
+  recordView: (slug: string) => api.post(`/courses/${slug}/view`),
+
+  // Admin/criador — reaproveitados pelo assistente de criação de produtos.
+  getByIdAdmin: (id: string) => api.get(`/admin/courses/${id}`),
+  listAdmin: () => api.get('/admin/courses'),
+  updateBasicInfo: (id: string, data: unknown) => api.patch(`/courses/${id}`, data),
+  setPrice: (id: string, price: number) => api.put(`/courses/${id}/price`, { price }),
+  setSalesPage: (id: string, data: unknown) => api.put(`/courses/${id}/sales-page`, data),
+  archive: (id: string) => api.post(`/courses/${id}/archive`),
+  duplicate: (id: string) => api.post(`/courses/${id}/duplicate`),
+  deleteCourse: (id: string) => api.delete(`/courses/${id}`),
+  addModule: (courseId: string, data: { title: string; description?: string }) =>
+    api.post(`/courses/${courseId}/modules`, data),
+  addLesson: (courseId: string, moduleId: string, data: { title: string; description?: string; isPreview?: boolean }) =>
+    api.post(`/courses/${courseId}/modules/${moduleId}/lessons`, data),
+  addAttachment: (courseId: string, moduleId: string, lessonId: string, data: unknown) =>
+    api.post(`/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/attachments`, data),
+};
+
+export const videosApi = {
+  getUploadUrl: () => api.post('/videos/upload-url', {}),
+  linkVideo: (videoId: string, data: { courseId: string; moduleId: string; lessonId: string; isPreview?: boolean }) =>
+    api.post(`/videos/${videoId}/link-lesson`, data),
+  importExternal: (url: string) => api.post('/videos/import', { url }),
+};
+
+export const materialsApi = {
+  upload: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/materials/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
+// ─── Jornada Guiada de Criação de Produtos ─────────────────────────
+export const creatorStudioApi = {
+  myProducts: () => api.get('/creator-studio/my-products'),
+  generateProductCopy: (data: { productName: string; category?: string; subcategory?: string }) =>
+    api.post('/creator-studio/generate-product-copy', data),
+  generateSalesPageCopy: (courseId: string) =>
+    api.post(`/creator-studio/products/${courseId}/generate-sales-page-copy`),
+  publicationChecklist: (courseId: string) =>
+    api.get(`/creator-studio/products/${courseId}/publication-checklist`),
+  publish: (courseId: string) => api.post(`/creator-studio/products/${courseId}/publish`),
+  dashboard: (courseId: string) => api.get(`/creator-studio/products/${courseId}/dashboard`),
+  captureLead: (data: { courseId: string; name: string; email: string; phone?: string; source?: string }) =>
+    api.post('/creator-studio/leads', data),
+};
+
+export const courseSubscriptionPlansApi = {
+  getByCourse: (courseId: string) => api.get(`/subscriptions/plans/by-course/${courseId}`),
+  createForCourse: (courseId: string, data: { price: number; billingCycle: string; trialDays?: number }) =>
+    api.post(`/subscriptions/plans/by-course/${courseId}`, data),
 };
 
 export const enrollmentsApi = {

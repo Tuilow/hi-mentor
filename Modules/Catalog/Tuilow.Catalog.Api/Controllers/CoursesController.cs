@@ -1,7 +1,15 @@
 using Tuilow.Catalog.Application.Commands.AddLesson;
+using Tuilow.Catalog.Application.Commands.AddLessonAttachment;
 using Tuilow.Catalog.Application.Commands.AddModule;
+using Tuilow.Catalog.Application.Commands.ArchiveCourse;
 using Tuilow.Catalog.Application.Commands.CreateCourse;
+using Tuilow.Catalog.Application.Commands.DeleteCourse;
+using Tuilow.Catalog.Application.Commands.DuplicateCourse;
 using Tuilow.Catalog.Application.Commands.PublishCourse;
+using Tuilow.Catalog.Application.Commands.RecordCourseView;
+using Tuilow.Catalog.Application.Commands.SetCoursePrice;
+using Tuilow.Catalog.Application.Commands.SetCourseSalesPage;
+using Tuilow.Catalog.Application.Commands.UpdateCourseBasicInfo;
 using Tuilow.Catalog.Application.Queries.GetCourseBySlug;
 using Tuilow.Catalog.Application.Queries.ListCourses;
 using Tuilow.Catalog.Domain.Enums;
@@ -59,7 +67,7 @@ public sealed class CoursesController(ISender sender, ICurrentUserService curren
     [Authorize(Roles = "Creator,Admin")]
     public async Task<IActionResult> AddModule(Guid courseId, [FromBody] AddModuleCommand command, CancellationToken ct)
     {
-        var moduleId = await sender.Send(command with { CourseId = courseId }, ct);
+        var moduleId = await sender.Send(command with { CourseId = courseId, InstructorId = currentUser.UserId!.Value }, ct);
         return Ok(new { id = moduleId });
     }
 
@@ -70,8 +78,19 @@ public sealed class CoursesController(ISender sender, ICurrentUserService curren
         [FromBody] AddLessonCommand command, CancellationToken ct)
     {
         var lessonId = await sender.Send(
-            command with { CourseId = courseId, ModuleId = moduleId }, ct);
+            command with { CourseId = courseId, ModuleId = moduleId, InstructorId = currentUser.UserId!.Value }, ct);
         return Ok(new { id = lessonId });
+    }
+
+    /// <summary>Anexa um material (PDF/DOCX/PPTX/ZIP/imagem/planilha) à aula (passo 4 do assistente).</summary>
+    [HttpPost("{courseId:guid}/modules/{moduleId:guid}/lessons/{lessonId:guid}/attachments")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> AddAttachment(Guid courseId, Guid moduleId, Guid lessonId,
+        [FromBody] AddLessonAttachmentCommand command, CancellationToken ct)
+    {
+        var attachmentId = await sender.Send(
+            command with { CourseId = courseId, ModuleId = moduleId, LessonId = lessonId, InstructorId = currentUser.UserId!.Value }, ct);
+        return Ok(new { id = attachmentId });
     }
 
     /// <summary>Publica o curso (torna-o visível para alunos).</summary>
@@ -81,5 +100,71 @@ public sealed class CoursesController(ISender sender, ICurrentUserService curren
     {
         await sender.Send(new PublishCourseCommand(courseId, currentUser.UserId!.Value), ct);
         return Ok(new { message = "Curso publicado com sucesso." });
+    }
+
+    /// <summary>Atualiza informações básicas do produto (passo 1 do assistente / edição posterior).</summary>
+    [HttpPatch("{courseId:guid}")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> UpdateBasicInfo(Guid courseId,
+        [FromBody] UpdateCourseBasicInfoCommand command, CancellationToken ct)
+    {
+        await sender.Send(command with { CourseId = courseId, InstructorId = currentUser.UserId!.Value }, ct);
+        return Ok(new { message = "Produto atualizado com sucesso." });
+    }
+
+    /// <summary>Define o preço do produto — Grátis ou Pagamento único (passo 5 do assistente).</summary>
+    [HttpPut("{courseId:guid}/price")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> SetPrice(Guid courseId,
+        [FromBody] SetCoursePriceCommand command, CancellationToken ct)
+    {
+        await sender.Send(command with { CourseId = courseId, InstructorId = currentUser.UserId!.Value }, ct);
+        return Ok(new { message = "Preço atualizado com sucesso." });
+    }
+
+    /// <summary>Define/atualiza o conteúdo da página de vendas (passo 6 do assistente).</summary>
+    [HttpPut("{courseId:guid}/sales-page")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> SetSalesPage(Guid courseId,
+        [FromBody] SetCourseSalesPageCommand command, CancellationToken ct)
+    {
+        await sender.Send(command with { CourseId = courseId, InstructorId = currentUser.UserId!.Value }, ct);
+        return Ok(new { message = "Página de vendas atualizada com sucesso." });
+    }
+
+    /// <summary>Arquiva o produto (some do catálogo público, mas preserva histórico de alunos/vendas).</summary>
+    [HttpPost("{courseId:guid}/archive")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> Archive(Guid courseId, CancellationToken ct)
+    {
+        await sender.Send(new ArchiveCourseCommand(courseId, currentUser.UserId!.Value), ct);
+        return Ok(new { message = "Produto arquivado com sucesso." });
+    }
+
+    /// <summary>Duplica o produto (estrutura completa) como um novo rascunho.</summary>
+    [HttpPost("{courseId:guid}/duplicate")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> Duplicate(Guid courseId, CancellationToken ct)
+    {
+        var newCourseId = await sender.Send(new DuplicateCourseCommand(courseId, currentUser.UserId!.Value), ct);
+        return Ok(new { id = newCourseId });
+    }
+
+    /// <summary>Exclui o produto — só permitido para rascunhos que nunca foram publicados.</summary>
+    [HttpDelete("{courseId:guid}")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> Delete(Guid courseId, CancellationToken ct)
+    {
+        await sender.Send(new DeleteCourseCommand(courseId, currentUser.UserId!.Value), ct);
+        return Ok(new { message = "Produto excluído com sucesso." });
+    }
+
+    /// <summary>Registra uma visualização da página de vendas pública (anônimo).</summary>
+    [HttpPost("{slug}/view")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RecordView(string slug, CancellationToken ct)
+    {
+        await sender.Send(new RecordCourseViewCommand(slug), ct);
+        return NoContent();
     }
 }

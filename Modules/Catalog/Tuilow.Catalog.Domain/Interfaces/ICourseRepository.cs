@@ -12,9 +12,24 @@ public interface ICourseRepository : IRepository<Course>
         CourseLevel? level, string? search, int page, int pageSize, CancellationToken ct = default);
     Task<IEnumerable<Course>> ListAllForAdminAsync(CancellationToken ct = default);
 
+    /// <summary>Lista os produtos do criador (tela "Meus Produtos") — inclui todos os status.</summary>
+    Task<IEnumerable<Course>> ListByInstructorAsync(Guid instructorId, CancellationToken ct = default);
+
     /// <summary>Força EntityState.Added para o Module — evita DbUpdateConcurrencyException.</summary>
     Task AddModuleAsync(Module module, CancellationToken ct = default);
 
     /// <summary>Força EntityState.Added para a Lesson — evita DbUpdateConcurrencyException.</summary>
     Task AddLessonAsync(Lesson lesson, CancellationToken ct = default);
+
+    /// <summary>Força EntityState.Added para o LessonAttachment — evita DbUpdateConcurrencyException.</summary>
+    Task AddAttachmentAsync(LessonAttachment attachment, CancellationToken ct = default);
+
+    /// <summary>Força EntityState.Added para o CourseFaqItem — evita DbUpdateConcurrencyException.</summary>
+    Task AddFaqItemAsync(CourseFaqItem faqItem, CancellationToken ct = default);
+
+    /// <summary>
+    /// Remove explicitamente do DbContext (Course.ClearFaqItems só limpa a coleção em memória;
+    /// sem isso as linhas antigas ficariam órfãs no banco em vez de serem excluídas).
+    /// </summary>
+    void RemoveFaqItem(CourseFaqItem faqItem);
 }

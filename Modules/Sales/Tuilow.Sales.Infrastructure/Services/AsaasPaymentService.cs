@@ -103,10 +103,11 @@ public sealed class AsaasPaymentService(
     {
         var cycle = request.Cycle switch
         {
-            BillingCycle.Monthly   => "MONTHLY",
-            BillingCycle.Quarterly => "QUARTERLY",
-            BillingCycle.Annual    => "YEARLY",
-            _                      => "MONTHLY"
+            BillingCycle.Monthly    => "MONTHLY",
+            BillingCycle.Quarterly  => "QUARTERLY",
+            BillingCycle.Semiannual => "SEMIANNUALLY",
+            BillingCycle.Annual     => "YEARLY",
+            _                       => "MONTHLY"
         };
 
         var payload = new

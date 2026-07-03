@@ -1,5 +1,7 @@
 using Tuilow.Streaming.Application.Commands.GetVideoUploadUrl;
+using Tuilow.Streaming.Application.Commands.ImportExternalVideo;
 using Tuilow.Streaming.Application.Commands.LinkVideoToLesson;
+using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +11,7 @@ namespace Tuilow.Streaming.Api.Controllers;
 [ApiController]
 [Route("api/v1/videos")]
 [Produces("application/json")]
-public sealed class VideosController(ISender sender) : ControllerBase
+public sealed class VideosController(ISender sender, ICurrentUserService currentUser) : ControllerBase
 {
     /// <summary>
     /// Gera um slot de upload direto no Cloudflare Stream.
@@ -21,6 +23,22 @@ public sealed class VideosController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetUploadUrl(CancellationToken ct)
     {
         var result = await sender.Send(new GetVideoUploadUrlCommand(), ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Importa um vídeo já hospedado em outra plataforma (YouTube, Vimeo, Cloudflare Stream,
+    /// Google Drive, Dropbox ou OneDrive) a partir da URL — passo 2 do assistente de criação.
+    /// Estratégia da plataforma: preferir import a upload local sempre que possível, para não
+    /// pagar armazenamento/transcodificação de algo que já está hospedado em outro lugar.
+    /// Retorna um VideoId no mesmo formato do upload — o passo seguinte (vincular à aula) usa
+    /// o endpoint /link-lesson normalmente, sem distinguir a origem do vídeo.
+    /// </summary>
+    [HttpPost("import")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> Import([FromBody] ImportExternalVideoCommand command, CancellationToken ct)
+    {
+        var result = await sender.Send(command, ct);
         return Ok(result);
     }
 
@@ -37,7 +55,7 @@ public sealed class VideosController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         await sender.Send(new LinkVideoToLessonCommand(
-            request.CourseId, request.ModuleId, request.LessonId,
+            request.CourseId, currentUser.UserId!.Value, request.ModuleId, request.LessonId,
             videoId, request.IsPreview), ct);
 
         return Ok(new { message = "Vídeo vinculado à aula com sucesso." });

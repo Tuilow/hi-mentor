@@ -9,6 +9,7 @@ namespace Tuilow.Streaming.Application.Commands.LinkVideoToLesson;
 /// </summary>
 public sealed record LinkVideoToLessonCommand(
     Guid CourseId,
+    Guid InstructorId,
     Guid ModuleId,
     Guid LessonId,
     Guid VideoId,

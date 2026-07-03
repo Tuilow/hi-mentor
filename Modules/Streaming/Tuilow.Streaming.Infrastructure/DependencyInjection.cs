@@ -17,6 +17,11 @@ public static class DependencyInjection
     {
         services.AddScoped<IVideoRepository, VideoRepository>();
 
+        // Importação de vídeo externo (passo 2 do assistente) — usa oEmbed público do
+        // YouTube/Vimeo, real independentemente de Cloudflare:MockMode (não depende do
+        // Cloudflare Stream em si, então não faz sentido ter uma versão "mock" separada).
+        services.AddHttpClient<IMediaImportService, MediaImportService>();
+
         var cloudflareMock = configuration.GetValue<bool>("Cloudflare:MockMode");
         if (cloudflareMock)
         {

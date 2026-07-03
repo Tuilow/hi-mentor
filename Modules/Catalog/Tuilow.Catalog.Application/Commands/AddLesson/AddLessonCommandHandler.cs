@@ -14,6 +14,9 @@ public sealed class AddLessonCommandHandler(
         var course = await courseRepository.GetByIdAsync(request.CourseId, ct)
             ?? throw new NotFoundException("Curso", request.CourseId);
 
+        if (course.InstructorId != request.InstructorId)
+            throw new ForbiddenException("Apenas o criador pode adicionar aulas a este produto.");
+
         var module = course.Modules.SingleOrDefault(m => m.Id == request.ModuleId)
             ?? throw new NotFoundException("Módulo", request.ModuleId);
 

@@ -12,7 +12,24 @@ public sealed record CourseDetailResponse(
     string Level,
     int TotalDurationMinutes,
     DateTime? PublishedAt,
-    IEnumerable<ModuleResponse> Modules
+    IEnumerable<ModuleResponse> Modules,
+    string Status,
+    string? Category,
+    string? Subcategory,
+    string ProductType,
+    int ViewCount,
+    string? SalesPageHeadline,
+    string? SalesPageSubheadline,
+    string? SalesPageCtaText,
+    IEnumerable<string> SalesPageBenefits,
+    IEnumerable<FaqItemResponse> FaqItems
+);
+
+public sealed record FaqItemResponse(
+    Guid Id,
+    string Question,
+    string Answer,
+    int Order
 );
 
 public sealed record ModuleResponse(

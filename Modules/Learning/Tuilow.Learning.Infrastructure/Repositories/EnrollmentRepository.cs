@@ -43,4 +43,7 @@ public sealed class EnrollmentRepository(DbContext context) : IEnrollmentReposit
     /// </summary>
     public async Task AddLessonProgressAsync(LessonProgress progress, CancellationToken ct = default) =>
         await context.Set<LessonProgress>().AddAsync(progress, ct);
+
+    public async Task<int> CountByCourseAsync(Guid courseId, CancellationToken ct = default) =>
+        await context.Set<Enrollment>().CountAsync(e => e.CourseId == courseId, ct);
 }

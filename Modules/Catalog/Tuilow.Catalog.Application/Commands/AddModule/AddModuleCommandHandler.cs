@@ -14,6 +14,9 @@ public sealed class AddModuleCommandHandler(
         var course = await courseRepository.GetByIdAsync(request.CourseId, ct)
             ?? throw new NotFoundException("Curso", request.CourseId);
 
+        if (course.InstructorId != request.InstructorId)
+            throw new ForbiddenException("Apenas o criador pode adicionar módulos a este produto.");
+
         var module = course.AddModule(request.Title, request.Description);
 
         // Registra explicitamente como Added — evita DbUpdateConcurrencyException

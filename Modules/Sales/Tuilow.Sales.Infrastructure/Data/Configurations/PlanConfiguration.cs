@@ -33,6 +33,12 @@ public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
         builder.Property(p => p.IsActive).HasDefaultValue(true);
         builder.Property(p => p.TrialDays).HasDefaultValue(0);
 
+        // Plano de assinatura por produto (passo 5 do assistente). Null = plano da plataforma
+        // (modelo legado). Sem FK de verdade pro Course (Catalog é outro módulo) — só índice
+        // pra consulta rápida de "plano de assinatura deste curso".
+        builder.Property(p => p.CourseId).HasColumnName("course_id");
+        builder.HasIndex(p => p.CourseId).HasDatabaseName("ix_plans_course_id");
+
         builder.HasMany(p => p.Features)
             .WithOne()
             .HasForeignKey(f => f.PlanId)

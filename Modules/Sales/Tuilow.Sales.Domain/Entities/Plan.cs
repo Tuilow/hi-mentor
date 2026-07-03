@@ -17,11 +17,18 @@ public sealed class Plan : AggregateRoot
     public bool IsActive { get; private set; } = true;
     public string? AsaasPlanId { get; private set; }
 
+    /// <summary>
+    /// Null = plano da plataforma (modelo legado, dá acesso a todo o catálogo — não removido).
+    /// Preenchido = plano de assinatura de UM produto específico (passo 5 do assistente:
+    /// "Assinatura" como opção de preço), criado pelo próprio criador para o seu curso.
+    /// </summary>
+    public Guid? CourseId { get; private set; }
+
     public IReadOnlyCollection<PlanFeature> Features => _features.AsReadOnly();
 
     private Plan() { }
 
-    public static Plan Create(string name, decimal price, BillingCycle billingCycle, int trialDays = 0)
+    public static Plan Create(string name, decimal price, BillingCycle billingCycle, int trialDays = 0, Guid? courseId = null)
     {
         return new Plan
         {
@@ -29,7 +36,8 @@ public sealed class Plan : AggregateRoot
             Slug = Slug.Create(name),
             Price = Money.Of(price),
             BillingCycle = billingCycle,
-            TrialDays = trialDays
+            TrialDays = trialDays,
+            CourseId = courseId
         };
     }
 

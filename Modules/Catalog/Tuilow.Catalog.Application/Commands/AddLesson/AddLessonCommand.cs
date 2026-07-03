@@ -4,6 +4,7 @@ namespace Tuilow.Catalog.Application.Commands.AddLesson;
 
 public sealed record AddLessonCommand(
     Guid CourseId,
+    Guid InstructorId,
     Guid ModuleId,
     string Title,
     string? Description,

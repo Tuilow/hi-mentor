@@ -15,5 +15,8 @@ public sealed record CourseAdminResponse(
     int ModuleCount,
     int LessonCount,
     DateTime CreatedAt,
-    DateTime? PublishedAt
+    DateTime? PublishedAt,
+    string? Category,
+    string ProductType,
+    int ViewCount
 );

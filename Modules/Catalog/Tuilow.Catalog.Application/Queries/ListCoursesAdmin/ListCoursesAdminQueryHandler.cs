@@ -22,7 +22,10 @@ public sealed class ListCoursesAdminQueryHandler(ICourseRepository courseReposit
             c.Modules.Count,
             c.Modules.SelectMany(m => m.Lessons).Count(),
             c.CreatedAt,
-            c.PublishedAt
+            c.PublishedAt,
+            c.Category,
+            c.ProductType.ToString(),
+            c.ViewCount
         ));
     }
 }

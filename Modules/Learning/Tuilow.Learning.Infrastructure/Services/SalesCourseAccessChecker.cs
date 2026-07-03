@@ -6,11 +6,11 @@ namespace Tuilow.Learning.Infrastructure.Services;
 /// <summary>
 /// Implementação real de <see cref="ICourseAccessChecker"/> — consulta o módulo Sales.
 ///
-/// Novo modelo de negócio: o acesso pago principal é por COMPRA INDIVIDUAL do curso
-/// (CoursePurchase confirmada para o CourseId específico). Assinatura ativa da plataforma
-/// (Subscription) é mantida como acesso alternativo válido apenas por compatibilidade com
-/// assinantes do modelo antigo — nenhuma funcionalidade existente é removida, mas novos
-/// criadores/alunos não dependem mais dela.
+/// Novo modelo de negócio: o acesso pago é concedido por qualquer um dos três caminhos, em
+/// ordem de checagem: (1) COMPRA INDIVIDUAL do curso (CoursePurchase confirmada — pagamento
+/// único, passo "Preço" do assistente), (2) ASSINATURA POR PRODUTO (Plan com CourseId = este
+/// curso — opção "Assinatura" do mesmo passo) ou (3) assinatura ativa da PLATAFORMA (modelo
+/// legado, mantido só por compatibilidade — nenhuma funcionalidade existente é removida).
 /// </summary>
 public sealed class SalesCourseAccessChecker(
     ICoursePurchaseRepository coursePurchaseRepository,
@@ -22,8 +22,12 @@ public sealed class SalesCourseAccessChecker(
         if (await coursePurchaseRepository.HasConfirmedPurchaseAsync(userId, courseId, ct))
             return true;
 
+        var courseSubscription = await subscriptionRepository.GetActiveByUserForCourseAsync(userId, courseId, ct);
+        if (courseSubscription is not null && courseSubscription.IsActive)
+            return true;
+
         // Compatibilidade com o modelo legado de assinatura da plataforma (não removido).
-        var subscription = await subscriptionRepository.GetActiveByUserAsync(userId, ct);
-        return subscription is not null && subscription.IsActive;
+        var platformSubscription = await subscriptionRepository.GetActiveByUserAsync(userId, ct);
+        return platformSubscription is not null && platformSubscription.IsActive;
     }
 }
