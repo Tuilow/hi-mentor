@@ -6,6 +6,7 @@ import { subscriptionsApi } from '@/lib/api';
 import { Plan, Subscription } from '@/types';
 import toast from 'react-hot-toast';
 import { Check, X, Star, Zap, Crown } from 'lucide-react';
+import { AxiosError } from 'axios';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -239,8 +240,9 @@ export default function AssinaturaPage() {
         toast.success('Assinatura criada! Você receberá o link de pagamento por e-mail.');
       }
     },
-    onError: () => {
-      toast.error('Erro ao criar assinatura. Verifique os dados e tente novamente.');
+    onError: (err) => {
+      const detail = (err as AxiosError<{ title?: string; detail?: string }>).response?.data;
+      toast.error(detail?.title ?? detail?.detail ?? 'Erro ao criar assinatura. Verifique os dados e tente novamente.');
     },
   });
 

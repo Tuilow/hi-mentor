@@ -642,18 +642,48 @@ function OrganizationStep({
   return (
     <div className="space-y-5">
       <h2 className="font-bold text-gray-800 text-lg">3. Organização</h2>
-      <p className="text-sm text-gray-500">Estruture o produto em módulos e aulas.</p>
+      <p className="text-sm text-gray-500">
+        Crie os módulos e aulas do produto. Depois de criar uma aula, escolha um dos vídeos
+        enviados/importados no passo anterior no menu <strong>&quot;Vincular vídeo&quot;</strong> ao lado dela.
+      </p>
+
+      <div className="bg-brand-50 border border-brand-100 rounded-xl p-3">
+        <p className="text-xs font-semibold text-brand-700 mb-2">
+          Vídeos disponíveis para vincular ({videos.length})
+        </p>
+        {videos.length === 0 ? (
+          <p className="text-xs text-gray-500">
+            Nenhum vídeo disponível ainda — volte ao passo &quot;Conteúdo&quot; para enviar ou importar um.
+          </p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {videos.map(v => (
+              <li key={v.videoId} className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-full px-3 py-1">
+                <Video className="w-3 h-3 text-brand-600" /> {v.title}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="space-y-4">
+        {modules.length === 0 && (
+          <p className="text-sm text-gray-400">Nenhum módulo criado ainda — crie um abaixo para começar.</p>
+        )}
         {modules.map(m => (
           <div key={m.id} className="border border-gray-200 rounded-xl p-4">
             <p className="font-semibold text-gray-800 mb-2">{m.title}</p>
+            {m.lessons.length === 0 && (
+              <p className="text-xs text-gray-400 mb-2">Nenhuma aula ainda — crie uma abaixo.</p>
+            )}
             <ul className="space-y-2 mb-3">
               {m.lessons.map((l: LessonDetail) => (
                 <li key={l.id} className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2">
                   <span className="flex-1">{l.title}</span>
                   {l.hasVideo ? (
                     <span className="badge-green badge">Vídeo ✓</span>
+                  ) : videos.length === 0 ? (
+                    <span className="text-xs text-gray-400">Sem vídeos disponíveis</span>
                   ) : (
                     <select className="text-xs border border-gray-200 rounded-lg px-2 py-1"
                       onChange={e => e.target.value && onLinkVideo(m.id, l.id, e.target.value)}
@@ -673,7 +703,7 @@ function OrganizationStep({
                 onAddLesson(m.id, lessonDrafts[m.id] ?? '');
                 setLessonDrafts(d => ({ ...d, [m.id]: '' }));
               }}>
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4" /> Adicionar aula
               </button>
             </div>
           </div>

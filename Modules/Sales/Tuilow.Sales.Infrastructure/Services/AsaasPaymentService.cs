@@ -76,9 +76,15 @@ public sealed class AsaasPaymentService(
         if (!string.IsNullOrEmpty(cpf))
             payloadDict["cpfCnpj"] = cpf;
 
-        var phone = request.Phone?.Trim();
-        if (!string.IsNullOrEmpty(phone))
-            payloadDict["phone"] = phone;
+        // Asaas distingue "phone" (fixo) de "mobilePhone" (celular) e rejeita um celular de
+        // 11 dígitos (DDD + 9 + 8 dígitos) enviado no campo de fixo. O formulário de checkout
+        // só tem um campo genérico "Telefone", então inferimos pelo tamanho do número: 11
+        // dígitos = celular, 10 dígitos = fixo.
+        var phoneDigits = new string((request.Phone ?? "").Where(char.IsDigit).ToArray());
+        if (phoneDigits.Length == 11)
+            payloadDict["mobilePhone"] = phoneDigits;
+        else if (!string.IsNullOrEmpty(phoneDigits))
+            payloadDict["phone"] = phoneDigits;
 
         var json = JsonSerializer.Serialize(payloadDict);
         logger.LogDebug("Asaas CreateCustomer payload: {Json}", json);
