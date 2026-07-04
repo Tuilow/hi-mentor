@@ -58,14 +58,7 @@ export interface PlanFeature {
   displayName?: string;
 }
 
-export interface LearnerProfile {
-  id: string;
-  name: string;
-  category?: string;
-  ageMonths?: number;
-  photoUrl?: string;
-  level?: string;
-}
+// LearnerProfile removido junto com "Meus Perfis" — ver comentário em lib/api.ts.
 
 export interface Subscription {
   id: string;

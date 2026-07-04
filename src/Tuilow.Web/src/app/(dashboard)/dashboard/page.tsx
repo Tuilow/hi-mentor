@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 
 const quickActions = [
   { href: '/cursos',  icon: '📚', title: 'Explorar Cursos', desc: 'Encontre o curso ideal para você',   color: 'from-blue-50 to-blue-100/60' },
-  { href: '/perfis',  icon: '🎓', title: 'Meus Perfis',     desc: 'Gerencie seus perfis de aprendizado', color: 'from-emerald-50 to-teal-50' },
   { href: '/assinatura', icon: '💎', title: 'Assinatura',   desc: 'Gerencie seu plano atual',            color: 'from-orange-50 to-rose-50' },
 ];
 
@@ -121,7 +120,7 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Acesso rápido</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {quickActions.map(action => (
           <Link
             key={action.href}

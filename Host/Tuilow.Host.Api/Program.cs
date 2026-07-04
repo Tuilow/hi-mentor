@@ -4,7 +4,11 @@ using Tuilow.SharedKernel.Infrastructure;
 using Tuilow.IdentidadeAcesso.Api;
 using Tuilow.Catalog.Api;
 using Tuilow.Learning.Api;
-using Tuilow.Journey.Api;
+// "Meus Perfis" removido temporariamente da experiência do usuário (era um conceito de perfil
+// de aprendizado, sem relação com Role/Permission de IdentidadeAcesso). Módulo Journey mantido
+// intacto — código, entidades e tabelas — só desligado do pipeline (ver linhas comentadas
+// abaixo). Futuro: pode virar a base de "Troca de Contexto" (Aluno/Criador/Admin/Colaborador).
+// using Tuilow.Journey.Api;
 using Tuilow.Sales.Api;
 using Tuilow.Streaming.Api;
 using Tuilow.Finance.Api;
@@ -24,7 +28,7 @@ builder.Services.AddSharedKernel();
 builder.Services.AddIdentidadeAcessoModule();
 builder.Services.AddCatalogModule();
 builder.Services.AddLearningModule();
-builder.Services.AddJourneyModule();
+// builder.Services.AddJourneyModule(); // "Meus Perfis" desligado — ver comentário acima
 builder.Services.AddSalesModule(builder.Configuration);
 builder.Services.AddStreamingModule(builder.Configuration);
 // Novo modelo de negócio (venda avulsa de curso + comissão da plataforma): Finance precisa
@@ -57,7 +61,7 @@ builder.Services.AddControllers()
     .AddApplicationPart(typeof(Tuilow.IdentidadeAcesso.Api.Controllers.AuthController).Assembly)
     .AddApplicationPart(typeof(Tuilow.Catalog.Api.Controllers.CoursesController).Assembly)
     .AddApplicationPart(typeof(Tuilow.Learning.Api.Controllers.EnrollmentsController).Assembly)
-    .AddApplicationPart(typeof(Tuilow.Journey.Api.Controllers.LearnerProfilesController).Assembly)
+    // .AddApplicationPart(typeof(Tuilow.Journey.Api.Controllers.LearnerProfilesController).Assembly) // "Meus Perfis" desligado
     .AddApplicationPart(typeof(Tuilow.Sales.Api.Controllers.SubscriptionsController).Assembly)
     .AddApplicationPart(typeof(Tuilow.Streaming.Api.Controllers.VideosController).Assembly)
     .AddApplicationPart(typeof(Tuilow.Finance.Api.Controllers.FinanceController).Assembly)
@@ -77,7 +81,7 @@ builder.Services.AddSwaggerGen(opt =>
     {
         Title = "Tuilow API (Host modular)",
         Version = "v1",
-        Description = "Composição dos módulos Tuilow — IdentidadeAcesso, Catalog, Learning, Journey, Sales, Streaming, Finance, Payout e CreatorStudio. Plataforma aberta a criadores: sem mensalidade, comissão retida apenas sobre vendas de curso. Assistente guiado de criação de produto em CreatorStudio. Só Channel/Growth seguem como stub.",
+        Description = "Composição dos módulos Tuilow — IdentidadeAcesso, Catalog, Learning, Sales, Streaming, Finance, Payout e CreatorStudio. Plataforma aberta a criadores: sem mensalidade, comissão retida apenas sobre vendas de curso. Assistente guiado de criação de produto em CreatorStudio. Só Channel/Growth seguem como stub. (Módulo Journey existe no código mas está temporariamente desligado do pipeline — ver comentários no topo deste arquivo.)",
         Contact = new OpenApiContact { Name = "Tuilow", Email = "api@tuilow.com.br" }
     });
 

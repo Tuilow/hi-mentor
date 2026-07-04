@@ -7,9 +7,9 @@ const features = [
     desc: 'Mais de 100 aulas com instrutores certificados. Assista no seu ritmo, onde quiser.',
   },
   {
-    icon: '🎓',
-    title: 'Perfis de Aprendizado',
-    desc: 'Crie perfis de estudo e acompanhe a evolução de cada um com histórico completo.',
+    icon: '🚀',
+    title: 'Crie e Venda Seus Produtos',
+    desc: 'Publique cursos, ebooks e mentorias em poucos minutos com nosso assistente guiado.',
   },
   {
     icon: '🏆',

@@ -166,10 +166,9 @@ export const subscriptionsApi = {
   cancel: (reason?: string) => api.delete('/subscriptions/me', { data: { reason } }),
 };
 
-export const learnerProfilesApi = {
-  getMyProfiles: () => api.get('/learner-profiles'),
-  register: (data: unknown) => api.post('/learner-profiles', data),
-};
+// "Meus Perfis" (learnerProfilesApi) removido temporariamente da experiência do usuário — era
+// um conceito de perfil de aprendizado sem relação com o modelo de negócio atual. O módulo
+// backend (Journey) foi preservado intacto, só desligado do pipeline (ver Host/Program.cs).
 
 // ─── Types ───────────────────────────────────────────────────────
 interface RegisterRequest {
