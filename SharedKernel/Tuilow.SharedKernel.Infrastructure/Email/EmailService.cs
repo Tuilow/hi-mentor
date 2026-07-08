@@ -65,6 +65,20 @@ public sealed class EmailService(
         await SendAsync(to, "Pagamento confirmado — Tuilow", body, ct);
     }
 
+    public async Task SendCourseAccessGrantedAsync(string to, string firstName, string courseTitle, string courseSlug, CancellationToken ct = default)
+    {
+        var courseUrl = $"{_frontendUrl}/cursos/{courseSlug}";
+        var body = $"""
+            <h2>Pagamento confirmado! 🎉</h2>
+            <p>Olá, {firstName}! Seu acesso ao curso <strong>{courseTitle}</strong> já está liberado.</p>
+            <p>Se ainda não tem uma conta na Tuilow com este e-mail, crie uma gratuitamente para acessar o conteúdo.</p>
+            <a href="{courseUrl}" style="background:#2563EB;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">
+                Acessar o Curso
+            </a>
+            """;
+        await SendAsync(to, $"Acesso liberado: {courseTitle} — Tuilow", body, ct);
+    }
+
     public async Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateUrl, CancellationToken ct = default)
     {
         var body = $"""

@@ -11,4 +11,12 @@ public interface IEmailService
     Task SendPasswordResetAsync(string to, string firstName, string resetToken, CancellationToken ct = default);
     Task SendPaymentConfirmedAsync(string to, string firstName, decimal amount, CancellationToken ct = default);
     Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateUrl, CancellationToken ct = default);
+
+    /// <summary>
+    /// Disparado quando o acesso a um curso é liberado (compra avulsa confirmada ou assinatura
+    /// do produto confirmada) — avisa o aluno com um link direto para a página do curso, já que
+    /// a conta/matrícula não são criadas automaticamente no ato do pagamento (ver
+    /// Tuilow.Learning.Application.EventHandlers).
+    /// </summary>
+    Task SendCourseAccessGrantedAsync(string to, string firstName, string courseTitle, string courseSlug, CancellationToken ct = default);
 }

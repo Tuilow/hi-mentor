@@ -5,18 +5,63 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
   Sparkles, Upload, Link2, Plus, Video, Check, Loader2,
-  ChevronRight, ChevronLeft, Paperclip,
+  ChevronRight, ChevronLeft, Paperclip, GraduationCap, RefreshCw, Users, CalendarDays,
+  BookOpen, Briefcase,
 } from 'lucide-react';
 import {
   coursesApi, videosApi, materialsApi, creatorStudioApi, courseSubscriptionPlansApi,
 } from '@/lib/api';
 import type {
-  ProductDetail, PublicationChecklist, ModuleDetail, LessonDetail,
+  ProductDetail, PublicationChecklist, ModuleDetail, LessonDetail, ProductType,
 } from '@/types';
 
 const STEPS = [
   'Info Básica', 'Conteúdo', 'Organização', 'Materiais', 'Preço', 'Página de Vendas', 'Publicação',
 ];
+
+// ─── Passo 0: seleção do tipo de produto ─────────────────────────────────
+// Puramente classificatório — todos os tipos usam o mesmo mecanismo de entrega (módulos/
+// aulas/vídeo) por trás. Serve para o criador rotular a oferta e para o front dar contexto
+// (título/copy) ao restante do assistente. Ver Tuilow.Catalog.Domain.Enums.ProductType.
+const PRODUCT_TYPES: Array<{
+  id: ProductType; label: string; description: string; icon: typeof GraduationCap;
+}> = [
+  { id: 'Course', label: 'Curso Online', description: 'Aulas em vídeo organizadas em módulos, no seu ritmo.', icon: GraduationCap },
+  { id: 'Subscription', label: 'Assinatura', description: 'Acesso recorrente, com cobrança mensal, trimestral ou anual.', icon: RefreshCw },
+  { id: 'Mentoring', label: 'Mentoria', description: 'Acompanhamento próximo, individual ou em grupo.', icon: Users },
+  { id: 'Event', label: 'Evento', description: 'Encontro ao vivo, único ou em série de datas.', icon: CalendarDays },
+  { id: 'Ebook', label: 'E-book', description: 'Conteúdo em PDF para leitura e download.', icon: BookOpen },
+  { id: 'Service', label: 'Serviço', description: 'Entrega personalizada, sob demanda.', icon: Briefcase },
+];
+
+function ProductTypeStep({ onSelect }: { onSelect: (type: ProductType) => void }) {
+  return (
+    <div className="max-w-4xl mx-auto animate-fade-in">
+      <h1 className="text-2xl font-bold text-gray-800 mb-1">Que tipo de produto você quer criar?</h1>
+      <p className="text-gray-500 text-sm mb-6">
+        Escolha o formato — você poderá revisar tudo antes de publicar.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {PRODUCT_TYPES.map(({ id, label, description, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => onSelect(id)}
+            className="group text-left rounded-2xl border-2 border-gray-200 bg-white p-5
+              transition-all hover:border-brand-400 hover:shadow-lg hover:-translate-y-0.5
+              focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center
+              mb-3 transition-colors group-hover:bg-brand-600 group-hover:text-white">
+              <Icon className="w-5 h-5" />
+            </div>
+            <p className="font-semibold text-gray-800">{label}</p>
+            <p className="text-sm text-gray-500 mt-1">{description}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface LocalVideo {
   videoId: string;
@@ -33,9 +78,14 @@ function ProductWizard() {
   const params = useSearchParams();
   const existingCourseId = params.get('courseId');
 
-  const [step, setStep] = useState(1);
+  // Produtos novos começam no passo 0 (escolha do tipo); ao editar um rascunho existente,
+  // o tipo já foi escolhido — pula direto para o passo 1.
+  const [step, setStep] = useState(existingCourseId ? 1 : 0);
   const [courseId, setCourseId] = useState<string | null>(existingCourseId);
   const [saving, setSaving] = useState(false);
+
+  // Passo 0
+  const [productType, setProductType] = useState<ProductType | null>(null);
 
   // Passo 1
   const [name, setName] = useState('');
@@ -87,6 +137,7 @@ function ProductWizard() {
     if (!existingCourseId) return;
     coursesApi.getByIdAdmin(existingCourseId).then(({ data }: { data: ProductDetail }) => {
       setName(data.title);
+      setProductType(data.productType);
       setCategory(data.category ?? '');
       setSubcategory(data.subcategory ?? '');
       setShortDescription(data.shortDescription ?? '');
@@ -114,6 +165,12 @@ function ProductWizard() {
     const { data } = await coursesApi.getByIdAdmin(id);
     setModules(data.modules);
     return data as ProductDetail;
+  };
+
+  // ─── Passo 0 ────────────────────────────────────────────────────────────
+  const handleSelectType = (type: ProductType) => {
+    setProductType(type);
+    setStep(1);
   };
 
   // ─── Passo 1 ────────────────────────────────────────────────────────────
@@ -147,6 +204,7 @@ function ProductWizard() {
       if (!id) {
         const { data } = await coursesApi.create({
           title: name, description: fullDescription, shortDescription, level: 'Beginner', price: 0,
+          productType: productType ?? 'Course',
         });
         id = data.id;
         setCourseId(id);
@@ -330,11 +388,19 @@ function ProductWizard() {
 
   const canJumpTo = (target: number) => target === 1 || !!courseId;
 
+  if (step === 0) {
+    return <ProductTypeStep onSelect={handleSelectType} />;
+  }
+
+  const selectedType = PRODUCT_TYPES.find(t => t.id === productType);
+
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800 mb-1">Criar Produto</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-1">
+        Criar {selectedType?.label ?? 'Produto'}
+      </h1>
       <p className="text-gray-500 text-sm mb-6">
-        Publique seu curso em poucos passos — a Tuilow não cobra mensalidade, só uma comissão sobre as vendas.
+        Publique seu produto em poucos passos — a Tuilow não cobra mensalidade, só uma comissão sobre as vendas.
       </p>
 
       {/* Indicador de passos */}
@@ -362,7 +428,19 @@ function ProductWizard() {
       <div className="card">
         {step === 1 && (
           <div className="space-y-4">
-            <h2 className="font-bold text-gray-800 text-lg">1. Informações Básicas</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-gray-800 text-lg">1. Informações Básicas</h2>
+              {selectedType && (
+                <span className="badge flex items-center gap-1.5 bg-brand-50 text-brand-700">
+                  <selectedType.icon className="w-3.5 h-3.5" /> {selectedType.label}
+                </span>
+              )}
+            </div>
+            {!courseId && (
+              <button onClick={() => setStep(0)} className="btn-ghost text-xs flex items-center gap-1 -mt-2">
+                <ChevronLeft className="w-3.5 h-3.5" /> Trocar tipo de produto
+              </button>
+            )}
             <div>
               <label className="text-sm font-medium text-gray-600">Nome do produto</label>
               <input className="input-field mt-1" value={name} onChange={e => setName(e.target.value)}

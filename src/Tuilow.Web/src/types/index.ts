@@ -73,7 +73,8 @@ export interface Subscription {
 // ─── Jornada Guiada de Criação de Produtos ─────────────────────────
 
 export type ProductStatus = 'Draft' | 'InReview' | 'Published' | 'Archived';
-export type ProductType = 'Course' | 'Ebook' | 'Bundle';
+export type ProductType =
+  | 'Course' | 'Ebook' | 'Bundle' | 'Subscription' | 'Mentoring' | 'Event' | 'Service';
 
 export interface ProductListItem {
   id: string;

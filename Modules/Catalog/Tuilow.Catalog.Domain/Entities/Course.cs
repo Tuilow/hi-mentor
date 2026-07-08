@@ -24,9 +24,9 @@ public sealed class Course : AggregateRoot
     public DateTime? PublishedAt { get; private set; }
 
     // ─── Jornada Guiada de Criação de Produtos (wizard) ─────────────────────────
-    // Categoria/Subcategoria/Tipo: usados no passo 1 (Info Básica) e como contexto pro
-    // "Gerar com IA". ProductType hoje é sempre Course (única entrega suportada), mas o campo
-    // já existe para não travar formatos futuros (ebook, bundle) sem migração de schema.
+    // Categoria/Subcategoria/Tipo: ProductType é escolhido no passo 0 (cards de tipo de
+    // produto) e Categoria/Subcategoria no passo 1 (Info Básica), como contexto pro
+    // "Gerar com IA". A entrega em si (módulos/aulas/vídeo) é a mesma para todos os tipos.
     public string? Category { get; private set; }
     public string? Subcategory { get; private set; }
     public ProductType ProductType { get; private set; } = ProductType.Course;
@@ -53,7 +53,8 @@ public sealed class Course : AggregateRoot
         string title,
         string description,
         CourseLevel level,
-        decimal price = 0)
+        decimal price = 0,
+        ProductType productType = ProductType.Course)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
@@ -65,7 +66,8 @@ public sealed class Course : AggregateRoot
             Slug = Slug.Create(title),
             Description = description.Trim(),
             Level = level,
-            Price = Money.Of(price)
+            Price = Money.Of(price),
+            ProductType = productType
         };
     }
 

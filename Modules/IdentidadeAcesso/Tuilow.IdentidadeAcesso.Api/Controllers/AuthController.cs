@@ -87,15 +87,15 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
     /// <summary>
     /// Auto-promoção: o próprio usuário autenticado se torna um Creator, sem depender de
     /// aprovação de um Admin — plataforma aberta, qualquer pessoa pode publicar cursos.
-    /// Não remove o role Student existente (multi-role). O token de acesso atual não é
-    /// atualizado automaticamente: chame /auth/refresh-token em seguida para obter um novo
-    /// access token já com o claim de role "Creator".
+    /// Não remove o role Student existente (multi-role). Retorna AuthTokens já com o claim de
+    /// role "Creator" no access token — o front não precisa (nem deve) chamar
+    /// /auth/refresh-token depois disso.
     /// </summary>
     [HttpPost("become-creator")]
     [Authorize]
     public async Task<IActionResult> BecomeCreator(CancellationToken ct)
     {
-        await sender.Send(new BecomeCreatorCommand(currentUser.UserId!.Value), ct);
-        return Ok(new { message = "Você agora é um criador de conteúdo no Tuilow! 🎬" });
+        var tokens = await sender.Send(new BecomeCreatorCommand(currentUser.UserId!.Value), ct);
+        return Ok(tokens);
     }
 }

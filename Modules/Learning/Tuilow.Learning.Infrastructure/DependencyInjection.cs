@@ -13,6 +13,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
         services.AddScoped<ICourseAccessChecker, SalesCourseAccessChecker>();
+        services.AddScoped<IUserContactLookup, IdentidadeAcessoUserContactLookup>();
         return services;
     }
 }

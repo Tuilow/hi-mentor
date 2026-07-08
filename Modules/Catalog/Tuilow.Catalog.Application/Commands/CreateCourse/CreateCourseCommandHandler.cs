@@ -13,7 +13,7 @@ public sealed class CreateCourseCommandHandler(
     {
         var course = Course.Create(
             request.InstructorId, request.Title,
-            request.Description, request.Level, request.Price);
+            request.Description, request.Level, request.Price, request.ProductType);
 
         await courseRepository.AddAsync(course, ct);
         await uow.SaveChangesAsync(ct);

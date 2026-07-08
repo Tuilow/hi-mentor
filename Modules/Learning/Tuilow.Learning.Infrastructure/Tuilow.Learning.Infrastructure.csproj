@@ -15,5 +15,8 @@
     <ProjectReference Include="..\Tuilow.Learning.Application\Tuilow.Learning.Application.csproj" />
     <!-- Acoplamento legítimo: verificação de acesso pago consulta o módulo Sales (assinaturas). -->
     <ProjectReference Include="..\..\Sales\Tuilow.Sales.Domain\Tuilow.Sales.Domain.csproj" />
+    <!-- Acoplamento legítimo: IUserContactLookup consulta o módulo IdentidadeAcesso (e-mail/nome
+         do usuário) para o e-mail automático de acesso liberado. -->
+    <ProjectReference Include="..\..\IdentidadeAcesso\Tuilow.IdentidadeAcesso.Domain\Tuilow.IdentidadeAcesso.Domain.csproj" />
   </ItemGroup>
 </Project>

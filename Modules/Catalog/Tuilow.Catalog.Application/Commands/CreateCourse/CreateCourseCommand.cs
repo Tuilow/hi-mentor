@@ -9,5 +9,6 @@ public sealed record CreateCourseCommand(
     string Description,
     string? ShortDescription,
     CourseLevel Level,
-    decimal Price = 0
+    decimal Price = 0,
+    ProductType ProductType = ProductType.Course
 ) : IRequest<Guid>;

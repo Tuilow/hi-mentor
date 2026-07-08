@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { authApi, subscriptionsApi } from '@/lib/api';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -13,8 +13,14 @@ const quickActions = [
 
 export default function DashboardPage() {
   const [becomingCreator, setBecomingCreator] = useState(false);
+  const queryClient = useQueryClient();
 
-  const { data: user, refetch: refetchUser } = useQuery({
+  // Mesma query key usada no sidebar (DashboardLayout) — um único cache compartilhado evita
+  // duas chamadas redundantes a /auth/me a cada carregamento de página (eram duas requisições
+  // concorrentes independentes, o que deixava o carregamento mais lento e multiplicava as
+  // chances de uma delas cair num 401 por token perto de expirar) e permite atualizar sidebar
+  // + conteúdo juntos com um simples invalidateQueries, sem reload de página.
+  const { data: user } = useQuery({
     queryKey: ['user-profile'],
     queryFn: () => authApi.me().then(r => r.data),
   });
@@ -29,24 +35,22 @@ export default function DashboardPage() {
   const handleBecomeCreator = async () => {
     setBecomingCreator(true);
     try {
-      await authApi.becomeCreator();
+      // O backend já devolve tokens novos (access token com o claim de role "Creator" e o
+      // refresh token ativo) — evita uma chamada extra a /auth/refresh-token logo em seguida,
+      // que competia pelo refresh token de uso único e causava um erro intermitente aqui.
+      const { data } = await authApi.becomeCreator();
+      localStorage.setItem('access_token', data.accessToken);
+      localStorage.setItem('refresh_token', data.refreshToken);
 
-      // O token de acesso atual não tem o claim de role "Creator" — busca um novo token
-      // (refresh-token já regenera os claims a partir dos roles atuais do usuário no banco).
-      const refreshToken = localStorage.getItem('refresh_token');
-      if (refreshToken) {
-        const { data } = await authApi.refreshToken(refreshToken);
-        localStorage.setItem('access_token', data.accessToken);
-        localStorage.setItem('refresh_token', data.refreshToken);
-      }
-
-      await refetchUser();
+      // Invalida o cache em vez de recarregar a página inteira: sidebar e conteúdo atualizam
+      // na hora com os novos recursos de criador (sem repetir toda a dança de autenticação de
+      // um reload completo, que era o que deixava lento e, ocasionalmente, deslogava o usuário
+      // se algum token estivesse perto de expirar durante o reload).
+      await queryClient.invalidateQueries({ queryKey: ['user-profile'] });
       toast.success('Você agora é um criador de conteúdo! Veja "Gerenciar Cursos" no menu.');
-
-      // Recarrega para o menu lateral (que também busca /auth/me de forma independente) atualizar.
-      setTimeout(() => window.location.reload(), 1200);
     } catch {
       toast.error('Não foi possível ativar o modo criador. Tente novamente.');
+    } finally {
       setBecomingCreator(false);
     }
   };
