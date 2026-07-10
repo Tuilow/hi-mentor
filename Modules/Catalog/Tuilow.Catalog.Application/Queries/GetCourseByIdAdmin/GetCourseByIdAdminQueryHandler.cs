@@ -31,6 +31,10 @@ public sealed class GetCourseByIdAdminQueryHandler(ICourseRepository courseRepos
             course.Level.ToString(), course.TotalDurationMinutes, course.PublishedAt, modules,
             course.Status.ToString(), course.Category, course.Subcategory, course.ProductType.ToString(),
             course.ViewCount, course.SalesPageHeadline, course.SalesPageSubheadline, course.SalesPageCtaText,
-            course.SalesPageBenefits, faqItems);
+            course.SalesPageBenefits, faqItems,
+            // Tela de edição do próprio criador — não precisa de nome/avatar/bio (ele já sabe
+            // quem é), só InstructorId (já é propriedade direta de Course, sem exigir o
+            // ICreatorProfileLookup/IInstructorLookup usado na página de vendas pública).
+            course.InstructorId, null, null, null);
     }
 }

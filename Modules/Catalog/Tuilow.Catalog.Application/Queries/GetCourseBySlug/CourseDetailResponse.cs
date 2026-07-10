@@ -22,7 +22,11 @@ public sealed record CourseDetailResponse(
     string? SalesPageSubheadline,
     string? SalesPageCtaText,
     IEnumerable<string> SalesPageBenefits,
-    IEnumerable<FaqItemResponse> FaqItems
+    IEnumerable<FaqItemResponse> FaqItems,
+    Guid InstructorId,
+    string? InstructorName,
+    string? InstructorAvatarUrl,
+    string? InstructorBio
 );
 
 public sealed record FaqItemResponse(

@@ -14,6 +14,7 @@ using Tuilow.Streaming.Api;
 using Tuilow.Finance.Api;
 using Tuilow.Payout.Api;
 using Tuilow.CreatorStudio.Api;
+using Tuilow.Channel.Api;
 using Tuilow.Host.Api.Data;
 using Tuilow.Host.Api.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -38,7 +39,10 @@ builder.Services.AddPayoutModule();
 // Jornada Guiada de Criação de Produtos: orquestra Catalog/Sales/Learning/Finance — não
 // possui regra de negócio própria sobre essas entidades, só compõe (ver csproj do módulo).
 builder.Services.AddCreatorStudioModule(builder.Configuration);
-// Próximo módulo migrado entra aqui (ex.: Channel/Growth quando tiverem domínio real).
+// Canal do Criador: vitrine pública (@handle + redes sociais) com o catálogo de cursos
+// publicados do criador — compõe Catalog/Learning, não duplica dado (ver csproj do módulo).
+builder.Services.AddChannelModule();
+// Próximo módulo migrado entra aqui (ex.: Growth quando tiver domínio real).
 
 // ─── DATABASE ──────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -67,6 +71,7 @@ builder.Services.AddControllers()
     .AddApplicationPart(typeof(Tuilow.Finance.Api.Controllers.FinanceController).Assembly)
     .AddApplicationPart(typeof(Tuilow.Payout.Api.Controllers.PayoutsController).Assembly)
     .AddApplicationPart(typeof(Tuilow.CreatorStudio.Api.Controllers.CreatorStudioController).Assembly)
+    .AddApplicationPart(typeof(Tuilow.Channel.Api.Controllers.ChannelController).Assembly)
     .AddJsonOptions(opt =>
     {
         opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -81,7 +86,7 @@ builder.Services.AddSwaggerGen(opt =>
     {
         Title = "Tuilow API (Host modular)",
         Version = "v1",
-        Description = "Composição dos módulos Tuilow — IdentidadeAcesso, Catalog, Learning, Sales, Streaming, Finance, Payout e CreatorStudio. Plataforma aberta a criadores: sem mensalidade, comissão retida apenas sobre vendas de curso. Assistente guiado de criação de produto em CreatorStudio. Só Channel/Growth seguem como stub. (Módulo Journey existe no código mas está temporariamente desligado do pipeline — ver comentários no topo deste arquivo.)",
+        Description = "Composição dos módulos Tuilow — IdentidadeAcesso, Catalog, Learning, Sales, Streaming, Finance, Payout, CreatorStudio e Channel. Plataforma aberta a criadores: sem mensalidade, comissão retida apenas sobre vendas de curso. Assistente guiado de criação de produto em CreatorStudio; Canal do Criador (vitrine pública) em Channel. Só Growth segue como stub. (Módulo Journey existe no código mas está temporariamente desligado do pipeline — ver comentários no topo deste arquivo.)",
         Contact = new OpenApiContact { Name = "Tuilow", Email = "api@tuilow.com.br" }
     });
 

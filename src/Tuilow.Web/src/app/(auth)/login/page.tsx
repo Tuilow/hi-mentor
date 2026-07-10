@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,8 +17,12 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Vindo da página de vendas pública (/c/[slug]) — depois de logar, volta direto pra lá em vez
+  // de cair no dashboard genérico, sem o que o visitante perdia o produto que veio comprar.
+  const returnUrl = searchParams.get('returnUrl');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -33,7 +37,7 @@ export default function LoginPage() {
       localStorage.setItem('access_token', res.data.accessToken);
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Bem-vindo de volta!');
-      router.push('/dashboard');
+      router.push(returnUrl || '/dashboard');
     } catch {
       toast.error('E-mail ou senha incorretos.');
     } finally {
@@ -52,7 +56,7 @@ export default function LoginPage() {
       localStorage.setItem('access_token', res.data.accessToken);
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Bem-vindo!');
-      router.push('/dashboard');
+      router.push(returnUrl || '/dashboard');
     } catch {
       toast.error('Falha no login com Google. Tente novamente.');
     } finally {
@@ -135,7 +139,7 @@ export default function LoginPage() {
           <div className="divider mt-6 pt-6">
             <p className="text-center text-sm text-gray-400">
               Não tem conta?{' '}
-              <Link href="/registro"
+              <Link href={returnUrl ? `/registro?returnUrl=${encodeURIComponent(returnUrl)}` : '/registro'}
                 className="text-brand-600 font-medium hover:text-brand-700 transition-colors">
                 Cadastre-se grátis
               </Link>
@@ -144,5 +148,15 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// useSearchParams exige um limite de Suspense (retornUrl vindo de /c/[slug]) — sem isso o
+// Next.js falha o build estático desta página.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -9,6 +9,7 @@ using StreamingEntities = Tuilow.Streaming.Domain.Entities;
 using FinanceEntities = Tuilow.Finance.Domain.Entities;
 using PayoutEntities = Tuilow.Payout.Domain.Entities;
 using CreatorStudioEntities = Tuilow.CreatorStudio.Domain.Entities;
+using ChannelEntities = Tuilow.Channel.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,9 +21,10 @@ namespace Tuilow.Host.Api.Data;
 /// não precisa conhecer os detalhes internos de cada módulo, só a lista de assemblies.
 ///
 /// IMPORTANTE (transição): todos os módulos de plataforma com código real já foram migrados
-/// (IdentidadeAcesso, Catalog, Learning, Journey, Sales, Streaming). Restam só Channel e Growth,
-/// que são contextos novos sem código legado (ainda stubs). O Tuilow.API antigo (src/Tuilow.API)
-/// pode ser desligado depois que os dois lados forem validados lado a lado — ver Task #18.
+/// (IdentidadeAcesso, Catalog, Learning, Journey, Sales, Streaming, CreatorStudio, Channel).
+/// Resta só Growth, que é um contexto novo sem código legado (ainda stub). O Tuilow.API antigo
+/// (src/Tuilow.API) pode ser desligado depois que os dois lados forem validados lado a lado —
+/// ver Task #18.
 /// Os dois hosts apontam para bancos diferentes (tuilow_dev vs tuilow_modular_dev); não rode os
 /// dois contra o mesmo banco de dev ao mesmo tempo.
 /// </summary>
@@ -80,6 +82,9 @@ public sealed class AppDbContext(
     // CreatorStudio — jornada guiada de criação de produtos (leads capturados na página de vendas)
     public DbSet<CreatorStudioEntities.Lead> Leads => Set<CreatorStudioEntities.Lead>();
 
+    // Channel — Canal do Criador (vitrine pública com @handle e redes sociais)
+    public DbSet<ChannelEntities.CreatorChannel> CreatorChannels => Set<ChannelEntities.CreatorChannel>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -114,6 +119,9 @@ public sealed class AppDbContext(
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(CreatorStudio.Infrastructure.Data.Configurations.LeadConfiguration).Assembly);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(Channel.Infrastructure.Data.Configurations.CreatorChannelConfiguration).Assembly);
 
         modelBuilder.HasDefaultSchema("public");
     }

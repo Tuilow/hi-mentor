@@ -5,6 +5,7 @@ using Tuilow.IdentidadeAcesso.Application.Commands.GoogleLogin;
 using Tuilow.IdentidadeAcesso.Application.Commands.LoginUser;
 using Tuilow.IdentidadeAcesso.Application.Commands.RefreshToken;
 using Tuilow.IdentidadeAcesso.Application.Commands.RegisterUser;
+using Tuilow.IdentidadeAcesso.Application.Commands.UpdateProfile;
 using Tuilow.IdentidadeAcesso.Application.Queries.GetUserProfile;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
@@ -85,6 +86,20 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
     }
 
     /// <summary>
+    /// Edita nome/telefone/bio/avatar do usuário autenticado. Alimenta, entre outras telas, o
+    /// editor do Canal do Criador (bio/avatar exibidos lá são deste perfil, não duplicados).
+    /// </summary>
+    [HttpPut("me")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request, CancellationToken ct)
+    {
+        await sender.Send(new UpdateProfileCommand(
+            currentUser.UserId!.Value, request.FirstName, request.LastName,
+            request.Phone, request.BirthDate, request.Bio, request.AvatarUrl), ct);
+        return Ok(new { message = "Perfil atualizado com sucesso." });
+    }
+
+    /// <summary>
     /// Auto-promoção: o próprio usuário autenticado se torna um Creator, sem depender de
     /// aprovação de um Admin — plataforma aberta, qualquer pessoa pode publicar cursos.
     /// Não remove o role Student existente (multi-role). Retorna AuthTokens já com o claim de
@@ -99,3 +114,6 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
         return Ok(tokens);
     }
 }
+
+public sealed record UpdateProfileRequest(
+    string FirstName, string LastName, string? Phone, DateOnly? BirthDate, string? Bio, string? AvatarUrl);

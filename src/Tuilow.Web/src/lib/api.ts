@@ -83,6 +83,11 @@ export const authApi = {
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
   confirmEmail: (token: string) => api.post('/auth/confirm-email', { token }),
   me: () => api.get('/auth/me'),
+  // Edita nome/telefone/bio/avatar — usado, entre outras telas, pelo editor do Canal do Criador.
+  updateProfile: (data: {
+    firstName: string; lastName: string; phone?: string;
+    birthDate?: string; bio?: string; avatarUrl?: string;
+  }) => api.put('/auth/me', data),
   // Auto-promoção a Creator (plataforma aberta — sem aprovação de Admin).
   becomeCreator: () => api.post('/auth/become-creator'),
   refreshToken: (refreshToken: string) => api.post('/auth/refresh-token', { refreshToken }),
@@ -95,6 +100,9 @@ export const coursesApi = {
   getLessonPlayUrl: (courseId: string, lessonId: string) =>
     api.get(`/courses/${courseId}/lessons/${lessonId}/play`),
   recordView: (slug: string) => api.post(`/courses/${slug}/view`),
+  // Cross-sell: outros cursos publicados do mesmo criador. Público — não exige login.
+  getByInstructor: (instructorId: string, excludeCourseId?: string) =>
+    api.get(`/courses/by-instructor/${instructorId}`, { params: { excludeCourseId } }),
 
   // Admin/criador — reaproveitados pelo assistente de criação de produtos.
   getByIdAdmin: (id: string) => api.get(`/admin/courses/${id}`),
@@ -138,6 +146,9 @@ export const creatorStudioApi = {
     api.post('/creator-studio/generate-product-copy', data),
   generateSalesPageCopy: (courseId: string) =>
     api.post(`/creator-studio/products/${courseId}/generate-sales-page-copy`),
+  // Central de Divulgação — texto pronto por canal (Instagram/Stories/WhatsApp/E-mail/Ads/Headline).
+  generateMarketingCopy: (courseId: string, channel: string) =>
+    api.post(`/creator-studio/products/${courseId}/generate-marketing-copy`, { channel }),
   publicationChecklist: (courseId: string) =>
     api.get(`/creator-studio/products/${courseId}/publication-checklist`),
   publish: (courseId: string) => api.post(`/creator-studio/products/${courseId}/publish`),
@@ -179,6 +190,15 @@ export const coursePurchasesApi = {
   // SANDBOX/DEV apenas — 404 fora de Development no backend. Substitui o webhook do Asaas
   // (que não alcança localhost) para permitir testar o fluxo de compra ponta a ponta.
   simulatePayment: (purchaseId: string) => api.post(`/course-purchases/${purchaseId}/simulate-payment`),
+};
+
+// Canal do Criador — vitrine pública em /canal/[handle] (@handle + redes sociais + catálogo).
+export const channelApi = {
+  getMy: () => api.get('/channel/me'),
+  upsert: (data: { handle: string; socialLinks: { platform: string; url: string }[] }) =>
+    api.put('/channel/me', data),
+  // Público — não exige login. viewerUserId é inferido no backend via token opcional.
+  getByHandle: (handle: string) => api.get(`/channel/${handle}`),
 };
 
 // "Meus Perfis" (learnerProfilesApi) removido temporariamente da experiência do usuário — era

@@ -1,7 +1,9 @@
 using Tuilow.CreatorStudio.Application.Commands.CaptureLead;
+using Tuilow.CreatorStudio.Application.Commands.GenerateMarketingCopy;
 using Tuilow.CreatorStudio.Application.Commands.GenerateProductCopy;
 using Tuilow.CreatorStudio.Application.Commands.GenerateSalesPageCopy;
 using Tuilow.CreatorStudio.Application.Commands.PublishProduct;
+using Tuilow.CreatorStudio.Application.Interfaces;
 using Tuilow.CreatorStudio.Application.Queries.GetMyProducts;
 using Tuilow.CreatorStudio.Application.Queries.GetProductDashboard;
 using Tuilow.CreatorStudio.Application.Queries.GetPublicationChecklist;
@@ -83,4 +85,16 @@ public sealed class CreatorStudioController(ISender sender, ICurrentUserService 
         var leadId = await sender.Send(command, ct);
         return Ok(new { id = leadId });
     }
+
+    /// <summary>Central de Divulgação — gera texto pronto por canal (Instagram/Stories/WhatsApp/E-mail/Ads/Headline).</summary>
+    [HttpPost("products/{courseId:guid}/generate-marketing-copy")]
+    public async Task<IActionResult> GenerateMarketingCopy(
+        Guid courseId, [FromBody] GenerateMarketingCopyRequest request, CancellationToken ct)
+    {
+        var result = await sender.Send(
+            new GenerateMarketingCopyCommand(courseId, currentUser.UserId!.Value, request.Channel), ct);
+        return Ok(result);
+    }
 }
+
+public sealed record GenerateMarketingCopyRequest(MarketingChannel Channel);

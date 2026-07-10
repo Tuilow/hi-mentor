@@ -78,4 +78,62 @@ public sealed class MockAiContentGenerator : IAiContentGenerator
 
         return Task.FromResult(new SalesPageSuggestion(headline, subheadline, benefits, faq, callToAction));
     }
+
+    public Task<MarketingCopySuggestion> GenerateMarketingCopyAsync(
+        string productName, MarketingChannel channel, string? category, string? shortDescription,
+        IReadOnlyList<string> benefits, decimal price, CancellationToken ct = default)
+    {
+        var topic = category ?? "essa área";
+        var priceLabel = price > 0 ? $"por R$ {price:0.00}" : "de graça";
+        var topBenefit = benefits.Count > 0 ? benefits[0] : $"aprender {topic} do zero";
+
+        var suggestion = channel switch
+        {
+            MarketingChannel.InstagramPost => new MarketingCopySuggestion(
+                $"🚀 {productName}\n\n" +
+                $"Quer {topBenefit.ToLowerInvariant()}? Chegou o curso que faltava.\n\n" +
+                $"✅ {(benefits.Count > 0 ? string.Join("\n✅ ", benefits.Take(3)) : $"Aulas práticas de {topic}")}\n\n" +
+                $"Vagas abertas {priceLabel}. Link na bio 👆\n\n" +
+                $"#{Slugify(productName)} #{Slugify(topic)} #cursoonline #aprenda{Slugify(topic)}",
+                "Quero começar agora →"),
+
+            MarketingChannel.InstagramStory => new MarketingCopySuggestion(
+                $"👀 {productName}\n\n{topBenefit}\n\nArrasta pra cima e garante sua vaga ⬆️",
+                "Arrasta pra cima →"),
+
+            MarketingChannel.WhatsApp => new MarketingCopySuggestion(
+                $"Oi! 👋 Bora {topBenefit.ToLowerInvariant()}?\n\n" +
+                $"Lancei o curso *{productName}* {priceLabel}, com aulas práticas de {topic} do zero.\n\n" +
+                "Só vou avisar aqui uma vez, quem quiser entrar é só clicar no link 👇",
+                "Quero saber mais"),
+
+            MarketingChannel.Email => new MarketingCopySuggestion(
+                $"Assunto: {productName} — {(price > 0 ? "vagas abertas" : "acesso grátis liberado")}\n\n" +
+                $"Olá!\n\nSe você quer {topBenefit.ToLowerInvariant()}, o curso *{productName}* foi feito pra você.\n\n" +
+                $"Nele você vai encontrar:\n- {string.Join("\n- ", benefits.Count > 0 ? benefits.Take(4) : [$"Conteúdo prático de {topic}"])}\n\n" +
+                $"As vagas estão abertas {priceLabel}. Clique no link abaixo para garantir a sua.\n\nUm abraço.",
+                "Garantir minha vaga"),
+
+            MarketingChannel.MetaAds => new MarketingCopySuggestion(
+                $"Título: {productName} — {topBenefit}\n" +
+                $"Texto principal: Aprenda {topic} do zero, no seu ritmo, com aulas 100% práticas. " +
+                $"Inscrições abertas {priceLabel}.\n" +
+                "Descrição: Vagas limitadas — comece hoje mesmo.",
+                "Saiba mais"),
+
+            MarketingChannel.Headline => new MarketingCopySuggestion(
+                $"Aprenda {productName} do Zero\n" +
+                $"Método Validado de {productName}\n" +
+                $"{productName}: Domine {topic} em Poucas Semanas\n" +
+                "Vagas Limitadas — Garanta a Sua Agora",
+                null),
+
+            _ => new MarketingCopySuggestion($"{productName} — {topBenefit}", "Saiba mais")
+        };
+
+        return Task.FromResult(suggestion);
+    }
+
+    private static string Slugify(string text) =>
+        new(text.Trim().ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
 }

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,8 +23,10 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get('returnUrl');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -39,7 +41,7 @@ export default function RegisterPage() {
       localStorage.setItem('access_token', res.data.accessToken);
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Conta criada! Verifique seu e-mail.');
-      router.push('/dashboard');
+      router.push(returnUrl || '/dashboard');
     } catch {
       toast.error('Erro ao criar conta. Verifique os dados.');
     } finally {
@@ -58,7 +60,7 @@ export default function RegisterPage() {
       localStorage.setItem('access_token', res.data.accessToken);
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Conta criada com Google!');
-      router.push('/dashboard');
+      router.push(returnUrl || '/dashboard');
     } catch {
       toast.error('Falha no cadastro com Google. Tente novamente.');
     } finally {
@@ -151,7 +153,8 @@ export default function RegisterPage() {
           <div className="divider mt-6 pt-6">
             <p className="text-center text-sm text-gray-400">
               Já tem conta?{' '}
-              <Link href="/login" className="text-brand-600 font-medium hover:text-brand-700 transition-colors">
+              <Link href={returnUrl ? `/login?returnUrl=${encodeURIComponent(returnUrl)}` : '/login'}
+                className="text-brand-600 font-medium hover:text-brand-700 transition-colors">
                 Entrar
               </Link>
             </p>
@@ -163,5 +166,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }

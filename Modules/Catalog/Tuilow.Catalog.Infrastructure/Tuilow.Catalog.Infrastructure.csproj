@@ -14,5 +14,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tuilow.Catalog.Application\Tuilow.Catalog.Application.csproj" />
+    <!-- Acoplamento legítimo: IInstructorLookup consulta o módulo IdentidadeAcesso (nome/avatar/
+         bio do instrutor) para o bloco "Sobre o Professor" da página de vendas pública. -->
+    <ProjectReference Include="..\..\IdentidadeAcesso\Tuilow.IdentidadeAcesso.Domain\Tuilow.IdentidadeAcesso.Domain.csproj" />
   </ItemGroup>
 </Project>

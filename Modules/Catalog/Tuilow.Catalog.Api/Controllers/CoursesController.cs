@@ -11,6 +11,7 @@ using Tuilow.Catalog.Application.Commands.SetCoursePrice;
 using Tuilow.Catalog.Application.Commands.SetCourseSalesPage;
 using Tuilow.Catalog.Application.Commands.UpdateCourseBasicInfo;
 using Tuilow.Catalog.Application.Queries.GetCourseBySlug;
+using Tuilow.Catalog.Application.Queries.GetOtherCoursesByInstructor;
 using Tuilow.Catalog.Application.Queries.ListCourses;
 using Tuilow.Catalog.Domain.Enums;
 using Tuilow.SharedKernel.Application.Interfaces;
@@ -166,5 +167,18 @@ public sealed class CoursesController(ISender sender, ICurrentUserService curren
     {
         await sender.Send(new RecordCourseViewCommand(slug), ct);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Cross-sell: outros cursos publicados do mesmo criador (anônimo) — usado na página do
+    /// curso, na página de vendas pública e no Canal do Criador.
+    /// </summary>
+    [HttpGet("by-instructor/{instructorId:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetByInstructor(
+        Guid instructorId, [FromQuery] Guid? excludeCourseId, CancellationToken ct)
+    {
+        var result = await sender.Send(new GetOtherCoursesByInstructorQuery(instructorId, excludeCourseId), ct);
+        return Ok(result);
     }
 }

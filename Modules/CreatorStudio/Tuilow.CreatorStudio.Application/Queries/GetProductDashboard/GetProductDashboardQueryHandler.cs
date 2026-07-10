@@ -52,7 +52,7 @@ public sealed class GetProductDashboardQueryHandler(
         var netRevenue = revenue - platformFee;
 
         return new ProductDashboardResponse(
-            course.Id, course.Title, course.ViewCount, leadsCount, studentsCount, salesCount,
+            course.Id, course.Title, course.Slug.Value, course.ViewCount, leadsCount, studentsCount, salesCount,
             revenue, platformFee, netRevenue, feePercentage);
     }
 }

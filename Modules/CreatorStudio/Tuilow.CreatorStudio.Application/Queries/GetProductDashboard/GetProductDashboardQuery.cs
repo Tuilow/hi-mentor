@@ -8,6 +8,7 @@ public sealed record GetProductDashboardQuery(Guid CourseId, Guid InstructorId) 
 public sealed record ProductDashboardResponse(
     Guid CourseId,
     string ProductName,
+    string Slug,
     int Views,
     int Leads,
     int Students,

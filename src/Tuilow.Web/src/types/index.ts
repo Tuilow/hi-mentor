@@ -169,6 +169,10 @@ export interface ProductDetail {
   salesPageCtaText?: string;
   salesPageBenefits: string[];
   faqItems: FaqItem[];
+  instructorId: string;
+  instructorName?: string;
+  instructorAvatarUrl?: string;
+  instructorBio?: string;
 }
 
 export interface PublicationChecklist {
@@ -182,6 +186,7 @@ export interface PublicationChecklist {
 export interface ProductDashboard {
   courseId: string;
   productName: string;
+  slug: string;
   views: number;
   leads: number;
   students: number;
@@ -211,4 +216,59 @@ export interface SalesPageSuggestion {
   benefits: string[];
   faq: SalesPageFaqSuggestion[];
   callToAction: string;
+}
+
+// Central de Divulgação — botão "Gerar com IA" por canal.
+export type MarketingChannel =
+  | 'InstagramPost' | 'InstagramStory' | 'WhatsApp' | 'Email' | 'MetaAds' | 'Headline';
+
+export interface MarketingCopySuggestion {
+  content: string;
+  cta?: string;
+}
+
+// Cross-sell: outros cursos publicados do mesmo criador (GET /courses/by-instructor/:id).
+export interface InstructorCourseSummary {
+  id: string;
+  title: string;
+  slug: string;
+  thumbnailUrl?: string;
+  price: number;
+  isFree: boolean;
+  level: string;
+}
+
+// ─── Canal do Criador ─────────────────────────
+
+export interface SocialLinkItem {
+  platform: string;
+  url: string;
+}
+
+// GET /channel/me — tela "Meu Canal" (null se o criador ainda não criou um).
+export interface MyChannel {
+  id: string;
+  handle: string;
+  socialLinks: SocialLinkItem[];
+}
+
+// GET /channel/:handle — vitrine pública em /canal/[handle].
+export interface PublicChannelCourseItem {
+  id: string;
+  title: string;
+  slug: string;
+  thumbnailUrl?: string;
+  price: number;
+  isFree: boolean;
+  isUnlocked: boolean;
+}
+
+export interface PublicChannel {
+  channelId: string;
+  handle: string;
+  displayName: string;
+  avatarUrl?: string;
+  bio?: string;
+  socialLinks: SocialLinkItem[];
+  courses: PublicChannelCourseItem[];
 }

@@ -1,11 +1,20 @@
 using Tuilow.SharedKernel.Application.Exceptions;
+using Tuilow.Catalog.Application.Interfaces;
 using Tuilow.Catalog.Domain.Interfaces;
 using MediatR;
 
 namespace Tuilow.Catalog.Application.Queries.GetCourseBySlug;
 
-public sealed class GetCourseBySlugQueryHandler(ICourseRepository courseRepository)
-    : IRequestHandler<GetCourseBySlugQuery, CourseDetailResponse>
+/// <summary>
+/// Endpoint público (GET /courses/{slug} não exige autenticação) — é a mesma consulta usada
+/// tanto pela página do curso autenticada (dashboard) quanto pela página de vendas pública
+/// (/c/{slug}). InstructorName/AvatarUrl/Bio alimentam o bloco "Sobre o Professor" da página
+/// de vendas; vêm de IInstructorLookup (IdentidadeAcesso) — nunca duplicados em Catalog.
+/// </summary>
+public sealed class GetCourseBySlugQueryHandler(
+    ICourseRepository courseRepository,
+    IInstructorLookup instructorLookup
+) : IRequestHandler<GetCourseBySlugQuery, CourseDetailResponse>
 {
     public async Task<CourseDetailResponse> Handle(GetCourseBySlugQuery request, CancellationToken ct)
     {
@@ -24,12 +33,15 @@ public sealed class GetCourseBySlugQueryHandler(ICourseRepository courseReposito
             .OrderBy(f => f.Order)
             .Select(f => new FaqItemResponse(f.Id, f.Question, f.Answer, f.Order));
 
+        var instructor = await instructorLookup.GetProfileAsync(course.InstructorId, ct);
+
         return new CourseDetailResponse(
             course.Id, course.Title, course.Slug.Value, course.Description,
             course.ShortDescription, course.ThumbnailUrl, course.Price.Amount, course.IsFree,
             course.Level.ToString(), course.TotalDurationMinutes, course.PublishedAt, modules,
             course.Status.ToString(), course.Category, course.Subcategory, course.ProductType.ToString(),
             course.ViewCount, course.SalesPageHeadline, course.SalesPageSubheadline, course.SalesPageCtaText,
-            course.SalesPageBenefits, faqItems);
+            course.SalesPageBenefits, faqItems,
+            course.InstructorId, instructor?.DisplayName, instructor?.AvatarUrl, instructor?.Bio);
     }
 }

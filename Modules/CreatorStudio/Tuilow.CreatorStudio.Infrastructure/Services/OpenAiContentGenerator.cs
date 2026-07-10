@@ -78,6 +78,41 @@ public sealed class OpenAiContentGenerator(
             root.GetProperty("callToAction").GetString() ?? "");
     }
 
+    private static readonly Dictionary<MarketingChannel, string> ChannelInstruction = new()
+    {
+        [MarketingChannel.InstagramPost] = "um post de Instagram (legenda com emojis, benefícios em bullet e hashtags relevantes ao final)",
+        [MarketingChannel.InstagramStory] = "um Story de Instagram (texto bem curto, direto, chamando para arrastar para cima)",
+        [MarketingChannel.WhatsApp] = "uma mensagem para enviar em grupos de WhatsApp (tom pessoal e direto, sem parecer spam)",
+        [MarketingChannel.Email] = "um e-mail de vendas (com uma linha 'Assunto:' no início do texto, seguida do corpo do e-mail)",
+        [MarketingChannel.MetaAds] = "um anúncio para o Meta Ads Manager (com linhas 'Título:', 'Texto principal:' e 'Descrição:')",
+        [MarketingChannel.Headline] = "uma lista de 4 variações de headline (título de impacto) para a página de vendas, uma por linha",
+    };
+
+    public async Task<MarketingCopySuggestion> GenerateMarketingCopyAsync(
+        string productName, MarketingChannel channel, string? category, string? shortDescription,
+        IReadOnlyList<string> benefits, decimal price, CancellationToken ct = default)
+    {
+        var instruction = ChannelInstruction.GetValueOrDefault(channel, "um texto de divulgação");
+        var benefitsText = benefits.Count > 0 ? string.Join(", ", benefits) : "não informados";
+
+        var prompt =
+            $"Você é um copywriter especialista em marketing digital para cursos online. Gere {instruction} " +
+            $"para divulgar o curso \"{productName}\" (categoria: {category ?? "não informada"}, " +
+            $"descrição curta: {shortDescription ?? "não informada"}, benefícios: {benefitsText}, " +
+            $"preço: {(price > 0 ? $"R$ {price:0.00}" : "gratuito")}). " +
+            "Responda APENAS com um JSON no formato exato: {\"content\": string, \"cta\": string ou null}";
+
+        var json = await CompleteAsync(prompt, ct);
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        var cta = root.TryGetProperty("cta", out var ctaEl) && ctaEl.ValueKind != JsonValueKind.Null
+            ? ctaEl.GetString()
+            : null;
+
+        return new MarketingCopySuggestion(root.GetProperty("content").GetString() ?? "", cta);
+    }
+
     private async Task<string> CompleteAsync(string prompt, CancellationToken ct)
     {
         var payload = new

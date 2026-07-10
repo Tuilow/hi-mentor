@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { coursesApi, enrollmentsApi, courseSubscriptionPlansApi, coursePurchasesApi, subscriptionsApi } from '@/lib/api';
-import type { CoursePlan } from '@/types';
+import type { CoursePlan, InstructorCourseSummary } from '@/types';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
@@ -46,6 +46,7 @@ interface CourseDetail {
   totalDurationMinutes?: number;
   publishedAt?: string;
   modules: Module[];
+  instructorId: string;
 }
 
 // GET /enrollments/courses/{courseId} — 200 com esse shape se o aluno já está matriculado,
@@ -239,6 +240,14 @@ export default function CourseDetailPage() {
   // Endpoint de simulação só existe no backend em Development (404 em produção) — este check
   // evita mostrar o botão à toa fora de ambiente de dev/sandbox.
   const isDevEnv = process.env.NODE_ENV !== 'production';
+
+  // Cross-sell: outros cursos publicados deste mesmo criador — audiência própria em vez de
+  // curso isolado. Público no backend, mas só faz sentido mostrar depois que o curso carregou.
+  const { data: otherCourses = [] } = useQuery<InstructorCourseSummary[]>({
+    queryKey: ['instructor-courses', course?.instructorId, course?.id],
+    queryFn: () => coursesApi.getByInstructor(course!.instructorId, course!.id).then(r => r.data),
+    enabled: !!course?.instructorId,
+  });
 
   const toggleModule = (id: string) =>
     setOpenModules(prev => {
@@ -543,6 +552,29 @@ export default function CourseDetailPage() {
             })}
         </div>
       </div>
+
+      {/* Cross-sell: audiência própria do criador, não curso isolado */}
+      {otherCourses.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Mais cursos deste professor</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {otherCourses.map(c => (
+              <Link key={c.id} href={`/cursos/${c.slug}`}
+                className="card border-gray-200 hover:border-brand-300 transition-colors p-0 overflow-hidden flex gap-3">
+                {c.thumbnailUrl ? (
+                  <img src={c.thumbnailUrl} alt={c.title} className="w-24 h-24 object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-24 h-24 bg-gray-100 flex items-center justify-center text-2xl flex-shrink-0">📚</div>
+                )}
+                <div className="py-3 pr-3 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{c.title}</p>
+                  <p className="text-xs text-gray-400 mt-1">{formatPrice(c.price)}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {checkoutOpen && course && (
         <CheckoutModal
