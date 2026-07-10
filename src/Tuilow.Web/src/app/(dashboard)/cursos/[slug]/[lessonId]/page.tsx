@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { coursesApi, subscriptionsApi } from '@/lib/api';
+import { useEffect, useRef, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { coursesApi, enrollmentsApi } from '@/lib/api';
 import Link from 'next/link';
 
 interface PlayUrlResponse {
@@ -58,10 +58,32 @@ interface CourseDetail {
   }>;
 }
 
+// GET /enrollments/courses/{courseId} — inclui o progresso salvo de CADA aula, usado aqui para
+// retomar o vídeo de onde parou e marcar aulas concluídas na barra lateral.
+interface LessonProgressDto {
+  lessonId: string;
+  watchedSeconds: number;
+  isCompleted: boolean;
+}
+interface EnrollmentProgressDto {
+  enrollmentId: string;
+  courseId: string;
+  status: string;
+  progressPercentage: number;
+  lessonProgress: LessonProgressDto[];
+}
+
+// Intervalo mínimo entre salvamentos automáticos de progresso durante a reprodução — evita
+// bater na API a cada frame do evento timeupdate (que dispara várias vezes por segundo).
+const PROGRESS_SAVE_INTERVAL_SECONDS = 10;
+
 export default function LessonPlayerPage() {
   const { slug, lessonId } = useParams<{ slug: string; lessonId: string }>();
-  const router = useRouter();
+  const qc = useQueryClient();
   const [courseId, setCourseId] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const lastSavedAtRef = useRef(0);
+  const hasResumedRef = useRef(false);
 
   // 1. Busca o curso para obter o courseId e a lista de aulas (sidebar)
   const { data: course } = useQuery<CourseDetail>({
@@ -87,13 +109,67 @@ export default function LessonPlayerPage() {
     retry: false,
   });
 
-  // 3. Verifica assinatura para o paywall
-  const { data: subscription } = useQuery({
-    queryKey: ['my-subscription'],
-    queryFn: () => subscriptionsApi.getMySubscription().then(r => r.data).catch(() => null),
+  // 3. Progresso da matrícula — de onde retomar este vídeo e quais aulas já foram concluídas.
+  // GET /enrollments/courses/{courseId} retorna 404 se o aluno não está matriculado (ex.: preview
+  // gratuito sem matrícula); nesse caso não há progresso pra salvar/retomar, e tudo bem.
+  const { data: enrollmentProgress } = useQuery<EnrollmentProgressDto | null>({
+    queryKey: ['enrollment-progress', courseId],
+    queryFn: () => enrollmentsApi.getProgress(courseId!).then(r => r.data).catch(() => null),
+    enabled: !!courseId,
   });
+  const isEnrolled = !!enrollmentProgress;
+  const myLessonProgress = enrollmentProgress?.lessonProgress.find(lp => lp.lessonId === lessonId);
+  const resumeSeconds = myLessonProgress?.watchedSeconds ?? 0;
 
-  // Status do erro (403 = sem assinatura, 401 = não logado)
+  // Reseta o "já retomei este vídeo" ao trocar de aula — sem isso, ao navegar de uma aula pra
+  // outra o próximo <video> nunca seria posicionado (o ref ficava true da aula anterior).
+  useEffect(() => {
+    hasResumedRef.current = false;
+    lastSavedAtRef.current = 0;
+  }, [lessonId]);
+
+  const saveProgress = (watchedSeconds: number, totalSeconds: number) => {
+    if (!enrollmentProgress?.enrollmentId || !totalSeconds) return;
+    enrollmentsApi.trackProgress(enrollmentProgress.enrollmentId, {
+      lessonId, watchedSeconds: Math.floor(watchedSeconds), totalSeconds: Math.floor(totalSeconds),
+    }).catch(() => { /* não trava o player por causa disso — tenta de novo no próximo intervalo */ });
+  };
+
+  // Ao carregar os metadados do vídeo, pula direto pra onde o aluno parou da última vez
+  // (só uma vez por aula — depois disso o aluno pode navegar livremente sem ser "puxado de volta").
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    if (hasResumedRef.current) return;
+    hasResumedRef.current = true;
+    const video = e.currentTarget;
+    if (resumeSeconds > 5 && resumeSeconds < video.duration - 5) {
+      video.currentTime = resumeSeconds;
+    }
+  };
+
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    if (video.currentTime - lastSavedAtRef.current >= PROGRESS_SAVE_INTERVAL_SECONDS) {
+      lastSavedAtRef.current = video.currentTime;
+      saveProgress(video.currentTime, video.duration);
+    }
+  };
+
+  // Pausa e fim de vídeo salvam na hora (não esperam o intervalo de 10s) e atualizam a barra
+  // lateral / progresso da matrícula em outras telas (ex.: aba "Meus cursos" e o ✓ ao lado desta
+  // aula), já que uma pausa costuma ser exatamente o momento em que o aluno vai embora.
+  const handlePauseOrEnded = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    lastSavedAtRef.current = video.currentTime;
+    saveProgress(video.currentTime, video.duration);
+    qc.invalidateQueries({ queryKey: ['enrollment-progress', courseId] });
+    qc.invalidateQueries({ queryKey: ['my-enrollments'] });
+  };
+
+  // Status do erro (403 = sem acesso pago a este curso, 401 = não logado). O motivo exato
+  // (compra pendente vs. assinatura pendente) depende do modelo de monetização do PRODUTO, não
+  // é algo genérico da plataforma — por isso o paywall abaixo manda o aluno de volta para a
+  // página do curso, que já sabe (via Plan.CourseId) se este produto é Compra Única ou
+  // Assinatura e mostra o botão certo (Comprar/Assinar). Ver cursos/[slug]/page.tsx.
   const errStatus = (error as { response?: { status?: number } })?.response?.status;
   const isPaywalled = errStatus === 403 || errStatus === 401;
 
@@ -131,19 +207,15 @@ export default function LessonPlayerPage() {
               <div className="text-5xl">🔒</div>
               <div>
                 <h2 className="text-xl font-bold text-gray-800 mb-2">
-                  Conteúdo exclusivo para assinantes
+                  Conteúdo pago
                 </h2>
                 <p className="text-gray-500 text-sm max-w-sm mx-auto">
-                  Esta aula faz parte do conteúdo pago.
-                  Assine um plano para ter acesso ilimitado a todos os cursos.
+                  Esta aula faz parte do conteúdo pago deste curso.
+                  Adquira acesso na página do curso para continuar assistindo.
                 </p>
               </div>
-              <Link href="/assinatura" className="btn-primary mt-2">
-                Ver planos →
-              </Link>
-              <Link href={`/cursos/${slug}`}
-                className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
-                ← Voltar ao curso
+              <Link href={`/cursos/${slug}`} className="btn-primary mt-2">
+                Ver opções de acesso →
               </Link>
             </div>
           )}
@@ -163,7 +235,11 @@ export default function LessonPlayerPage() {
                 {(() => {
                   const embedUrl = toEmbedUrl(playData.playbackUrl);
                   if (embedUrl) {
-                    // YouTube/Vimeo/Drive/Cloudflare Stream — todos tocam via iframe de embed
+                    // YouTube/Vimeo/Drive/Cloudflare Stream — todos tocam via iframe de embed.
+                    // Não dá pra salvar/retomar posição aqui: o player fica isolado num outro
+                    // domínio (iframe) e não expõe currentTime sem integrar a API própria de
+                    // cada plataforma (YouTube IFrame API, Vimeo Player.js etc.) — fora do
+                    // escopo desta correção, que cobre o caso mais comum (vídeo enviado direto).
                     return (
                       <iframe
                         src={embedUrl}
@@ -185,14 +261,21 @@ export default function LessonPlayerPage() {
                       </div>
                     );
                   }
-                  // Arquivo de vídeo direto (upload — Cloudflare Stream real ou mock local)
+                  // Arquivo de vídeo direto (upload — Cloudflare Stream real ou mock local).
+                  // Único caso em que dá pra controlar currentTime diretamente — retoma de
+                  // resumeSeconds ao carregar e salva a posição periodicamente.
                   return (
                     <video
+                      ref={videoRef}
                       src={playData.playbackUrl}
                       controls
                       autoPlay
                       className="w-full h-full"
                       title={playData.title}
+                      onLoadedMetadata={handleLoadedMetadata}
+                      onTimeUpdate={handleTimeUpdate}
+                      onPause={handlePauseOrEnded}
+                      onEnded={handlePauseOrEnded}
                     />
                   );
                 })()}
@@ -202,12 +285,22 @@ export default function LessonPlayerPage() {
               <div className="mt-4 flex items-start justify-between gap-3">
                 <div>
                   <h1 className="text-xl font-bold text-gray-800">{playData.title}</h1>
-                  {playData.durationSeconds && (
-                    <p className="text-sm text-gray-400 mt-1">
-                      ⏱ {Math.floor(playData.durationSeconds / 60)}min{' '}
-                      {playData.durationSeconds % 60}s
-                    </p>
-                  )}
+                  <div className="flex items-center gap-3 mt-1">
+                    {playData.durationSeconds && (
+                      <p className="text-sm text-gray-400">
+                        ⏱ {Math.floor(playData.durationSeconds / 60)}min{' '}
+                        {playData.durationSeconds % 60}s
+                      </p>
+                    )}
+                    {myLessonProgress?.isCompleted && (
+                      <span className="text-xs text-emerald-500 font-medium">✓ Aula concluída</span>
+                    )}
+                    {!myLessonProgress?.isCompleted && resumeSeconds > 5 && (
+                      <span className="text-xs text-gray-400">
+                        Retomando de {Math.floor(resumeSeconds / 60)}min {resumeSeconds % 60}s
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {playData.isPreview && (
                   <span className="badge-green flex-shrink-0">Preview gratuito</span>
@@ -272,7 +365,9 @@ export default function LessonPlayerPage() {
                       .sort((a, b) => a.order - b.order)
                       .map(lesson => {
                         const isCurrent = lesson.id === lessonId;
-                        const isLocked = !lesson.isPreview;
+                        const isLocked = !lesson.isPreview && !isEnrolled;
+                        const isCompleted = enrollmentProgress?.lessonProgress
+                          .find(lp => lp.lessonId === lesson.id)?.isCompleted ?? false;
                         return (
                           <Link
                             key={lesson.id}
@@ -286,7 +381,7 @@ export default function LessonPlayerPage() {
                             `}
                           >
                             <span className="text-base mt-0.5 flex-shrink-0">
-                              {isCurrent ? '▶' : isLocked ? '🔒' : '▷'}
+                              {isCurrent ? '▶' : isLocked ? '🔒' : isCompleted ? '✅' : '▷'}
                             </span>
                             <div className="min-w-0">
                               <p className={`text-xs font-medium leading-snug truncate

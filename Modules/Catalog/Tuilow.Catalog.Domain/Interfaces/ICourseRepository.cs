@@ -15,6 +15,10 @@ public interface ICourseRepository : IRepository<Course>
     /// <summary>Lista os produtos do criador (tela "Meus Produtos") — inclui todos os status.</summary>
     Task<IEnumerable<Course>> ListByInstructorAsync(Guid instructorId, CancellationToken ct = default);
 
+    /// <summary>Busca em lote por Id — usado por outros módulos (ex.: Learning, tela "meus cursos
+    /// matriculados") para resolver os dados de exibição de uma lista de CourseIds de uma vez.</summary>
+    Task<IEnumerable<Course>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
+
     /// <summary>Força EntityState.Added para o Module — evita DbUpdateConcurrencyException.</summary>
     Task AddModuleAsync(Module module, CancellationToken ct = default);
 

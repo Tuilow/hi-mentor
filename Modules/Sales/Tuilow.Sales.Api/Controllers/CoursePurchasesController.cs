@@ -1,9 +1,11 @@
 using Tuilow.Sales.Application.Commands.PurchaseCourse;
+using Tuilow.Sales.Application.Commands.SimulateCoursePurchasePayment;
 using Tuilow.Sales.Application.Queries.GetMyCoursePurchases;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 
 namespace Tuilow.Sales.Api.Controllers;
 
@@ -16,7 +18,8 @@ namespace Tuilow.Sales.Api.Controllers;
 [Route("api/v1/course-purchases")]
 [Produces("application/json")]
 [Authorize]
-public sealed class CoursePurchasesController(ISender sender, ICurrentUserService currentUser) : ControllerBase
+public sealed class CoursePurchasesController(
+    ISender sender, ICurrentUserService currentUser, IHostEnvironment env) : ControllerBase
 {
     /// <summary>Inicia a compra de um curso — gera o link de pagamento (PIX/cartão/boleto).</summary>
     [HttpPost]
@@ -35,6 +38,19 @@ public sealed class CoursePurchasesController(ISender sender, ICurrentUserServic
     {
         var result = await sender.Send(new GetMyCoursePurchasesQuery(currentUser.UserId!.Value), ct);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// SANDBOX/DEV apenas: simula a confirmação do pagamento no lugar do webhook do Asaas, que
+    /// não alcança localhost. Indisponível fora de Development (404) — nunca existe em produção.
+    /// </summary>
+    [HttpPost("{id:guid}/simulate-payment")]
+    public async Task<IActionResult> SimulatePayment(Guid id, CancellationToken ct)
+    {
+        if (!env.IsDevelopment()) return NotFound();
+
+        await sender.Send(new SimulateCoursePurchasePaymentCommand(currentUser.UserId!.Value, id), ct);
+        return Ok();
     }
 }
 

@@ -157,6 +157,8 @@ export const enrollmentsApi = {
   trackProgress: (enrollmentId: string, data: unknown) =>
     api.post(`/enrollments/${enrollmentId}/progress`, data),
   getProgress: (courseId: string) => api.get(`/enrollments/courses/${courseId}`),
+  // Cursos em que o aluno está matriculado (filtro "Matriculados" em /cursos).
+  getMyEnrollments: () => api.get('/enrollments/me'),
 };
 
 export const subscriptionsApi = {
@@ -164,6 +166,19 @@ export const subscriptionsApi = {
   getMySubscription: () => api.get('/subscriptions/me'),
   subscribe: (data: unknown) => api.post('/subscriptions', data),
   cancel: (reason?: string) => api.delete('/subscriptions/me', { data: { reason } }),
+};
+
+// Compra avulsa de curso (pagamento único) — modelo principal de monetização do Tuilow.
+// Espelha o wrapper de subscriptionsApi acima, só que para o endpoint de compra avulsa
+// (Tuilow.Sales.Api.Controllers.CoursePurchasesController), que já existia no backend mas
+// nunca tinha sido consumido pelo frontend do aluno.
+export const coursePurchasesApi = {
+  purchase: (data: { courseId: string; customerName: string; customerEmail: string; cpfCnpj?: string; phone?: string }) =>
+    api.post('/course-purchases', data),
+  getMyPurchases: () => api.get('/course-purchases/me'),
+  // SANDBOX/DEV apenas — 404 fora de Development no backend. Substitui o webhook do Asaas
+  // (que não alcança localhost) para permitir testar o fluxo de compra ponta a ponta.
+  simulatePayment: (purchaseId: string) => api.post(`/course-purchases/${purchaseId}/simulate-payment`),
 };
 
 // "Meus Perfis" (learnerProfilesApi) removido temporariamente da experiência do usuário — era

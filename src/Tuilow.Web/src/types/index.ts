@@ -41,6 +41,23 @@ export interface EnrollmentProgress {
   totalLessons: number;
 }
 
+// GET /enrollments/me — cursos em que o aluno está matriculado (filtro "Matriculados" em /cursos).
+export interface MyEnrollment {
+  enrollmentId: string;
+  courseId: string;
+  title: string;
+  slug: string;
+  thumbnailUrl?: string;
+  price: number;
+  isFree: boolean;
+  level: string;
+  status: string;
+  progressPercentage: number;
+  enrolledAt: string;
+  completedAt?: string;
+  completedLessonsCount: number;
+}
+
 export interface Plan {
   id: string;
   name: string;
@@ -56,6 +73,17 @@ export interface PlanFeature {
   featureKey: string;
   featureValue?: string;
   displayName?: string;
+}
+
+// Plano de assinatura vinculado a UM produto específico (GET /subscriptions/plans/by-course/:id).
+// Formato reduzido em relação a Plan (sem slug/features) — é o que o endpoint por-curso retorna.
+export interface CoursePlan {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  billingCycle: 'Monthly' | 'Quarterly' | 'Semiannual' | 'Annual';
+  trialDays: number;
 }
 
 // LearnerProfile removido junto com "Meus Perfis" — ver comentário em lib/api.ts.

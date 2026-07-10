@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { authApi, subscriptionsApi } from '@/lib/api';
+import { authApi, subscriptionsApi, enrollmentsApi } from '@/lib/api';
+import type { MyEnrollment } from '@/types';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -29,6 +30,19 @@ export default function DashboardPage() {
     queryKey: ['my-subscription'],
     queryFn: () => subscriptionsApi.getMySubscription().then(r => r.data).catch(() => null),
   });
+
+  // Mesma query key usada em /cursos (filtro "Matriculados") — um único cache alimenta os dois
+  // lugares. Antes os 4 cards abaixo eram só '—' fixo, nunca conectados a dado nenhum.
+  const { data: myEnrollments = [] } = useQuery<MyEnrollment[]>({
+    queryKey: ['my-enrollments'],
+    queryFn: () => enrollmentsApi.getMyEnrollments().then(r => r.data),
+  });
+
+  const totalCompletedLessons = myEnrollments.reduce((acc, e) => acc + e.completedLessonsCount, 0);
+  const avgProgress = myEnrollments.length > 0
+    ? Math.round(myEnrollments.reduce((acc, e) => acc + e.progressPercentage, 0) / myEnrollments.length)
+    : 0;
+  const certificatesCount = myEnrollments.filter(e => e.status === 'Completed').length;
 
   const isCreator = user?.roles?.includes('Creator') || user?.roles?.includes('Admin');
 
@@ -110,10 +124,10 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Cursos',       value: '—', sub: 'matriculados' },
-          { label: 'Aulas',        value: '—', sub: 'concluídas' },
-          { label: 'Progresso',    value: '—', sub: 'médio' },
-          { label: 'Certificados', value: '—', sub: 'conquistados' },
+          { label: 'Cursos',       value: String(myEnrollments.length), sub: 'matriculados' },
+          { label: 'Aulas',        value: String(totalCompletedLessons), sub: 'concluídas' },
+          { label: 'Progresso',    value: `${avgProgress}%`, sub: 'médio' },
+          { label: 'Certificados', value: String(certificatesCount), sub: 'conquistados' },
         ].map(s => (
           <div key={s.label} className="card border-gray-200 text-center">
             <p className="text-2xl font-bold gradient-text">{s.value}</p>

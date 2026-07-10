@@ -1,6 +1,7 @@
 using Tuilow.Learning.Application.Commands.CompleteLesson;
 using Tuilow.Learning.Application.Commands.EnrollStudent;
 using Tuilow.Learning.Application.Queries.GetEnrollmentProgress;
+using Tuilow.Learning.Application.Queries.GetMyEnrollments;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -42,6 +43,14 @@ public sealed class EnrollmentsController(ISender sender, ICurrentUserService cu
             new GetEnrollmentProgressQuery(currentUser.UserId!.Value, courseId), ct);
         if (progress is null) return NotFound();
         return Ok(progress);
+    }
+
+    /// <summary>Lista os cursos em que o aluno autenticado está matriculado (filtro "Matriculados").</summary>
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMyEnrollments(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetMyEnrollmentsQuery(currentUser.UserId!.Value), ct);
+        return Ok(result);
     }
 }
 

@@ -57,6 +57,11 @@ public sealed class CourseRepository(DbContext context) : ICourseRepository
             .OrderByDescending(c => c.CreatedAt)
             .ToListAsync(ct);
 
+    public async Task<IEnumerable<Course>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default) =>
+        await context.Set<Course>()
+            .Where(c => ids.Contains(c.Id))
+            .ToListAsync(ct);
+
     /// <summary>
     /// Registra o Module explicitamente como Added no DbContext.
     /// Necessário porque DetectChanges marca entidades filhas com Guid novo como Modified.
