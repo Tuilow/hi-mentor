@@ -13,6 +13,20 @@ function formatPrice(price: number): string {
     : price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/**
+ * Converte a URL colada pelo criador (YouTube/Vimeo) numa URL de embed — mesma lógica de
+ * /c/[slug] (vídeo da página de vendas), aqui para o vídeo de apresentação do canal.
+ */
+function toEmbedUrl(url: string): string | null {
+  const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
+  if (youtubeMatch) return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+
+  const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+
+  return null;
+}
+
 const platformIcon: Record<string, string> = {
   instagram: '📷',
   youtube: '▶️',
@@ -75,6 +89,13 @@ export default function PublicChannelPage() {
         </div>
       </header>
 
+      {channel.bannerUrl && (
+        <div className="w-full h-40 sm:h-56 bg-gray-100 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={channel.bannerUrl} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-4 py-10">
         {/* Perfil do canal */}
         <div className="flex flex-col items-center text-center mb-8">
@@ -103,6 +124,18 @@ export default function PublicChannelPage() {
             </div>
           )}
         </div>
+
+        {/* Vídeo de apresentação */}
+        {channel.introVideoUrl && toEmbedUrl(channel.introVideoUrl) && (
+          <div className="mb-10 rounded-xl overflow-hidden aspect-video bg-black">
+            <iframe
+              src={toEmbedUrl(channel.introVideoUrl)!}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        )}
 
         {/* Catálogo de cursos */}
         <h2 className="text-lg font-semibold text-gray-800 mb-4">

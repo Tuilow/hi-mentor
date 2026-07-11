@@ -1,6 +1,8 @@
 using Tuilow.Learning.Application.Commands.CompleteLesson;
 using Tuilow.Learning.Application.Commands.EnrollStudent;
+using Tuilow.Learning.Application.Queries.GetContinueWatching;
 using Tuilow.Learning.Application.Queries.GetEnrollmentProgress;
+using Tuilow.Learning.Application.Queries.GetLessonHistory;
 using Tuilow.Learning.Application.Queries.GetMyEnrollments;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
@@ -50,6 +52,22 @@ public sealed class EnrollmentsController(ISender sender, ICurrentUserService cu
     public async Task<IActionResult> GetMyEnrollments(CancellationToken ct)
     {
         var result = await sender.Send(new GetMyEnrollmentsQuery(currentUser.UserId!.Value), ct);
+        return Ok(result);
+    }
+
+    /// <summary>"Continuar de onde parei" — a última aula assistida entre todos os cursos matriculados.</summary>
+    [HttpGet("continue-watching")]
+    public async Task<IActionResult> GetContinueWatching(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetContinueWatchingQuery(currentUser.UserId!.Value), ct);
+        return Ok(result);
+    }
+
+    /// <summary>Histórico de aulas assistidas — todas as aulas com progresso, entre todos os cursos.</summary>
+    [HttpGet("history")]
+    public async Task<IActionResult> GetLessonHistory(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetLessonHistoryQuery(currentUser.UserId!.Value), ct);
         return Ok(result);
     }
 }

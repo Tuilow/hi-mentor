@@ -17,6 +17,12 @@ public static class DependencyInjection
     public static IServiceCollection AddCreatorStudioInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<ILeadRepository, LeadRepository>();
+        services.AddScoped<ICreatorStyleProfileRepository, CreatorStyleProfileRepository>();
+        services.AddScoped<ILessonScriptRepository, LessonScriptRepository>();
+        services.AddScoped<IRecordingTemplateRepository, RecordingTemplateRepository>();
+
+        // Porta preparada, sem processamento real ainda (ver NoOpVideoEditingService).
+        services.AddSingleton<IVideoEditingService, NoOpVideoEditingService>();
 
         // Default true: funciona de ponta a ponta sem nenhuma chave de API configurada.
         var aiMock = configuration.GetValue("AiContentGenerator:MockMode", defaultValue: true);

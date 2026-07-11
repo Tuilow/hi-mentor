@@ -32,7 +32,9 @@ public sealed class ChannelController(ISender sender, ICurrentUserService curren
     public async Task<IActionResult> UpsertMyChannel([FromBody] UpsertChannelRequest request, CancellationToken ct)
     {
         var id = await sender.Send(
-            new UpsertChannelCommand(currentUser.UserId!.Value, request.Handle, request.SocialLinks), ct);
+            new UpsertChannelCommand(
+                currentUser.UserId!.Value, request.Handle, request.SocialLinks,
+                request.BannerUrl, request.IntroVideoUrl), ct);
         return Ok(new { id });
     }
 
@@ -46,4 +48,8 @@ public sealed class ChannelController(ISender sender, ICurrentUserService curren
     }
 }
 
-public sealed record UpsertChannelRequest(string Handle, IReadOnlyList<SocialLinkInput> SocialLinks);
+public sealed record UpsertChannelRequest(
+    string Handle,
+    IReadOnlyList<SocialLinkInput> SocialLinks,
+    string? BannerUrl = null,
+    string? IntroVideoUrl = null);

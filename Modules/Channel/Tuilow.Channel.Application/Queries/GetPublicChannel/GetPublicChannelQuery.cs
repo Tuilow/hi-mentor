@@ -17,7 +17,9 @@ public sealed record PublicChannelResponse(
     string? AvatarUrl,
     string? Bio,
     IReadOnlyList<PublicSocialLink> SocialLinks,
-    IReadOnlyList<PublicChannelCourse> Courses
+    IReadOnlyList<PublicChannelCourse> Courses,
+    string? BannerUrl,
+    string? IntroVideoUrl
 );
 
 public sealed record PublicSocialLink(string Platform, string Url);

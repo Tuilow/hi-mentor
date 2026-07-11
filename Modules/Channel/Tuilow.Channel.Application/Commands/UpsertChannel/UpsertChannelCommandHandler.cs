@@ -23,6 +23,7 @@ public sealed class UpsertChannelCommandHandler(
 
             channel = CreatorChannel.Create(request.CreatorId, request.Handle);
             channel.SetSocialLinks(links);
+            channel.SetBranding(request.BannerUrl, request.IntroVideoUrl);
             await channelRepository.AddAsync(channel, ct);
         }
         else
@@ -33,6 +34,7 @@ public sealed class UpsertChannelCommandHandler(
 
             channel.ChangeHandle(request.Handle);
             channel.SetSocialLinks(links);
+            channel.SetBranding(request.BannerUrl, request.IntroVideoUrl);
             channelRepository.Update(channel);
         }
 

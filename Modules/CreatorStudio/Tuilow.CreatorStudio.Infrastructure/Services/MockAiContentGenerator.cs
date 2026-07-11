@@ -1,4 +1,5 @@
 using Tuilow.CreatorStudio.Application.Interfaces;
+using Tuilow.CreatorStudio.Domain.Enums;
 
 namespace Tuilow.CreatorStudio.Infrastructure.Services;
 
@@ -132,6 +133,136 @@ public sealed class MockAiContentGenerator : IAiContentGenerator
         };
 
         return Task.FromResult(suggestion);
+    }
+
+    public Task<CourseOutlineSuggestion> GenerateCourseOutlineAsync(
+        string niche, string targetAudience, string objective, AudienceLevel level, CancellationToken ct = default)
+    {
+        var tone = NicheTone(niche);
+        var levelLabel = level switch
+        {
+            AudienceLevel.Beginner => "iniciante",
+            AudienceLevel.Intermediate => "intermediário",
+            _ => "avançado",
+        };
+
+        var courseName = $"{niche}: {objective}";
+        var courseDescription =
+            $"Curso pensado para {targetAudience.ToLowerInvariant()}, nível {levelLabel}, com foco em {objective.ToLowerInvariant()}. " +
+            $"{tone.Intro}";
+
+        var modules = new List<CourseOutlineModule>
+        {
+            new($"Módulo 1 - Fundamentos de {niche}",
+            [
+                new CourseOutlineLesson($"Os principais conceitos de {niche.ToLowerInvariant()}", "Teórica"),
+                new CourseOutlineLesson("Erros comuns e como evitá-los", "Teórica"),
+                new CourseOutlineLesson("Definindo metas realistas", "Teórica"),
+            ]),
+            new($"Módulo 2 - Colocando em prática",
+            [
+                new CourseOutlineLesson($"Primeiros passos para {levelLabel}s", "Prática"),
+                new CourseOutlineLesson("Aplicando na rotina do dia a dia", "Prática"),
+                new CourseOutlineLesson("Estudo de caso real", "Estudo de caso"),
+            ]),
+            new("Módulo 3 - Consolidando resultados",
+            [
+                new CourseOutlineLesson("Acompanhando sua evolução", "Teórica"),
+                new CourseOutlineLesson("Próximos passos e recursos extras", "Teórica"),
+            ]),
+        };
+
+        return Task.FromResult(new CourseOutlineSuggestion(courseName, courseDescription, modules));
+    }
+
+    public Task<LessonScriptSuggestion> GenerateLessonScriptAsync(
+        string lessonTitle, string niche, string targetAudience, AudienceLevel level, CancellationToken ct = default)
+    {
+        var tone = NicheTone(niche);
+
+        var introduction =
+            $"Olá, seja bem-vindo(a)! {tone.Greeting} Nesta aula você vai aprender sobre \"{lessonTitle}\" — " +
+            $"conteúdo pensado especialmente para {targetAudience.ToLowerInvariant()}.";
+
+        var developmentTopics = new List<string>
+        {
+            $"Explique o conceito central de \"{lessonTitle}\" com suas palavras",
+            $"{tone.DevelopmentHint}",
+            "Traga um exemplo prático do dia a dia",
+            "Destaque os erros mais comuns nesse tema",
+        };
+
+        var demonstrationSuggestions = new List<string>
+        {
+            tone.DemonstrationHint,
+            "Grave um passo a passo mostrando na prática o que foi explicado",
+        };
+
+        var closingCta =
+            $"{tone.ClosingHint} Na próxima aula vamos continuar evoluindo em {niche.ToLowerInvariant()} — não perca!";
+
+        return Task.FromResult(new LessonScriptSuggestion(
+            introduction, developmentTopics, demonstrationSuggestions, closingCta));
+    }
+
+    private sealed record NicheToneProfile(
+        string Intro, string Greeting, string DevelopmentHint, string DemonstrationHint, string ClosingHint);
+
+    /// <summary>
+    /// IA especialista por nicho (item 11 do Estúdio do Criador): adapta tom/linguagem/exemplos
+    /// por palavra-chave do nicho informado. Classificação simples por Contains — o provider
+    /// real (OpenAI) faz isso via prompt, aqui é um mock determinístico sem chamada de rede.
+    /// </summary>
+    private static NicheToneProfile NicheTone(string niche)
+    {
+        var n = niche.ToLowerInvariant();
+
+        if (n.Contains("personal") || n.Contains("treino") || n.Contains("fitness") || n.Contains("academia"))
+            return new NicheToneProfile(
+                "Aulas com linguagem motivacional, pensadas para gerar resultado real no corpo e na rotina do aluno.",
+                "Bora com tudo!",
+                "Demonstre a execução correta do movimento ou técnica",
+                "Grave a demonstração física do exercício/técnica, de frente e de lado, em ambiente bem iluminado",
+                "Você é capaz — continue firme!");
+
+        if (n.Contains("advoga") || n.Contains("direito") || n.Contains("jurídic"))
+            return new NicheToneProfile(
+                "Conteúdo com linguagem formal e tecnicamente precisa, com referência a casos e legislação aplicável.",
+                "Vamos analisar este tema com o rigor que ele exige.",
+                "Cite a base legal ou jurisprudência relevante ao tema",
+                "Apresente um caso jurídico real (anonimizado) que ilustre o conceito",
+                "Consulte sempre um profissional para o seu caso concreto.");
+
+        if (n.Contains("nutri") || n.Contains("dieta") || n.Contains("alimenta"))
+            return new NicheToneProfile(
+                "Aulas com linguagem acolhedora e baseada em evidências, sem promessas milagrosas.",
+                "Vamos falar sobre isso com calma e carinho.",
+                "Explique o embasamento científico por trás da recomendação",
+                "Mostre exemplos reais de pratos/cardápios aplicando o conceito",
+                "Cuide-se — pequenos passos consistentes fazem toda a diferença.");
+
+        if (n.Contains("inglês") || n.Contains("idioma") || n.Contains("professor") || n.Contains("ensino"))
+            return new NicheToneProfile(
+                "Aulas com linguagem didática, repletas de exemplos e oportunidades de prática.",
+                "Vamos aprender juntos, passo a passo.",
+                "Dê pelo menos dois exemplos de uso no contexto real",
+                "Grave um exercício de fixação guiado, com pausa para o aluno responder",
+                "Pratique o que aprendeu hoje antes da próxima aula!");
+
+        if (n.Contains("financ") || n.Contains("investi") || n.Contains("consultor"))
+            return new NicheToneProfile(
+                "Conteúdo direto e orientado a resultado, com exemplos numéricos claros.",
+                "Vamos direto ao ponto.",
+                "Traga um exemplo numérico simples ilustrando o conceito",
+                "Mostre uma planilha ou simulação real na tela",
+                "Coloque isso em prática ainda esta semana.");
+
+        return new NicheToneProfile(
+            "Aulas práticas e diretas ao ponto, pensadas para gerar resultado rápido para o aluno.",
+            "Vamos direto ao que interessa.",
+            "Aprofunde o conceito com um exemplo prático",
+            "Grave uma demonstração prática do que foi explicado",
+            "Continue praticando — o próximo passo está logo ali.");
     }
 
     private static string Slugify(string text) =>

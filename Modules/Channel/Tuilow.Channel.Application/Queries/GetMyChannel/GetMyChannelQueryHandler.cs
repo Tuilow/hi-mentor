@@ -13,6 +13,7 @@ public sealed class GetMyChannelQueryHandler(ICreatorChannelRepository channelRe
 
         return new MyChannelResponse(
             channel.Id, channel.Handle.Value,
-            channel.SocialLinks.Select(l => new SocialLinkResponse(l.Platform, l.Url)).ToList());
+            channel.SocialLinks.Select(l => new SocialLinkResponse(l.Platform, l.Url)).ToList(),
+            channel.BannerUrl, channel.IntroVideoUrl);
     }
 }

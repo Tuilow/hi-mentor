@@ -1,3 +1,5 @@
+using Tuilow.CreatorStudio.Domain.Enums;
+
 namespace Tuilow.CreatorStudio.Application.Interfaces;
 
 /// <summary>Sugestão de copy do produto (passo 1 do assistente — botão "Gerar com IA").</summary>
@@ -31,6 +33,26 @@ public enum MarketingChannel { InstagramPost, InstagramStory, WhatsApp, Email, M
 /// <summary>Texto pronto para um canal específico (passo "Central de Divulgação").</summary>
 public sealed record MarketingCopySuggestion(string Content, string? Cta);
 
+/// <summary>Aula sugerida dentro de um módulo — Format é o "arquétipo" da aula no nicho (ex.: Teórica, Prática, Estudo de caso), usado como dica de tom pro Gerador de Roteiros.</summary>
+public sealed record CourseOutlineLesson(string Title, string Format);
+
+public sealed record CourseOutlineModule(string Title, IReadOnlyList<CourseOutlineLesson> Lessons);
+
+/// <summary>Estrutura de curso sugerida a partir do nicho — passo 2 do Estúdio do Criador.</summary>
+public sealed record CourseOutlineSuggestion(
+    string CourseName,
+    string CourseDescription,
+    IReadOnlyList<CourseOutlineModule> Modules
+);
+
+/// <summary>Roteiro de gravação sugerido para uma aula — passo 3 do Estúdio do Criador.</summary>
+public sealed record LessonScriptSuggestion(
+    string Introduction,
+    IReadOnlyList<string> DevelopmentTopics,
+    IReadOnlyList<string> DemonstrationSuggestions,
+    string ClosingCta
+);
+
 /// <summary>
 /// Geração de conteúdo assistida por IA. A IA sempre SUGERE — nunca é aplicada
 /// automaticamente; quem decide usar (e pode editar livremente antes) é o criador. Persistir a
@@ -50,4 +72,22 @@ public interface IAiContentGenerator
     Task<MarketingCopySuggestion> GenerateMarketingCopyAsync(
         string productName, MarketingChannel channel, string? category, string? shortDescription,
         IReadOnlyList<string> benefits, decimal price, CancellationToken ct = default);
+
+    /// <summary>
+    /// Estúdio do Criador, passo 2 — a partir do nicho/público/objetivo/nível, sugere nome,
+    /// descrição, módulos e aulas do curso (linguagem/exemplos adaptados ao nicho — IA
+    /// especialista por nicho).
+    /// </summary>
+    Task<CourseOutlineSuggestion> GenerateCourseOutlineAsync(
+        string niche, string targetAudience, string objective, AudienceLevel level,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Estúdio do Criador, passo 3 — roteiro completo de gravação para uma aula específica
+    /// (introdução, tópicos de desenvolvimento, sugestões de demonstração prática e CTA de
+    /// encerramento), com linguagem adaptada ao nicho do criador.
+    /// </summary>
+    Task<LessonScriptSuggestion> GenerateLessonScriptAsync(
+        string lessonTitle, string niche, string targetAudience, AudienceLevel level,
+        CancellationToken ct = default);
 }

@@ -40,6 +40,8 @@ export default function MeuCanalPage() {
   const [handle, setHandle] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [bannerUrl, setBannerUrl] = useState('');
+  const [introVideoUrl, setIntroVideoUrl] = useState('');
   const [links, setLinks] = useState<SocialLinkItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
@@ -48,6 +50,8 @@ export default function MeuCanalPage() {
     if (channel) {
       setHandle(channel.handle);
       setLinks(channel.socialLinks);
+      setBannerUrl(channel.bannerUrl ?? '');
+      setIntroVideoUrl(channel.introVideoUrl ?? '');
     }
     if (me) {
       setBio(me.bio ?? '');
@@ -61,6 +65,8 @@ export default function MeuCanalPage() {
       await channelApi.upsert({
         handle,
         socialLinks: links.filter(l => l.platform && l.url),
+        bannerUrl: bannerUrl || undefined,
+        introVideoUrl: introVideoUrl || undefined,
       });
       if (me) {
         // Update é um "overwrite" completo no backend (não faz merge parcial) — precisamos
@@ -139,6 +145,30 @@ export default function MeuCanalPage() {
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
                        focus:outline-none focus:ring-2 focus:ring-brand-300"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Banner do canal (URL de imagem)</label>
+          <input
+            value={bannerUrl}
+            onChange={e => setBannerUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                       focus:outline-none focus:ring-2 focus:ring-brand-300"
+          />
+          <p className="text-xs text-gray-400 mt-1">Exibido no topo da sua vitrine pública. Recomendado: 1200x300px.</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Vídeo de apresentação (YouTube/Vimeo)</label>
+          <input
+            value={introVideoUrl}
+            onChange={e => setIntroVideoUrl(e.target.value)}
+            placeholder="https://youtube.com/watch?v=..."
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
+                       focus:outline-none focus:ring-2 focus:ring-brand-300"
+          />
+          <p className="text-xs text-gray-400 mt-1">Aparece logo abaixo do seu perfil, antes do catálogo de cursos.</p>
         </div>
 
         <div>

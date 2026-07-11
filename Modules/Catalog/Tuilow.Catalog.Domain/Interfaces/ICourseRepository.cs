@@ -19,6 +19,14 @@ public interface ICourseRepository : IRepository<Course>
     /// matriculados") para resolver os dados de exibição de uma lista de CourseIds de uma vez.</summary>
     Task<IEnumerable<Course>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
 
+    /// <summary>
+    /// Mesmo que <see cref="GetByIdsAsync"/>, mas com Modules/Lessons já carregados — usado pelo
+    /// histórico de aulas assistidas (Learning), que precisa resolver o título da aula a partir
+    /// do LessonId. Método separado para não pesar o GetByIdsAsync "leve" usado em telas que só
+    /// precisam de título/slug/thumbnail do curso.
+    /// </summary>
+    Task<IEnumerable<Course>> GetByIdsWithLessonsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
+
     /// <summary>Força EntityState.Added para o Module — evita DbUpdateConcurrencyException.</summary>
     Task AddModuleAsync(Module module, CancellationToken ct = default);
 

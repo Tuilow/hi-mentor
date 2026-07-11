@@ -159,6 +159,36 @@ export const creatorStudioApi = {
     api.post('/creator-studio/leads', data),
 };
 
+// Estúdio do Criador — nicho, geração de estrutura/roteiro por IA, templates de gravação e
+// progresso do Clone do Professor.
+export const studioApi = {
+  getNiche: () => api.get('/creator-studio/studio/niche'),
+  setNiche: (data: { niche: string; targetAudience: string; objective: string; level: string }) =>
+    api.put('/creator-studio/studio/niche', data),
+  generateCourseOutline: (data: { niche: string; targetAudience: string; objective: string; level: string }) =>
+    api.post('/creator-studio/studio/course-outline', data),
+  generateLessonScript: (data: { lessonTitle: string; niche: string; targetAudience: string; level: string }) =>
+    api.post('/creator-studio/studio/lesson-script', data),
+  getMyScripts: () => api.get('/creator-studio/studio/lesson-scripts'),
+  saveScript: (data: {
+    lessonTitle: string;
+    introduction: string;
+    developmentTopics: string[];
+    demonstrationSuggestions: string[];
+    closingCta: string;
+    courseId?: string;
+    lessonId?: string;
+  }) => api.post('/creator-studio/studio/lesson-scripts', data),
+  markScriptAsRecorded: (scriptId: string) =>
+    api.post(`/creator-studio/studio/lesson-scripts/${scriptId}/mark-recorded`),
+  getMyTemplates: () => api.get('/creator-studio/studio/recording-templates'),
+  saveTemplate: (data: { name: string; sections: string[]; isDefault: boolean; templateId?: string }) =>
+    api.put('/creator-studio/studio/recording-templates', data),
+  deleteTemplate: (templateId: string) =>
+    api.delete(`/creator-studio/studio/recording-templates/${templateId}`),
+  getVideoEditingCapabilities: () => api.get('/creator-studio/studio/video-editing-capabilities'),
+};
+
 export const courseSubscriptionPlansApi = {
   getByCourse: (courseId: string) => api.get(`/subscriptions/plans/by-course/${courseId}`),
   createForCourse: (courseId: string, data: { price: number; billingCycle: string; trialDays?: number }) =>
@@ -172,6 +202,10 @@ export const enrollmentsApi = {
   getProgress: (courseId: string) => api.get(`/enrollments/courses/${courseId}`),
   // Cursos em que o aluno está matriculado (filtro "Matriculados" em /cursos).
   getMyEnrollments: () => api.get('/enrollments/me'),
+  // "Continuar de onde parei" — última aula assistida entre todos os cursos matriculados.
+  getContinueWatching: () => api.get('/enrollments/continue-watching'),
+  // Histórico de aulas assistidas — todas as aulas com progresso, entre todos os cursos.
+  getLessonHistory: () => api.get('/enrollments/history'),
 };
 
 export const subscriptionsApi = {
@@ -197,8 +231,12 @@ export const coursePurchasesApi = {
 // Canal do Criador — vitrine pública em /canal/[handle] (@handle + redes sociais + catálogo).
 export const channelApi = {
   getMy: () => api.get('/channel/me'),
-  upsert: (data: { handle: string; socialLinks: { platform: string; url: string }[] }) =>
-    api.put('/channel/me', data),
+  upsert: (data: {
+    handle: string;
+    socialLinks: { platform: string; url: string }[];
+    bannerUrl?: string;
+    introVideoUrl?: string;
+  }) => api.put('/channel/me', data),
   // Público — não exige login. viewerUserId é inferido no backend via token opcional.
   getByHandle: (handle: string) => api.get(`/channel/${handle}`),
 };

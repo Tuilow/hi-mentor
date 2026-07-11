@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { authApi, subscriptionsApi, enrollmentsApi } from '@/lib/api';
-import type { MyEnrollment } from '@/types';
+import type { MyEnrollment, ContinueWatching } from '@/types';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -36,6 +36,12 @@ export default function DashboardPage() {
   const { data: myEnrollments = [] } = useQuery<MyEnrollment[]>({
     queryKey: ['my-enrollments'],
     queryFn: () => enrollmentsApi.getMyEnrollments().then(r => r.data),
+  });
+
+  // "Continuar assistindo" — última aula tocada, entre todos os cursos matriculados.
+  const { data: continueWatching } = useQuery<ContinueWatching | null>({
+    queryKey: ['continue-watching'],
+    queryFn: () => enrollmentsApi.getContinueWatching().then(r => r.data).catch(() => null),
   });
 
   const totalCompletedLessons = myEnrollments.reduce((acc, e) => acc + e.completedLessonsCount, 0);
@@ -78,6 +84,39 @@ export default function DashboardPage() {
         </h1>
         <p className="text-gray-500 mt-1">Continue de onde parou ou explore novos cursos.</p>
       </div>
+
+      {/* Continuar assistindo — última aula tocada, entre todos os cursos matriculados */}
+      {continueWatching && (
+        <Link
+          href={`/cursos/${continueWatching.courseSlug}/${continueWatching.lessonId}`}
+          className="card border-gray-200 hover:border-blue-200 mb-8 flex items-center gap-4 group transition-all duration-200"
+        >
+          <div className="w-20 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
+            {continueWatching.thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={continueWatching.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xl">▶️</span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Continuar assistindo</p>
+            <p className="font-semibold text-gray-800 truncate group-hover:text-blue-700">
+              {continueWatching.lessonTitle}
+            </p>
+            <p className="text-xs text-gray-500 truncate">{continueWatching.courseTitle}</p>
+          </div>
+          <div className="flex-shrink-0 flex items-center gap-3">
+            <div className="w-24 h-1.5 rounded-full bg-gray-200 overflow-hidden hidden sm:block">
+              <div
+                className="h-full bg-blue-500 rounded-full"
+                style={{ width: `${Math.min(100, Math.round(continueWatching.courseProgressPercentage))}%` }}
+              />
+            </div>
+            <span className="btn-primary whitespace-nowrap">Continuar</span>
+          </div>
+        </Link>
+      )}
 
       {/* Subscription banner */}
       {!subscription ? (

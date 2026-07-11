@@ -8,7 +8,9 @@ public sealed record GetMyChannelQuery(Guid CreatorId) : IRequest<MyChannelRespo
 public sealed record MyChannelResponse(
     Guid Id,
     string Handle,
-    IReadOnlyList<SocialLinkResponse> SocialLinks
+    IReadOnlyList<SocialLinkResponse> SocialLinks,
+    string? BannerUrl,
+    string? IntroVideoUrl
 );
 
 public sealed record SocialLinkResponse(string Platform, string Url);

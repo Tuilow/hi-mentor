@@ -24,6 +24,12 @@ public sealed class CreatorChannel : AggregateRoot
     public Handle Handle { get; private set; } = null!;
     public IReadOnlyCollection<SocialLink> SocialLinks => _socialLinks.AsReadOnly();
 
+    /// <summary>Banner de topo da vitrine pública (URL de imagem) — opcional.</summary>
+    public string? BannerUrl { get; private set; }
+
+    /// <summary>Vídeo de apresentação do criador, exibido na vitrine pública (URL YouTube/Vimeo) — opcional.</summary>
+    public string? IntroVideoUrl { get; private set; }
+
     private CreatorChannel() { }
 
     public static CreatorChannel Create(Guid creatorId, string handle)
@@ -45,6 +51,14 @@ public sealed class CreatorChannel : AggregateRoot
     {
         _socialLinks.Clear();
         _socialLinks.AddRange(links.Where(l => !string.IsNullOrWhiteSpace(l.Url)));
+        Touch();
+    }
+
+    /// <summary>Define banner e vídeo de apresentação da vitrine pública — ambos opcionais.</summary>
+    public void SetBranding(string? bannerUrl, string? introVideoUrl)
+    {
+        BannerUrl = string.IsNullOrWhiteSpace(bannerUrl) ? null : bannerUrl.Trim();
+        IntroVideoUrl = string.IsNullOrWhiteSpace(introVideoUrl) ? null : introVideoUrl.Trim();
         Touch();
     }
 }

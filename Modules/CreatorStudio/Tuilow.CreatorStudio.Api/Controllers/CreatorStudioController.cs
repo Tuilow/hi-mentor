@@ -1,12 +1,24 @@
 using Tuilow.CreatorStudio.Application.Commands.CaptureLead;
+using Tuilow.CreatorStudio.Application.Commands.DeleteRecordingTemplate;
+using Tuilow.CreatorStudio.Application.Commands.GenerateCourseOutline;
+using Tuilow.CreatorStudio.Application.Commands.GenerateLessonScript;
 using Tuilow.CreatorStudio.Application.Commands.GenerateMarketingCopy;
 using Tuilow.CreatorStudio.Application.Commands.GenerateProductCopy;
 using Tuilow.CreatorStudio.Application.Commands.GenerateSalesPageCopy;
+using Tuilow.CreatorStudio.Application.Commands.MarkScriptAsRecorded;
 using Tuilow.CreatorStudio.Application.Commands.PublishProduct;
+using Tuilow.CreatorStudio.Application.Commands.SaveLessonScript;
+using Tuilow.CreatorStudio.Application.Commands.SaveRecordingTemplate;
+using Tuilow.CreatorStudio.Application.Commands.SetCreatorNiche;
 using Tuilow.CreatorStudio.Application.Interfaces;
+using Tuilow.CreatorStudio.Application.Queries.GetCreatorStyleProfile;
+using Tuilow.CreatorStudio.Application.Queries.GetMyLessonScripts;
 using Tuilow.CreatorStudio.Application.Queries.GetMyProducts;
+using Tuilow.CreatorStudio.Application.Queries.GetMyRecordingTemplates;
 using Tuilow.CreatorStudio.Application.Queries.GetProductDashboard;
 using Tuilow.CreatorStudio.Application.Queries.GetPublicationChecklist;
+using Tuilow.CreatorStudio.Application.Queries.GetVideoEditingCapabilities;
+using Tuilow.CreatorStudio.Domain.Enums;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -95,6 +107,118 @@ public sealed class CreatorStudioController(ISender sender, ICurrentUserService 
             new GenerateMarketingCopyCommand(courseId, currentUser.UserId!.Value, request.Channel), ct);
         return Ok(result);
     }
+
+    // ─── Estúdio do Criador ───────────────────────────────────────────────
+
+    /// <summary>Passo 1 — perfil de nicho do criador autenticado (null se ainda não preencheu).</summary>
+    [HttpGet("studio/niche")]
+    public async Task<IActionResult> GetMyNiche(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetCreatorStyleProfileQuery(currentUser.UserId!.Value), ct);
+        return Ok(result);
+    }
+
+    /// <summary>Passo 1 — salva/atualiza o perfil de nicho (nicho, público-alvo, objetivo, nível).</summary>
+    [HttpPut("studio/niche")]
+    public async Task<IActionResult> SetMyNiche([FromBody] SetNicheRequest request, CancellationToken ct)
+    {
+        var id = await sender.Send(new SetCreatorNicheCommand(
+            currentUser.UserId!.Value, request.Niche, request.TargetAudience, request.Objective, request.Level), ct);
+        return Ok(new { id });
+    }
+
+    /// <summary>Passo 2 — gera a estrutura do curso (nome, descrição, módulos e aulas) a partir do nicho.</summary>
+    [HttpPost("studio/course-outline")]
+    public async Task<IActionResult> GenerateCourseOutline([FromBody] GenerateCourseOutlineCommand command, CancellationToken ct)
+    {
+        var result = await sender.Send(command, ct);
+        return Ok(result);
+    }
+
+    /// <summary>Passo 3 — gera o roteiro de gravação de uma aula específica.</summary>
+    [HttpPost("studio/lesson-script")]
+    public async Task<IActionResult> GenerateLessonScript([FromBody] GenerateLessonScriptCommand command, CancellationToken ct)
+    {
+        var result = await sender.Send(command, ct);
+        return Ok(result);
+    }
+
+    /// <summary>Tela "Meus Roteiros" — todos os roteiros salvos pelo criador autenticado.</summary>
+    [HttpGet("studio/lesson-scripts")]
+    public async Task<IActionResult> GetMyLessonScripts(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetMyLessonScriptsQuery(currentUser.UserId!.Value), ct);
+        return Ok(result);
+    }
+
+    /// <summary>Salva (persiste) um roteiro gerado/editado pelo criador.</summary>
+    [HttpPost("studio/lesson-scripts")]
+    public async Task<IActionResult> SaveLessonScript([FromBody] SaveLessonScriptRequest request, CancellationToken ct)
+    {
+        var id = await sender.Send(new SaveLessonScriptCommand(
+            currentUser.UserId!.Value, request.LessonTitle, request.Introduction,
+            request.DevelopmentTopics, request.DemonstrationSuggestions, request.ClosingCta,
+            request.CourseId, request.LessonId), ct);
+        return Ok(new { id });
+    }
+
+    /// <summary>Marca um roteiro como gravado — conta para o progresso do Clone do Professor.</summary>
+    [HttpPost("studio/lesson-scripts/{scriptId:guid}/mark-recorded")]
+    public async Task<IActionResult> MarkScriptAsRecorded(Guid scriptId, CancellationToken ct)
+    {
+        await sender.Send(new MarkScriptAsRecordedCommand(scriptId, currentUser.UserId!.Value), ct);
+        return Ok();
+    }
+
+    /// <summary>Templates de gravação do criador autenticado.</summary>
+    [HttpGet("studio/recording-templates")]
+    public async Task<IActionResult> GetMyRecordingTemplates(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetMyRecordingTemplatesQuery(currentUser.UserId!.Value), ct);
+        return Ok(result);
+    }
+
+    /// <summary>Cria (TemplateId nulo) ou atualiza um template de gravação.</summary>
+    [HttpPut("studio/recording-templates")]
+    public async Task<IActionResult> SaveRecordingTemplate([FromBody] SaveRecordingTemplateRequest request, CancellationToken ct)
+    {
+        var id = await sender.Send(new SaveRecordingTemplateCommand(
+            currentUser.UserId!.Value, request.Name, request.Sections, request.IsDefault, request.TemplateId), ct);
+        return Ok(new { id });
+    }
+
+    /// <summary>Remove um template de gravação do criador autenticado.</summary>
+    [HttpDelete("studio/recording-templates/{templateId:guid}")]
+    public async Task<IActionResult> DeleteRecordingTemplate(Guid templateId, CancellationToken ct)
+    {
+        await sender.Send(new DeleteRecordingTemplateCommand(templateId, currentUser.UserId!.Value), ct);
+        return Ok();
+    }
+
+    /// <summary>O front consulta antes de mostrar os botões de edição automática/clipes (ou o aviso de "em breve").</summary>
+    [HttpGet("studio/video-editing-capabilities")]
+    public async Task<IActionResult> GetVideoEditingCapabilities(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetVideoEditingCapabilitiesQuery(), ct);
+        return Ok(result);
+    }
 }
 
 public sealed record GenerateMarketingCopyRequest(MarketingChannel Channel);
+
+public sealed record SetNicheRequest(string Niche, string TargetAudience, string Objective, AudienceLevel Level);
+
+public sealed record SaveLessonScriptRequest(
+    string LessonTitle,
+    string Introduction,
+    IReadOnlyList<string> DevelopmentTopics,
+    IReadOnlyList<string> DemonstrationSuggestions,
+    string ClosingCta,
+    Guid? CourseId,
+    Guid? LessonId);
+
+public sealed record SaveRecordingTemplateRequest(
+    string Name,
+    IReadOnlyList<string> Sections,
+    bool IsDefault,
+    Guid? TemplateId);

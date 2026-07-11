@@ -58,6 +58,31 @@ export interface MyEnrollment {
   completedLessonsCount: number;
 }
 
+// GET /enrollments/continue-watching — última aula assistida entre todos os cursos matriculados.
+export interface ContinueWatching {
+  courseId: string;
+  courseTitle: string;
+  courseSlug: string;
+  thumbnailUrl?: string;
+  lessonId: string;
+  lessonTitle: string;
+  courseProgressPercentage: number;
+  lastWatchedAt: string;
+}
+
+// GET /enrollments/history — todas as aulas com progresso, entre todos os cursos matriculados.
+export interface LessonHistoryItem {
+  courseId: string;
+  courseTitle: string;
+  courseSlug: string;
+  thumbnailUrl?: string;
+  lessonId: string;
+  lessonTitle: string;
+  isCompleted: boolean;
+  completedAt?: string;
+  lastWatchedAt: string;
+}
+
 export interface Plan {
   id: string;
   name: string;
@@ -261,6 +286,8 @@ export interface MyChannel {
   id: string;
   handle: string;
   socialLinks: SocialLinkItem[];
+  bannerUrl?: string;
+  introVideoUrl?: string;
 }
 
 // GET /channel/:handle — vitrine pública em /canal/[handle].
@@ -282,4 +309,76 @@ export interface PublicChannel {
   bio?: string;
   socialLinks: SocialLinkItem[];
   courses: PublicChannelCourseItem[];
+  bannerUrl?: string;
+  introVideoUrl?: string;
+}
+
+// ─── Estúdio do Criador ─────────────────────────
+
+export type AudienceLevel = 'Beginner' | 'Intermediate' | 'Advanced';
+
+// GET /creator-studio/studio/niche — perfil de nicho do criador (null se ainda não preencheu).
+export interface CreatorStyleProfile {
+  id: string;
+  niche: string;
+  targetAudience: string;
+  objective: string;
+  level: AudienceLevel;
+  recordedScriptsCount: number;
+  scriptsRequiredForClone: number;
+  isCloneReady: boolean;
+}
+
+export interface CourseOutlineLesson {
+  title: string;
+  format: string;
+}
+
+export interface CourseOutlineModule {
+  title: string;
+  lessons: CourseOutlineLesson[];
+}
+
+// POST /creator-studio/studio/course-outline
+export interface CourseOutlineSuggestion {
+  courseName: string;
+  courseDescription: string;
+  modules: CourseOutlineModule[];
+}
+
+// POST /creator-studio/studio/lesson-script
+export interface LessonScriptSuggestion {
+  introduction: string;
+  developmentTopics: string[];
+  demonstrationSuggestions: string[];
+  closingCta: string;
+}
+
+// GET /creator-studio/studio/lesson-scripts
+export interface LessonScriptItem {
+  id: string;
+  courseId?: string;
+  lessonId?: string;
+  lessonTitle: string;
+  introduction: string;
+  developmentTopics: string[];
+  demonstrationSuggestions: string[];
+  closingCta: string;
+  wasRecorded: boolean;
+  recordedAt?: string;
+  createdAt: string;
+}
+
+// GET /creator-studio/studio/recording-templates
+export interface RecordingTemplateItem {
+  id: string;
+  name: string;
+  sections: string[];
+  isDefault: boolean;
+}
+
+// GET /creator-studio/studio/video-editing-capabilities
+export interface VideoEditingCapabilities {
+  isAvailable: boolean;
+  statusMessage: string;
 }

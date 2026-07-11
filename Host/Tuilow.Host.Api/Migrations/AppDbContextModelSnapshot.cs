@@ -41,6 +41,15 @@ namespace Tuilow.Host.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("GuaranteeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("guarantee_days");
+
+                    b.Property<string>("GuaranteeText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("guarantee_text");
+
                     b.Property<Guid>("InstructorId")
                         .HasColumnType("uuid");
 
@@ -72,6 +81,11 @@ namespace Tuilow.Host.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("sales_page_subheadline");
+
+                    b.Property<string>("SalesPageVideoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("sales_page_video_url");
 
                     b.Property<string>("ShortDescription")
                         .HasMaxLength(500)
@@ -115,6 +129,11 @@ namespace Tuilow.Host.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("sales_page_benefits");
+
+                    b.Property<string>("_testimonials")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("testimonials");
 
                     b.HasKey("Id");
 
@@ -321,6 +340,11 @@ namespace Tuilow.Host.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BannerUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("banner_url");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -332,6 +356,11 @@ namespace Tuilow.Host.Api.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("handle");
+
+                    b.Property<string>("IntroVideoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("intro_video_url");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -352,6 +381,50 @@ namespace Tuilow.Host.Api.Migrations
                         .HasDatabaseName("ix_creator_channels_handle");
 
                     b.ToTable("creator_channels", "channel");
+                });
+
+            modelBuilder.Entity("Tuilow.CreatorStudio.Domain.Entities.CreatorStyleProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Niche")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Objective")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TargetAudience")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatorId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_creator_style_profiles_creator_id");
+
+                    b.ToTable("creator_style_profiles", "creator_studio");
                 });
 
             modelBuilder.Entity("Tuilow.CreatorStudio.Domain.Entities.Lead", b =>
@@ -393,6 +466,101 @@ namespace Tuilow.Host.Api.Migrations
                         .HasDatabaseName("ix_leads_course_id");
 
                     b.ToTable("leads", "creator_studio");
+                });
+
+            modelBuilder.Entity("Tuilow.CreatorStudio.Domain.Entities.LessonScript", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClosingCta")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Introduction")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("LessonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LessonTitle")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime?>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("WasRecorded")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("_demonstrationSuggestions")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("demonstration_suggestions");
+
+                    b.Property<string>("_developmentTopics")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("development_topics");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatorId")
+                        .HasDatabaseName("ix_lesson_scripts_creator_id");
+
+                    b.ToTable("lesson_scripts", "creator_studio");
+                });
+
+            modelBuilder.Entity("Tuilow.CreatorStudio.Domain.Entities.RecordingTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("_sections")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sections");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatorId")
+                        .HasDatabaseName("ix_recording_templates_creator_id");
+
+                    b.ToTable("recording_templates", "creator_studio");
                 });
 
             modelBuilder.Entity("Tuilow.Finance.Domain.Entities.CreatorWallet", b =>

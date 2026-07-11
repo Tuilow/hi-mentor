@@ -23,6 +23,9 @@ public sealed class CreatorChannelConfiguration : IEntityTypeConfiguration<Creat
             .HasConversion(h => h.Value, v => Handle.Create(v));
         builder.HasIndex(c => c.Handle).IsUnique().HasDatabaseName("ix_creator_channels_handle");
 
+        builder.Property(c => c.BannerUrl).HasColumnName("banner_url").HasMaxLength(500);
+        builder.Property(c => c.IntroVideoUrl).HasColumnName("intro_video_url").HasMaxLength(500);
+
         // Lista simples de redes sociais — mesma técnica de Catalog.Course.SalesPageBenefits
         // (serializada como JSON numa única coluna, com ValueComparer explícito porque é uma
         // coleção mutável mapeada via conversão, não um tipo primitivo).

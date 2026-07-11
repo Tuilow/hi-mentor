@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Tuilow.CreatorStudio.Application.Interfaces;
+using Tuilow.CreatorStudio.Domain.Enums;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -111,6 +112,77 @@ public sealed class OpenAiContentGenerator(
             : null;
 
         return new MarketingCopySuggestion(root.GetProperty("content").GetString() ?? "", cta);
+    }
+
+    public async Task<CourseOutlineSuggestion> GenerateCourseOutlineAsync(
+        string niche, string targetAudience, string objective, AudienceLevel level, CancellationToken ct = default)
+    {
+        var levelLabel = level switch
+        {
+            AudienceLevel.Beginner => "iniciante",
+            AudienceLevel.Intermediate => "intermediário",
+            _ => "avançado",
+        };
+
+        var prompt =
+            "Você é um especialista em design instrucional e no nicho informado, criando a estrutura de um " +
+            $"curso online. Nicho: \"{niche}\". Público-alvo: \"{targetAudience}\". Objetivo do curso: \"{objective}\". " +
+            $"Nível dos alunos: {levelLabel}. Adapte a linguagem e os exemplos ao nicho (ex.: motivacional para " +
+            "Personal Trainer, formal para Advogado, didática para Professor). Sugira 3 módulos, cada um com 2 a 4 " +
+            "aulas, em ordem recomendada de aprendizado. Para cada aula, classifique o formato (\"Teórica\", " +
+            "\"Prática\", \"Estudo de caso\", ou outro rótulo curto apropriado ao nicho). " +
+            "Responda APENAS com um JSON no formato exato: {\"courseName\": string, \"courseDescription\": string, " +
+            "\"modules\": [{\"title\": string, \"lessons\": [{\"title\": string, \"format\": string}]}]}";
+
+        var json = await CompleteAsync(prompt, ct);
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        var modules = root.GetProperty("modules").EnumerateArray()
+            .Select(m => new CourseOutlineModule(
+                m.GetProperty("title").GetString() ?? "",
+                m.GetProperty("lessons").EnumerateArray()
+                    .Select(l => new CourseOutlineLesson(
+                        l.GetProperty("title").GetString() ?? "", l.GetProperty("format").GetString() ?? "Teórica"))
+                    .ToList()))
+            .ToList();
+
+        return new CourseOutlineSuggestion(
+            root.GetProperty("courseName").GetString() ?? "",
+            root.GetProperty("courseDescription").GetString() ?? "",
+            modules);
+    }
+
+    public async Task<LessonScriptSuggestion> GenerateLessonScriptAsync(
+        string lessonTitle, string niche, string targetAudience, AudienceLevel level, CancellationToken ct = default)
+    {
+        var levelLabel = level switch
+        {
+            AudienceLevel.Beginner => "iniciante",
+            AudienceLevel.Intermediate => "intermediário",
+            _ => "avançado",
+        };
+
+        var prompt =
+            "Você é um especialista em roteiros de gravação de aulas para o nicho informado. Nicho: " +
+            $"\"{niche}\". Público-alvo: \"{targetAudience}\". Nível: {levelLabel}. Gere um roteiro de gravação " +
+            $"completo para a aula \"{lessonTitle}\", com linguagem e exemplos adaptados ao nicho (ex.: " +
+            "motivacional e com demonstrações físicas para Personal Trainer, formal e com casos jurídicos para " +
+            "Advogado, didática e com exercícios para Professor). Inclua: uma introdução de abertura, de 3 a 5 " +
+            "tópicos de desenvolvimento a abordar, de 1 a 3 sugestões práticas do que gravar/demonstrar, e um " +
+            "call-to-action de encerramento chamando para a próxima aula. " +
+            "Responda APENAS com um JSON no formato exato: {\"introduction\": string, \"developmentTopics\": " +
+            "string[], \"demonstrationSuggestions\": string[], \"closingCta\": string}";
+
+        var json = await CompleteAsync(prompt, ct);
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        return new LessonScriptSuggestion(
+            root.GetProperty("introduction").GetString() ?? "",
+            root.GetProperty("developmentTopics").EnumerateArray().Select(e => e.GetString() ?? "").ToList(),
+            root.GetProperty("demonstrationSuggestions").EnumerateArray().Select(e => e.GetString() ?? "").ToList(),
+            root.GetProperty("closingCta").GetString() ?? "");
     }
 
     private async Task<string> CompleteAsync(string prompt, CancellationToken ct)

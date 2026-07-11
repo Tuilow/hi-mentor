@@ -83,6 +83,11 @@ public sealed class AppDbContext(
     // CreatorStudio — jornada guiada de criação de produtos (leads capturados na página de vendas)
     public DbSet<CreatorStudioEntities.Lead> Leads => Set<CreatorStudioEntities.Lead>();
 
+    // CreatorStudio — Estúdio do Criador (nicho, roteiros gerados por IA, templates de gravação)
+    public DbSet<CreatorStudioEntities.CreatorStyleProfile> CreatorStyleProfiles => Set<CreatorStudioEntities.CreatorStyleProfile>();
+    public DbSet<CreatorStudioEntities.LessonScript> LessonScripts => Set<CreatorStudioEntities.LessonScript>();
+    public DbSet<CreatorStudioEntities.RecordingTemplate> RecordingTemplates => Set<CreatorStudioEntities.RecordingTemplate>();
+
     // Channel — Canal do Criador (vitrine pública com @handle e redes sociais)
     public DbSet<ChannelEntities.CreatorChannel> CreatorChannels => Set<ChannelEntities.CreatorChannel>();
 

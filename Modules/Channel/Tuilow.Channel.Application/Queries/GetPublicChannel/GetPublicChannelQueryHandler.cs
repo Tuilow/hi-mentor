@@ -44,6 +44,6 @@ public sealed class GetPublicChannelQueryHandler(
             channel.Id, channel.Handle.Value,
             profile?.DisplayName ?? "Criador Tuilow", profile?.AvatarUrl, profile?.Bio,
             channel.SocialLinks.Select(l => new PublicSocialLink(l.Platform, l.Url)).ToList(),
-            courses);
+            courses, channel.BannerUrl, channel.IntroVideoUrl);
     }
 }
