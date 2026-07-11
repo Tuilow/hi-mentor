@@ -1,5 +1,6 @@
 using Tuilow.IdentidadeAcesso.Application.Commands.BecomeCreator;
 using Tuilow.IdentidadeAcesso.Application.Commands.ConfirmEmail;
+using Tuilow.IdentidadeAcesso.Application.Commands.ConsumeMagicLink;
 using Tuilow.IdentidadeAcesso.Application.Commands.ForgotPassword;
 using Tuilow.IdentidadeAcesso.Application.Commands.GoogleLogin;
 using Tuilow.IdentidadeAcesso.Application.Commands.LoginUser;
@@ -39,6 +40,21 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
     {
         var tokens = await sender.Send(
             command with { IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() }, ct);
+        return Ok(tokens);
+    }
+
+    /// <summary>
+    /// Troca um Magic Link (recebido por e-mail/WhatsApp após pagamento confirmado) por um
+    /// login completo — sem senha. Anônimo por natureza: quem tem o token é quem entra.
+    /// </summary>
+    [HttpPost("magic-link/consume")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> ConsumeMagicLink([FromBody] ConsumeMagicLinkRequest request, CancellationToken ct)
+    {
+        var tokens = await sender.Send(
+            new ConsumeMagicLinkCommand(request.Token, HttpContext.Connection.RemoteIpAddress?.ToString()), ct);
         return Ok(tokens);
     }
 
@@ -117,3 +133,5 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
 
 public sealed record UpdateProfileRequest(
     string FirstName, string LastName, string? Phone, DateOnly? BirthDate, string? Bio, string? AvatarUrl);
+
+public sealed record ConsumeMagicLinkRequest(string Token);

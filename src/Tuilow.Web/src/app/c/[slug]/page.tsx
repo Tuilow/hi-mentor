@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { coursesApi } from '@/lib/api';
+import toast from 'react-hot-toast';
+import { AxiosError } from 'axios';
+import { coursesApi, coursePurchasesApi } from '@/lib/api';
 import type { ProductDetail, InstructorCourseSummary } from '@/types';
 
 const levelLabel: Record<string, string> = {
@@ -19,6 +21,116 @@ function formatPrice(price: number): string {
     : price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+interface CheckoutData {
+  customerName: string;
+  customerEmail: string;
+  cpfCnpj: string;
+  phone?: string;
+}
+
+/**
+ * Checkout embutido na própria Landing Page pública — o visitante compra sem sair da página e
+ * sem precisar de conta prévia. A conta é localizada ou criada automaticamente pelo e-mail
+ * informado aqui (checkout anônimo — ver PurchaseCourseCommandHandler); o acesso pós-pagamento
+ * chega por Magic Link no e-mail informado, sem senha. Mesmo formulário/validação de
+ * (dashboard)/cursos/[slug].
+ */
+function CheckoutModal({
+  title, priceLabel, onClose, onConfirm, loading,
+}: {
+  title: string;
+  priceLabel: string;
+  onClose: () => void;
+  onConfirm: (data: CheckoutData) => void;
+  loading: boolean;
+}) {
+  const [form, setForm] = useState<CheckoutData>({
+    customerName: '', customerEmail: '', cpfCnpj: '', phone: '',
+  });
+  const [errors, setErrors] = useState<Partial<CheckoutData>>({});
+
+  const validate = () => {
+    const e: Partial<CheckoutData> = {};
+    if (!form.customerName.trim()) e.customerName = 'Nome obrigatório';
+    if (!form.customerEmail.includes('@')) e.customerEmail = 'E-mail inválido';
+    const digits = form.cpfCnpj.replace(/\D/g, '');
+    if (digits.length !== 11 && digits.length !== 14)
+      e.cpfCnpj = 'CPF (11 dígitos) ou CNPJ (14 dígitos)';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const formatDoc = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 14);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0,3)}.${d.slice(3)}`;
+    if (d.length <= 9) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
+    if (d.length <= 11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+    if (d.length <= 12) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8)}`;
+    if (d.length <= 13) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+    return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12,14)}`;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validate()) onConfirm({ ...form, cpfCnpj: form.cpfCnpj.replace(/\D/g, '') });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-2xl animate-fade-in">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">{title}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">{priceLabel}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">Nome completo *</label>
+            <input className="input-field" placeholder="João da Silva"
+              value={form.customerName}
+              onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))} />
+            {errors.customerName && <p className="text-red-400 text-xs mt-1">{errors.customerName}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">E-mail *</label>
+            <input type="email" className="input-field" placeholder="joao@email.com"
+              value={form.customerEmail}
+              onChange={e => setForm(f => ({ ...f, customerEmail: e.target.value }))} />
+            {errors.customerEmail && <p className="text-red-400 text-xs mt-1">{errors.customerEmail}</p>}
+            <p className="text-xs text-gray-400 mt-1">Seu acesso ao curso chega direto neste e-mail, sem precisar de senha.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">CPF ou CNPJ *</label>
+            <input className="input-field" placeholder="000.000.000-00"
+              value={formatDoc(form.cpfCnpj)}
+              onChange={e => setForm(f => ({ ...f, cpfCnpj: e.target.value }))} />
+            {errors.cpfCnpj && <p className="text-red-400 text-xs mt-1">{errors.cpfCnpj}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">Telefone (opcional)</label>
+            <input className="input-field" placeholder="(11) 99999-9999"
+              value={form.phone}
+              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+          </div>
+          <div className="flex items-center gap-3 py-2">
+            <span className="text-xs text-gray-400">Formas de pagamento:</span>
+            <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">PIX</span>
+            <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">Cartão</span>
+            <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">Boleto</span>
+          </div>
+          <button type="submit" disabled={loading} className="btn-primary w-full py-3 mt-2">
+            {loading ? 'Processando...' : 'Ir para pagamento →'}
+          </button>
+          <p className="text-center text-xs text-gray-400">Processado com segurança via Asaas.</p>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Página de Vendas Pública (Kit de Divulgação) — não exige login. É para onde apontam o link
  * direto, o QR Code, o embed e o botão HTML gerados na aba "Divulgar" do dashboard do produto.
@@ -29,6 +141,13 @@ export default function PublicSalesPage() {
   const { slug } = useParams<{ slug: string }>();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const viewRecordedRef = useRef(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [processingCheckout, setProcessingCheckout] = useState(false);
+  const [createdPurchase, setCreatedPurchase] = useState<{ id: string; paymentUrl?: string } | null>(null);
+  const [simulating, setSimulating] = useState(false);
+  // Endpoint de simulação só existe no backend em Development (404 em produção) — este check
+  // evita mostrar o atalho de sandbox à toa fora de ambiente de dev.
+  const isDevEnv = process.env.NODE_ENV !== 'production';
 
   useEffect(() => {
     setIsLoggedIn(!!localStorage.getItem('access_token'));
@@ -54,12 +173,62 @@ export default function PublicSalesPage() {
     enabled: !!course?.instructorId,
   });
 
-  // Checkout/matrícula exigem conta — o visitante anônimo é levado a criar conta (ou logar) e
-  // volta automaticamente para a página autenticada do curso, que já tem todo o fluxo de
-  // Matricular/Comprar/Assinar pronto. Não duplicamos checkout aqui.
-  const ctaHref = course
+  const errorMessage = (e: unknown, fallback: string) =>
+    (e as AxiosError<{ title?: string; detail?: string; message?: string }>)
+      .response?.data?.detail
+    ?? (e as AxiosError<{ title?: string; detail?: string; message?: string }>).response?.data?.title
+    ?? (e as AxiosError<{ title?: string; detail?: string; message?: string }>).response?.data?.message
+    ?? fallback;
+
+  // Grátis continua exigindo conta (matrícula é um endpoint autenticado) — leva para o
+  // cadastro, que já volta pra cá com returnUrl. Pago: checkout embutido, sem sair da página
+  // e sem precisar de conta prévia (o diferencial da Tuilow — ver PurchaseCourseCommandHandler).
+  const ctaHref = course && course.isFree
     ? (isLoggedIn ? `/cursos/${slug}` : `/registro?returnUrl=${encodeURIComponent(`/cursos/${slug}`)}`)
-    : '#';
+    : undefined;
+
+  const handleCtaClick = () => {
+    if (!course) return;
+    if (course.isFree) return; // navegação normal via <a href>
+    setCreatedPurchase(null);
+    setCheckoutOpen(true);
+  };
+
+  const handleCheckout = async (data: CheckoutData) => {
+    if (!course) return;
+    setProcessingCheckout(true);
+    try {
+      const { data: purchase } = await coursePurchasesApi.purchase({ courseId: course.id, ...data });
+      setCheckoutOpen(false);
+      setCreatedPurchase({ id: purchase.coursePurchaseId, paymentUrl: purchase.paymentUrl });
+      if (purchase.paymentUrl) {
+        toast.success('Pedido criado! Redirecionando para pagamento...');
+        setTimeout(() => window.open(purchase.paymentUrl, '_blank'), 800);
+      } else {
+        toast.success('Pedido criado! Você receberá o link de pagamento por e-mail.');
+      }
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Erro ao processar a compra.'));
+    } finally {
+      setProcessingCheckout(false);
+    }
+  };
+
+  // SANDBOX/DEV: substitui o webhook do Asaas (que não alcança localhost), disponível mesmo
+  // sem login — fecha o loop compra anônima → pagamento confirmado → conta criada → Magic Link
+  // por e-mail, tudo testável direto da própria Landing Page.
+  const handleSimulatePayment = async () => {
+    if (!createdPurchase) return;
+    setSimulating(true);
+    try {
+      await coursePurchasesApi.simulatePayment(createdPurchase.id);
+      toast.success('Pagamento confirmado! Verifique o e-mail informado: chegou um link de acesso direto (Magic Link). 🎉');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Erro ao simular pagamento.'));
+    } finally {
+      setSimulating(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -120,8 +289,38 @@ export default function PublicSalesPage() {
 
         <div className="flex flex-col items-center gap-2 mb-10">
           <p className="text-3xl font-bold gradient-text">{formatPrice(course.price)}</p>
-          <a href={ctaHref} className="btn-primary px-8 py-3 text-base">{ctaText} →</a>
+          {ctaHref ? (
+            <a href={ctaHref} className="btn-primary px-8 py-3 text-base">{ctaText} →</a>
+          ) : (
+            <button onClick={handleCtaClick} className="btn-primary px-8 py-3 text-base">{ctaText} →</button>
+          )}
           <p className="text-xs text-gray-400">Pagamento seguro via PIX, cartão ou boleto.</p>
+
+          {createdPurchase && (
+            <div className="w-full max-w-sm mt-4 card border-brand-200 bg-brand-50/40 text-center">
+              <p className="text-sm font-medium text-gray-700">
+                {createdPurchase.paymentUrl ? '⏳ Aguardando confirmação do pagamento' : '⏳ Pedido criado'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Assim que o pagamento for confirmado, você recebe um Magic Link por e-mail e entra direto no curso, sem senha.
+              </p>
+              {createdPurchase.paymentUrl && (
+                <a href={createdPurchase.paymentUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-brand-600 hover:underline mt-2 inline-block">
+                  Abrir pagamento novamente →
+                </a>
+              )}
+              {isDevEnv && (
+                <button
+                  onClick={handleSimulatePayment}
+                  disabled={simulating}
+                  className="btn-primary text-xs py-2 px-4 mt-3 disabled:opacity-50"
+                >
+                  {simulating ? 'Simulando...' : '🧪 Simular pagamento confirmado (sandbox)'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Benefícios */}
@@ -224,9 +423,23 @@ export default function PublicSalesPage() {
         )}
 
         <div className="text-center pb-6">
-          <a href={ctaHref} className="btn-primary px-8 py-3 text-base">{ctaText} →</a>
+          {ctaHref ? (
+            <a href={ctaHref} className="btn-primary px-8 py-3 text-base">{ctaText} →</a>
+          ) : (
+            <button onClick={handleCtaClick} className="btn-primary px-8 py-3 text-base">{ctaText} →</button>
+          )}
         </div>
       </div>
+
+      {checkoutOpen && course && (
+        <CheckoutModal
+          title={`Comprar ${course.title}`}
+          priceLabel={formatPrice(course.price)}
+          onClose={() => setCheckoutOpen(false)}
+          onConfirm={handleCheckout}
+          loading={processingCheckout}
+        />
+      )}
     </div>
   );
 }

@@ -72,4 +72,16 @@ public sealed class UserRepository(DbContext context) : IUserRepository
     // já rastreado (ex.: PromoteUserCommand) gera UPDATE (0 linhas afetadas) em vez de INSERT.
     public async Task AddUserRoleAssignmentAsync(UserRoleAssignment assignment, CancellationToken ct = default) =>
         await context.Set<UserRoleAssignment>().AddAsync(assignment, ct);
+
+    public async Task<User?> GetByMagicLinkTokenAsync(string token, CancellationToken ct = default) =>
+        await context.Set<User>()
+            .Include(u => u.Profile)
+            .Include(u => u.MagicLinkTokens)
+            .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.MagicLinkTokens.Any(m => m.Token == token), ct);
+
+    // Mesmo padrão de AddRefreshTokenAsync — Guid não-default via Guid.NewGuid() no
+    // construtor da entidade seria tratado como Modified (UPDATE) por DetectChanges.
+    public async Task AddMagicLinkTokenAsync(MagicLinkToken token, CancellationToken ct = default) =>
+        await context.Set<MagicLinkToken>().AddAsync(token, ct);
 }

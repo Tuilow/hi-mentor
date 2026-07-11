@@ -35,5 +35,6 @@
     <ProjectReference Include="..\..\Modules\Finance\Tuilow.Finance.Api\Tuilow.Finance.Api.csproj" />
     <ProjectReference Include="..\..\Modules\Payout\Tuilow.Payout.Api\Tuilow.Payout.Api.csproj" />
     <ProjectReference Include="..\..\Modules\CreatorStudio\Tuilow.CreatorStudio.Api\Tuilow.CreatorStudio.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Channel\Tuilow.Channel.Api\Tuilow.Channel.Api.csproj" />
   </ItemGroup>
 </Project>

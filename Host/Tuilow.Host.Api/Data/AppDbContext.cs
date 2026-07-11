@@ -40,6 +40,7 @@ public sealed class AppDbContext(
     public DbSet<SocialLogin> SocialLogins => Set<SocialLogin>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRoleAssignment> UserRoleAssignments => Set<UserRoleAssignment>();
+    public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
 
     // Catalog
     public DbSet<CatalogEntities.Course> Courses => Set<CatalogEntities.Course>();

@@ -11,6 +11,7 @@ namespace Tuilow.Sales.Application.Commands.PurchaseCourse;
 public sealed class PurchaseCourseCommandHandler(
     ICourseRepository courseRepository,
     ICoursePurchaseRepository coursePurchaseRepository,
+    IUserProvisioningService userProvisioningService,
     IPaymentService paymentService,
     IUnitOfWork uow
 ) : IRequestHandler<PurchaseCourseCommand, PurchaseCourseResponse>
@@ -23,7 +24,13 @@ public sealed class PurchaseCourseCommandHandler(
         if (course.IsFree)
             throw new BusinessException("Este curso é gratuito — não é necessário comprá-lo, basta se matricular.");
 
-        if (await coursePurchaseRepository.HasConfirmedPurchaseAsync(request.StudentId, request.CourseId, ct))
+        // Checkout anônimo: sem login, localiza ou cria a conta pelo e-mail informado. A conta
+        // nova é adicionada ao mesmo DbContext/transação da compra (SaveChangesAsync único no
+        // fim deste handler) — se o pagamento falhar antes disso, nada é persistido.
+        var studentId = request.StudentId
+            ?? await userProvisioningService.FindOrCreateStudentAsync(request.CustomerEmail, request.CustomerName, ct);
+
+        if (await coursePurchaseRepository.HasConfirmedPurchaseAsync(studentId, request.CourseId, ct))
             throw new BusinessException("Você já comprou este curso.");
 
         var customer = await paymentService.CreateOrGetCustomerAsync(
@@ -33,7 +40,7 @@ public sealed class PurchaseCourseCommandHandler(
             new(customer.Id, course.Price.Amount, $"Curso: {course.Title}", course.Id.ToString()), ct);
 
         var purchase = CoursePurchaseEntity.Create(
-            request.StudentId, course.Id, course.InstructorId, course.Price.Amount,
+            studentId, course.Id, course.InstructorId, course.Price.Amount,
             customer.Id, charge.Id);
 
         await coursePurchaseRepository.AddAsync(purchase, ct);

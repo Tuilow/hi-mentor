@@ -10,6 +10,7 @@ public sealed class User : AggregateRoot
     private readonly List<RefreshToken> _refreshTokens = [];
     private readonly List<SocialLogin> _socialLogins = [];
     private readonly List<UserRoleAssignment> _userRoles = [];
+    private readonly List<MagicLinkToken> _magicLinkTokens = [];
 
     public Email Email { get; private set; } = null!;
     public Password? Password { get; private set; }
@@ -25,6 +26,7 @@ public sealed class User : AggregateRoot
     public UserProfile Profile { get; private set; } = null!;
     public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
     public IReadOnlyCollection<SocialLogin> SocialLogins => _socialLogins.AsReadOnly();
+    public IReadOnlyCollection<MagicLinkToken> MagicLinkTokens => _magicLinkTokens.AsReadOnly();
 
     // Suporte a multi-role: um usuário pode ter vários roles simultâneos
     // (ex.: Student + Creator, Creator + ChannelMember, Admin + Creator).
@@ -77,6 +79,53 @@ public sealed class User : AggregateRoot
             user.Id, email, firstName, string.Empty));
 
         return user;
+    }
+
+    // Factory: checkout anônimo de compra de curso (sem senha, sem passar por cadastro) — o
+    // acesso é feito só por Magic Link (ver IssueMagicLink/ConsumeMagicLink). Ativa imediatamente
+    // (o e-mail já foi validado indiretamente pelo gateway de pagamento na cobrança), mesmo
+    // padrão de RegisterFromSocialLogin, só que sem vínculo de login social.
+    public static User RegisterFromPurchase(
+        string email, string firstName, string lastName, Role? defaultRole = null)
+    {
+        var user = new User
+        {
+            Email = Email.Create(email),
+            Status = UserStatus.Active,
+            EmailConfirmedAt = DateTime.UtcNow
+        };
+
+        user.Profile = UserProfile.Create(user.Id, firstName, lastName);
+
+        if (defaultRole is not null)
+            user.AssignRole(defaultRole);
+
+        user.AddDomainEvent(new UserRegisteredDomainEvent(user.Id, email, firstName, string.Empty));
+
+        return user;
+    }
+
+    /// <summary>
+    /// Emite um novo Magic Link (token opaco de uso único, 48h de validade por padrão) — chamado
+    /// pelo módulo Learning quando o acesso a um curso é liberado, para o aluno entrar direto sem
+    /// senha a partir do e-mail/WhatsApp.
+    /// </summary>
+    public MagicLinkToken IssueMagicLink(string token, TimeSpan? validFor = null)
+    {
+        var magicLink = MagicLinkToken.Create(Id, token, DateTime.UtcNow.Add(validFor ?? TimeSpan.FromHours(48)));
+        _magicLinkTokens.Add(magicLink);
+        return magicLink;
+    }
+
+    /// <summary>Valida e consome um Magic Link (uso único) — usado no login sem senha.</summary>
+    public void ConsumeMagicLink(string token)
+    {
+        var link = _magicLinkTokens.SingleOrDefault(t => t.Token == token);
+        if (link is null || !link.IsValid)
+            throw new InvalidOperationException("Link de acesso inválido ou expirado.");
+
+        link.Consume();
+        Touch();
     }
 
     public void ConfirmEmail(string token)

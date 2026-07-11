@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Tuilow.Host.Api.Data;
@@ -11,9 +12,11 @@ using Tuilow.Host.Api.Data;
 namespace Tuilow.Host.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260710211806_AddCreatorChannel")]
+    partial class AddCreatorChannel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -505,42 +508,6 @@ namespace Tuilow.Host.Api.Migrations
                     b.HasIndex("Type", "Status");
 
                     b.ToTable("wallet_transactions", "finance");
-                });
-
-            modelBuilder.Entity("Tuilow.IdentidadeAcesso.Domain.Entities.MagicLinkToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ConsumedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Token")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("magic_link_tokens", "identity");
                 });
 
             modelBuilder.Entity("Tuilow.IdentidadeAcesso.Domain.Entities.RefreshToken", b =>
@@ -1715,15 +1682,6 @@ namespace Tuilow.Host.Api.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Tuilow.IdentidadeAcesso.Domain.Entities.MagicLinkToken", b =>
-                {
-                    b.HasOne("Tuilow.IdentidadeAcesso.Domain.Entities.User", null)
-                        .WithMany("MagicLinkTokens")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Tuilow.IdentidadeAcesso.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Tuilow.IdentidadeAcesso.Domain.Entities.User", null)
@@ -1978,8 +1936,6 @@ namespace Tuilow.Host.Api.Migrations
 
             modelBuilder.Entity("Tuilow.IdentidadeAcesso.Domain.Entities.User", b =>
                 {
-                    b.Navigation("MagicLinkTokens");
-
                     b.Navigation("Profile")
                         .IsRequired();
 

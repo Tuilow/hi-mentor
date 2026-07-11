@@ -29,7 +29,7 @@ public sealed class SimulateCoursePurchasePaymentCommandHandler(
         var purchase = await coursePurchaseRepository.GetByIdAsync(request.CoursePurchaseId, ct)
             ?? throw new NotFoundException("Compra", request.CoursePurchaseId);
 
-        if (purchase.StudentId != request.StudentId)
+        if (request.StudentId.HasValue && purchase.StudentId != request.StudentId.Value)
             throw new BusinessException("Esta compra não pertence a você.");
 
         purchase.ConfirmPayment(); // idempotente — mesma regra do webhook real

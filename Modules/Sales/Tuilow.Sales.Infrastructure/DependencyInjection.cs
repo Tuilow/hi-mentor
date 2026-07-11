@@ -14,6 +14,7 @@ public static class DependencyInjection
     {
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
         services.AddScoped<ICoursePurchaseRepository, CoursePurchaseRepository>();
+        services.AddScoped<IUserProvisioningService, IdentidadeAcessoUserProvisioningService>();
 
         services.AddHttpClient<IPaymentService, AsaasPaymentService>(client =>
         {

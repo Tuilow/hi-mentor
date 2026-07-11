@@ -90,6 +90,8 @@ export const authApi = {
   }) => api.put('/auth/me', data),
   // Auto-promoção a Creator (plataforma aberta — sem aprovação de Admin).
   becomeCreator: () => api.post('/auth/become-creator'),
+  // Magic Link — troca o token recebido por e-mail/WhatsApp por um login completo, sem senha.
+  consumeMagicLink: (token: string) => api.post('/auth/magic-link/consume', { token }),
   refreshToken: (refreshToken: string) => api.post('/auth/refresh-token', { refreshToken }),
 };
 

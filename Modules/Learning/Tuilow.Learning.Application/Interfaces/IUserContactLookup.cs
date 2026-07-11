@@ -1,7 +1,7 @@
 namespace Tuilow.Learning.Application.Interfaces;
 
-/// <summary>Dados mínimos de contato necessários para notificar o usuário por e-mail.</summary>
-public sealed record UserContact(string Email, string FirstName);
+/// <summary>Dados mínimos de contato necessários para notificar o usuário por e-mail/WhatsApp.</summary>
+public sealed record UserContact(string Email, string FirstName, string? Phone = null);
 
 /// <summary>
 /// Porta (anti-corruption layer) que abstrai "qual o e-mail/nome deste usuário?" sem o módulo

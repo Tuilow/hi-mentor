@@ -79,6 +79,20 @@ public sealed class EmailService(
         await SendAsync(to, $"Acesso liberado: {courseTitle} — Tuilow", body, ct);
     }
 
+    public async Task SendMagicLinkAccessAsync(string to, string firstName, string courseTitle, string courseSlug, string magicLinkToken, CancellationToken ct = default)
+    {
+        var magicLinkUrl = $"{_frontendUrl}/acesso?token={magicLinkToken}&redirect={Uri.EscapeDataString($"/cursos/{courseSlug}")}";
+        var body = $"""
+            <h2>Pagamento confirmado! 🎉</h2>
+            <p>Olá, {firstName}! Seu acesso ao curso <strong>{courseTitle}</strong> já está liberado.</p>
+            <a href="{magicLinkUrl}" style="background:#2563EB;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">
+                Entrar no Curso Agora
+            </a>
+            <p style="color:#6B7280;font-size:13px;">Este link te leva direto para o curso, sem precisar de senha. Válido por 48 horas.</p>
+            """;
+        await SendAsync(to, $"Acesso liberado: {courseTitle} — Tuilow", body, ct);
+    }
+
     public async Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateUrl, CancellationToken ct = default)
     {
         var body = $"""

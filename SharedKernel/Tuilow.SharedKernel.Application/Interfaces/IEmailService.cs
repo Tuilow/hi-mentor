@@ -19,4 +19,12 @@ public interface IEmailService
     /// Tuilow.Learning.Application.EventHandlers).
     /// </summary>
     Task SendCourseAccessGrantedAsync(string to, string firstName, string courseTitle, string courseSlug, CancellationToken ct = default);
+
+    /// <summary>
+    /// Disparado no lugar de <see cref="SendCourseAccessGrantedAsync"/> quando há um Magic Link
+    /// disponível (compra avulsa de curso confirmada) — o botão do e-mail já entra o aluno
+    /// direto na área do curso, sem senha. Cobre tanto quem já tinha conta quanto quem acabou
+    /// de ser criado automaticamente no checkout anônimo.
+    /// </summary>
+    Task SendMagicLinkAccessAsync(string to, string firstName, string courseTitle, string courseSlug, string magicLinkToken, CancellationToken ct = default);
 }
