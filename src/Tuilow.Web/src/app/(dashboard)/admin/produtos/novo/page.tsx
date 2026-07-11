@@ -70,6 +70,13 @@ interface LocalVideo {
   durationSeconds?: number | null;
 }
 
+interface TestimonialDraft {
+  authorName: string;
+  authorRole: string;
+  quote: string;
+  avatarUrl: string;
+}
+
 type PricingMode = 'free' | 'onetime' | 'subscription';
 type BillingCycle = 'Monthly' | 'Quarterly' | 'Semiannual' | 'Annual';
 
@@ -115,6 +122,10 @@ function ProductWizard() {
   const [benefits, setBenefits] = useState<string[]>([]);
   const [faq, setFaq] = useState<{ question: string; answer: string }[]>([]);
   const [generatingSalesPage, setGeneratingSalesPage] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [testimonials, setTestimonials] = useState<TestimonialDraft[]>([]);
+  const [guaranteeDays, setGuaranteeDays] = useState<number | ''>('');
+  const [guaranteeText, setGuaranteeText] = useState('');
 
   // Passo 7
   const [checklist, setChecklist] = useState<PublicationChecklist | null>(null);
@@ -150,6 +161,12 @@ function ProductWizard() {
       setCtaText(data.salesPageCtaText ?? '');
       setBenefits(data.salesPageBenefits ?? []);
       setFaq((data.faqItems ?? []).map(f => ({ question: f.question, answer: f.answer })));
+      setVideoUrl(data.salesPageVideoUrl ?? '');
+      setTestimonials((data.testimonials ?? []).map(t => ({
+        authorName: t.authorName, authorRole: t.authorRole ?? '', quote: t.quote, avatarUrl: t.avatarUrl ?? '',
+      })));
+      setGuaranteeDays(data.guaranteeDays ?? '');
+      setGuaranteeText(data.guaranteeText ?? '');
     }).catch(() => toast.error('Não foi possível carregar este produto.'));
   }, [existingCourseId]);
 
@@ -356,11 +373,29 @@ function ProductWizard() {
     }
   };
 
+  const addTestimonial = () =>
+    setTestimonials(t => [...t, { authorName: '', authorRole: '', quote: '', avatarUrl: '' }]);
+  const removeTestimonial = (i: number) =>
+    setTestimonials(t => t.filter((_, idx) => idx !== i));
+  const updateTestimonial = (i: number, field: keyof TestimonialDraft, value: string) =>
+    setTestimonials(t => t.map((item, idx) => (idx === i ? { ...item, [field]: value } : item)));
+
   const handleSaveSalesPage = async () => {
     if (!courseId) return;
     setSaving(true);
     try {
-      await coursesApi.setSalesPage(courseId, { headline, subheadline, ctaText, benefits, faqItems: faq });
+      await coursesApi.setSalesPage(courseId, {
+        headline, subheadline, ctaText, benefits, faqItems: faq,
+        videoUrl: videoUrl || null,
+        testimonials: testimonials
+          .filter(t => t.authorName.trim() && t.quote.trim())
+          .map(t => ({
+            authorName: t.authorName, authorRole: t.authorRole || null,
+            quote: t.quote, avatarUrl: t.avatarUrl || null,
+          })),
+        guaranteeDays: guaranteeDays === '' ? null : guaranteeDays,
+        guaranteeText: guaranteeText || null,
+      });
       toast.success('Página de vendas salva.');
       setStep(7);
     } catch {
@@ -637,6 +672,52 @@ function ProductWizard() {
             <div>
               <label className="text-sm font-medium text-gray-600">Chamada para ação (CTA)</label>
               <input className="input-field mt-1" value={ctaText} onChange={e => setCtaText(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Vídeo de apresentação (URL)</label>
+              <input className="input-field mt-1" value={videoUrl} onChange={e => setVideoUrl(e.target.value)}
+                placeholder="https://youtube.com/watch?v=... ou link do Vimeo" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Garantia</label>
+              <div className="flex gap-2 mt-1">
+                <input type="number" min={0} className="input-field w-28" value={guaranteeDays}
+                  onChange={e => setGuaranteeDays(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="Dias" />
+                <input className="input-field flex-1" value={guaranteeText}
+                  onChange={e => setGuaranteeText(e.target.value)}
+                  placeholder="Ex.: Satisfação garantida ou seu dinheiro de volta" />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-600">Depoimentos de alunos</label>
+                <button type="button" onClick={addTestimonial} className="btn-ghost text-xs flex items-center gap-1">
+                  <Plus className="w-3.5 h-3.5" /> Adicionar
+                </button>
+              </div>
+              {testimonials.length === 0 ? (
+                <p className="text-xs text-gray-400 mt-1">
+                  Nenhum depoimento ainda — adicione avaliações reais de alunos para reforçar a prova social.
+                </p>
+              ) : (
+                <div className="space-y-3 mt-2">
+                  {testimonials.map((t, i) => (
+                    <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                      <div className="flex gap-2">
+                        <input className="input-field text-sm flex-1" placeholder="Nome do aluno"
+                          value={t.authorName} onChange={e => updateTestimonial(i, 'authorName', e.target.value)} />
+                        <input className="input-field text-sm flex-1" placeholder="Cargo/curso (opcional)"
+                          value={t.authorRole} onChange={e => updateTestimonial(i, 'authorRole', e.target.value)} />
+                        <button type="button" onClick={() => removeTestimonial(i)}
+                          className="text-gray-400 hover:text-red-500 transition-colors px-2">✕</button>
+                      </div>
+                      <textarea className="input-field text-sm" rows={2} placeholder="O que o aluno disse"
+                        value={t.quote} onChange={e => updateTestimonial(i, 'quote', e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             {faq.length > 0 && (
               <div>

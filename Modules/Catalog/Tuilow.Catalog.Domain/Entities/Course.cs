@@ -10,6 +10,7 @@ public sealed class Course : AggregateRoot
     private readonly List<Module> _modules = [];
     private readonly List<CourseFaqItem> _faqItems = [];
     private readonly List<string> _salesPageBenefits = [];
+    private readonly List<Testimonial> _testimonials = [];
 
     public Guid InstructorId { get; private set; }
     public string Title { get; private set; } = string.Empty;
@@ -37,7 +38,11 @@ public sealed class Course : AggregateRoot
     public string? SalesPageHeadline { get; private set; }
     public string? SalesPageSubheadline { get; private set; }
     public string? SalesPageCtaText { get; private set; }
+    public string? SalesPageVideoUrl { get; private set; }
+    public int? GuaranteeDays { get; private set; }
+    public string? GuaranteeText { get; private set; }
     public IReadOnlyCollection<string> SalesPageBenefits => _salesPageBenefits.AsReadOnly();
+    public IReadOnlyCollection<Testimonial> Testimonials => _testimonials.AsReadOnly();
     public IReadOnlyCollection<CourseFaqItem> FaqItems => _faqItems.AsReadOnly();
 
     public int TotalDurationMinutes =>
@@ -157,16 +162,31 @@ public sealed class Course : AggregateRoot
         Touch();
     }
 
-    /// <summary>Passo 6 do wizard (Página de Vendas): manual ou pré-preenchido por IA (sugestão).</summary>
-    public void SetSalesPage(string? headline, string? subheadline, string? ctaText, IEnumerable<string>? benefits)
+    /// <summary>
+    /// Passo 6 do wizard (Página de Vendas): manual ou pré-preenchido por IA (sugestão).
+    /// VideoUrl/Testimonials/Guarantee são todos opcionais — a página de vendas funciona sem
+    /// eles, só ficam mais fortes com eles preenchidos (vídeo de apresentação, prova social,
+    /// garantia de satisfação).
+    /// </summary>
+    public void SetSalesPage(
+        string? headline, string? subheadline, string? ctaText, IEnumerable<string>? benefits,
+        string? videoUrl = null, IEnumerable<Testimonial>? testimonials = null,
+        int? guaranteeDays = null, string? guaranteeText = null)
     {
         SalesPageHeadline = headline?.Trim();
         SalesPageSubheadline = subheadline?.Trim();
         SalesPageCtaText = ctaText?.Trim();
+        SalesPageVideoUrl = string.IsNullOrWhiteSpace(videoUrl) ? null : videoUrl.Trim();
+        GuaranteeDays = guaranteeDays;
+        GuaranteeText = string.IsNullOrWhiteSpace(guaranteeText) ? null : guaranteeText.Trim();
 
         _salesPageBenefits.Clear();
         if (benefits is not null)
             _salesPageBenefits.AddRange(benefits.Where(b => !string.IsNullOrWhiteSpace(b)).Select(b => b.Trim()));
+
+        _testimonials.Clear();
+        if (testimonials is not null)
+            _testimonials.AddRange(testimonials.Where(t => !string.IsNullOrWhiteSpace(t.AuthorName) && !string.IsNullOrWhiteSpace(t.Quote)));
 
         Touch();
     }

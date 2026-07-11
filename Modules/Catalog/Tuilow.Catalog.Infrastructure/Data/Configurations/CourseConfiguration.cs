@@ -43,6 +43,9 @@ public sealed class CourseConfiguration : IEntityTypeConfiguration<Course>
         builder.Property(c => c.SalesPageHeadline).HasColumnName("sales_page_headline").HasMaxLength(300);
         builder.Property(c => c.SalesPageSubheadline).HasColumnName("sales_page_subheadline").HasMaxLength(500);
         builder.Property(c => c.SalesPageCtaText).HasColumnName("sales_page_cta_text").HasMaxLength(100);
+        builder.Property(c => c.SalesPageVideoUrl).HasColumnName("sales_page_video_url").HasMaxLength(500);
+        builder.Property(c => c.GuaranteeDays).HasColumnName("guarantee_days");
+        builder.Property(c => c.GuaranteeText).HasColumnName("guarantee_text").HasMaxLength(500);
 
         // Lista simples de bullets — não precisa de entidade filha própria (sem ID/ordem
         // relevantes fora da lista). SalesPageBenefits é uma propriedade só-leitura (expõe o
@@ -63,6 +66,20 @@ public sealed class CourseConfiguration : IEntityTypeConfiguration<Course>
             .Metadata.SetValueComparer(new ValueComparer<List<string>>(
                 (a, b) => (a ?? new List<string>()).SequenceEqual(b ?? new List<string>()),
                 v => v.Aggregate(0, (hash, s) => HashCode.Combine(hash, s.GetHashCode())),
+                v => v.ToList()));
+
+        // Depoimentos — mesma técnica de SalesPageBenefits, só que com objetos em vez de strings.
+        builder.Ignore(c => c.Testimonials);
+        builder.Property<List<Testimonial>>("_testimonials")
+            .HasColumnName("testimonials")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => string.IsNullOrEmpty(v)
+                    ? new List<Testimonial>()
+                    : JsonSerializer.Deserialize<List<Testimonial>>(v, (JsonSerializerOptions?)null) ?? new List<Testimonial>())
+            .Metadata.SetValueComparer(new ValueComparer<List<Testimonial>>(
+                (a, b) => (a ?? new List<Testimonial>()).SequenceEqual(b ?? new List<Testimonial>()),
+                v => v.Aggregate(0, (hash, t) => HashCode.Combine(hash, t.GetHashCode())),
                 v => v.ToList()));
 
         builder.HasMany(c => c.Modules)

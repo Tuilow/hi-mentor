@@ -25,6 +25,9 @@ public sealed class GetCourseByIdAdminQueryHandler(ICourseRepository courseRepos
             .OrderBy(f => f.Order)
             .Select(f => new FaqItemResponse(f.Id, f.Question, f.Answer, f.Order));
 
+        var testimonials = course.Testimonials
+            .Select(t => new TestimonialResponse(t.AuthorName, t.AuthorRole, t.Quote, t.AvatarUrl));
+
         return new CourseDetailResponse(
             course.Id, course.Title, course.Slug.Value, course.Description,
             course.ShortDescription, course.ThumbnailUrl, course.Price.Amount, course.IsFree,
@@ -35,6 +38,7 @@ public sealed class GetCourseByIdAdminQueryHandler(ICourseRepository courseRepos
             // Tela de edição do próprio criador — não precisa de nome/avatar/bio (ele já sabe
             // quem é), só InstructorId (já é propriedade direta de Course, sem exigir o
             // ICreatorProfileLookup/IInstructorLookup usado na página de vendas pública).
-            course.InstructorId, null, null, null);
+            course.InstructorId, null, null, null,
+            course.SalesPageVideoUrl, testimonials, course.GuaranteeDays, course.GuaranteeText);
     }
 }

@@ -13,7 +13,13 @@ public sealed record SetCourseSalesPageCommand(
     string? Subheadline,
     string? CtaText,
     List<string>? Benefits,
-    List<FaqItemInput>? FaqItems
+    List<FaqItemInput>? FaqItems,
+    string? VideoUrl = null,
+    List<TestimonialInput>? Testimonials = null,
+    int? GuaranteeDays = null,
+    string? GuaranteeText = null
 ) : IRequest;
 
 public sealed record FaqItemInput(string Question, string Answer);
+
+public sealed record TestimonialInput(string AuthorName, string? AuthorRole, string Quote, string? AvatarUrl);

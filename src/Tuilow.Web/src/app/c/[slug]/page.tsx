@@ -21,6 +21,21 @@ function formatPrice(price: number): string {
     : price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/**
+ * Converte a URL original colada pelo criador (YouTube/Vimeo) numa URL de embed própria da
+ * plataforma — mesma lógica de (dashboard)/cursos/[slug]/[lessonId], aqui só para o vídeo de
+ * apresentação da página de vendas (não para aulas do curso).
+ */
+function toEmbedUrl(url: string): string | null {
+  const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
+  if (youtubeMatch) return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+
+  const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+
+  return null;
+}
+
 interface CheckoutData {
   customerName: string;
   customerEmail: string;
@@ -277,7 +292,16 @@ export default function PublicSalesPage() {
           {subheadline && <p className="text-gray-500 text-lg">{subheadline}</p>}
         </div>
 
-        {course.thumbnailUrl ? (
+        {course.salesPageVideoUrl && toEmbedUrl(course.salesPageVideoUrl) ? (
+          <div className="w-full aspect-video rounded-2xl overflow-hidden mb-8 bg-black">
+            <iframe
+              src={toEmbedUrl(course.salesPageVideoUrl)!}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        ) : course.thumbnailUrl ? (
           <img src={course.thumbnailUrl} alt={course.title}
             className="w-full h-64 md:h-96 object-cover rounded-2xl mb-8" />
         ) : (
@@ -295,6 +319,11 @@ export default function PublicSalesPage() {
             <button onClick={handleCtaClick} className="btn-primary px-8 py-3 text-base">{ctaText} →</button>
           )}
           <p className="text-xs text-gray-400">Pagamento seguro via PIX, cartão ou boleto.</p>
+          {(course.guaranteeDays || course.guaranteeText) && (
+            <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+              🛡️ {course.guaranteeText || `Garantia de ${course.guaranteeDays} dias — satisfação ou seu dinheiro de volta`}
+            </p>
+          )}
 
           {createdPurchase && (
             <div className="w-full max-w-sm mt-4 card border-brand-200 bg-brand-50/40 text-center">
@@ -335,6 +364,34 @@ export default function PublicSalesPage() {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Depoimentos */}
+        {course.testimonials.length > 0 && (
+          <div className="card border-gray-200 mb-8">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">O que os alunos dizem</h2>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {course.testimonials.map((t, i) => (
+                <div key={i} className="border border-gray-200 rounded-xl p-4">
+                  <p className="text-sm text-gray-600 leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
+                  <div className="flex items-center gap-2 mt-3">
+                    {t.avatarUrl ? (
+                      <img src={t.avatarUrl} alt={t.authorName} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-accent-500
+                                      flex items-center justify-center text-white text-xs font-bold">
+                        {t.authorName[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-800">{t.authorName}</p>
+                      {t.authorRole && <p className="text-xs text-gray-400">{t.authorRole}</p>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

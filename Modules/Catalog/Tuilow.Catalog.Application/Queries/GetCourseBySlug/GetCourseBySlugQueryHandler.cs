@@ -35,6 +35,9 @@ public sealed class GetCourseBySlugQueryHandler(
 
         var instructor = await instructorLookup.GetProfileAsync(course.InstructorId, ct);
 
+        var testimonials = course.Testimonials
+            .Select(t => new TestimonialResponse(t.AuthorName, t.AuthorRole, t.Quote, t.AvatarUrl));
+
         return new CourseDetailResponse(
             course.Id, course.Title, course.Slug.Value, course.Description,
             course.ShortDescription, course.ThumbnailUrl, course.Price.Amount, course.IsFree,
@@ -42,6 +45,7 @@ public sealed class GetCourseBySlugQueryHandler(
             course.Status.ToString(), course.Category, course.Subcategory, course.ProductType.ToString(),
             course.ViewCount, course.SalesPageHeadline, course.SalesPageSubheadline, course.SalesPageCtaText,
             course.SalesPageBenefits, faqItems,
-            course.InstructorId, instructor?.DisplayName, instructor?.AvatarUrl, instructor?.Bio);
+            course.InstructorId, instructor?.DisplayName, instructor?.AvatarUrl, instructor?.Bio,
+            course.SalesPageVideoUrl, testimonials, course.GuaranteeDays, course.GuaranteeText);
     }
 }

@@ -1,5 +1,6 @@
 using Tuilow.SharedKernel.Application.Exceptions;
 using Tuilow.SharedKernel.Application.Interfaces;
+using Tuilow.Catalog.Domain.Entities;
 using Tuilow.Catalog.Domain.Interfaces;
 using MediatR;
 
@@ -17,7 +18,11 @@ public sealed class SetCourseSalesPageCommandHandler(
         if (course.InstructorId != request.InstructorId)
             throw new ForbiddenException("Apenas o criador pode editar a página de vendas.");
 
-        course.SetSalesPage(request.Headline, request.Subheadline, request.CtaText, request.Benefits);
+        course.SetSalesPage(
+            request.Headline, request.Subheadline, request.CtaText, request.Benefits,
+            request.VideoUrl,
+            request.Testimonials?.Select(t => new Testimonial(t.AuthorName, t.AuthorRole, t.Quote, t.AvatarUrl)),
+            request.GuaranteeDays, request.GuaranteeText);
         courseRepository.Update(course);
 
         // FAQ: substitui a lista inteira. Remove explicitamente as linhas antigas do

@@ -26,7 +26,11 @@ public sealed record CourseDetailResponse(
     Guid InstructorId,
     string? InstructorName,
     string? InstructorAvatarUrl,
-    string? InstructorBio
+    string? InstructorBio,
+    string? SalesPageVideoUrl,
+    IEnumerable<TestimonialResponse> Testimonials,
+    int? GuaranteeDays,
+    string? GuaranteeText
 );
 
 public sealed record FaqItemResponse(
@@ -34,6 +38,13 @@ public sealed record FaqItemResponse(
     string Question,
     string Answer,
     int Order
+);
+
+public sealed record TestimonialResponse(
+    string AuthorName,
+    string? AuthorRole,
+    string Quote,
+    string? AvatarUrl
 );
 
 public sealed record ModuleResponse(

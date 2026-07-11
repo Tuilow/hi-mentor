@@ -31,7 +31,9 @@ public sealed class DuplicateCourseCommandHandler(
             source.ShortDescription, source.Description);
         clone.SetProductType(source.ProductType);
         clone.SetSalesPage(source.SalesPageHeadline, source.SalesPageSubheadline,
-            source.SalesPageCtaText, source.SalesPageBenefits);
+            source.SalesPageCtaText, source.SalesPageBenefits,
+            source.SalesPageVideoUrl, source.Testimonials,
+            source.GuaranteeDays, source.GuaranteeText);
 
         foreach (var faq in source.FaqItems.OrderBy(f => f.Order))
             clone.AddFaqItem(faq.Question, faq.Answer);

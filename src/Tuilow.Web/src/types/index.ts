@@ -146,6 +146,13 @@ export interface FaqItem {
   order?: number;
 }
 
+export interface TestimonialItem {
+  authorName: string;
+  authorRole?: string;
+  quote: string;
+  avatarUrl?: string;
+}
+
 export interface ProductDetail {
   id: string;
   title: string;
@@ -173,6 +180,10 @@ export interface ProductDetail {
   instructorName?: string;
   instructorAvatarUrl?: string;
   instructorBio?: string;
+  salesPageVideoUrl?: string;
+  testimonials: TestimonialItem[];
+  guaranteeDays?: number;
+  guaranteeText?: string;
 }
 
 export interface PublicationChecklist {
