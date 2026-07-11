@@ -16,7 +16,7 @@ const adminApi = {
     api.post(`/courses/${courseId}/modules`, data),
   addLesson: (courseId: string, moduleId: string, data: { title: string; description?: string; isPreview?: boolean }) =>
     api.post(`/courses/${courseId}/modules/${moduleId}/lessons`, data),
-  getUploadUrl: () => api.post('/videos/upload-url', {}),
+  getUploadUrl: (courseId: string) => api.post('/videos/upload-url', { courseId }),
   linkVideo: (videoId: string, data: LinkLessonData) =>
     api.post(`/videos/${videoId}/link-lesson`, data),
 };
@@ -101,7 +101,7 @@ function VideoUploader({ courseId, moduleId, lessonId, onDone }: VideoUploaderPr
     try {
       // 1. Pede URL de upload ao backend
       setPhase('uploading');
-      const { data } = await adminApi.getUploadUrl();
+      const { data } = await adminApi.getUploadUrl(courseId);
       const { videoId, uploadUrl } = data;
 
       // 2. Faz upload direto para o Cloudflare via TUS

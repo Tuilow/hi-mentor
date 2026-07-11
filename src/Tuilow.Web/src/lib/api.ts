@@ -8,6 +8,56 @@ export const api = axios.create({
   timeout: 15000,
 });
 
+// ─── Indicador global de carregamento ─────────────────────────────
+// Conta requisições em andamento e avisa quem estiver inscrito (GlobalLoadingBar).
+// Existe para que QUALQUER clique que dispare uma chamada à API mostre feedback visual,
+// mesmo em telas onde o autor esqueceu de criar um estado de loading local — antes disso,
+// um clique podia "não fazer nada" na tela por até 15s (timeout) sem nenhum sinal, e o
+// usuário não tinha como saber se estava travado ou só demorando.
+let pendingRequests = 0;
+const loadingSubscribers = new Set<(count: number) => void>();
+
+const notifyLoadingSubscribers = () => {
+  loadingSubscribers.forEach((cb) => cb(pendingRequests));
+};
+
+export const subscribeToApiLoading = (cb: (count: number) => void) => {
+  loadingSubscribers.add(cb);
+  cb(pendingRequests);
+  return () => {
+    loadingSubscribers.delete(cb);
+  };
+};
+
+const beginRequest = () => {
+  pendingRequests += 1;
+  notifyLoadingSubscribers();
+};
+
+const endRequest = () => {
+  pendingRequests = Math.max(0, pendingRequests - 1);
+  notifyLoadingSubscribers();
+};
+
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  beginRequest();
+  return config;
+});
+
+// Garante que o contador sempre desce, mesmo em erro/timeout/cancelamento — se isso não
+// rodasse em ambos os ramos, uma requisição com erro deixaria a barra de loading presa
+// "para sempre" na tela, o que seria pior do que não ter barra nenhuma.
+api.interceptors.response.use(
+  (response) => {
+    endRequest();
+    return response;
+  },
+  (error: AxiosError) => {
+    endRequest();
+    return Promise.reject(error);
+  }
+);
+
 // ─── Token injection ──────────────────────────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {

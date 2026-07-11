@@ -1,5 +1,6 @@
 using Tuilow.SharedKernel.Application.Exceptions;
 using Tuilow.Catalog.Domain.Interfaces;
+using Tuilow.Learning.Domain.Interfaces;
 using Tuilow.Sales.Domain.Interfaces;
 using Tuilow.Streaming.Application.Interfaces;
 using Tuilow.Streaming.Domain.Enums;
@@ -13,6 +14,7 @@ public sealed class GetLessonPlayUrlQueryHandler(
     IVideoRepository videoRepository,
     ICoursePurchaseRepository coursePurchaseRepository,
     ISubscriptionRepository subscriptionRepository,
+    IEnrollmentRepository enrollmentRepository,
     IStreamingService streamingService
 ) : IRequestHandler<GetLessonPlayUrlQuery, LessonPlayUrlResponse>
 {
@@ -43,9 +45,13 @@ public sealed class GetLessonPlayUrlQueryHandler(
             throw new BusinessException("O vídeo ainda está sendo processado. Tente novamente em instantes.");
 
         // 3. Controle de acesso
-        if (!lesson.IsPreview)
+        // O próprio criador do curso sempre pode assistir às próprias aulas, mesmo pagas —
+        // nunca precisa comprar/assinar o próprio conteúdo.
+        var isOwner = request.CurrentUserId.HasValue && course.InstructorId == request.CurrentUserId.Value;
+
+        if (!lesson.IsPreview && !isOwner)
         {
-            // Conteúdo pago — exige usuário autenticado com acesso pago ao curso.
+            // Conteúdo pago — exige usuário autenticado com acesso pago (ou matrícula, se o curso for grátis).
             if (request.CurrentUserId is null)
                 throw new UnauthorizedException("Faça login para assistir este conteúdo.");
 
@@ -70,8 +76,17 @@ public sealed class GetLessonPlayUrlQueryHandler(
                 hasPaidAccess = subscription is not null && subscription.IsActive;
             }
 
+            // Curso grátis não gera CoursePurchase/Subscription nenhuma (não há o que cobrar) —
+            // aqui o "acesso pago" equivalente é simplesmente estar matriculado (Learning). Sem
+            // isso, quem se matriculava de graça nunca conseguia assistir: os 3 caminhos acima
+            // são todos sobre dinheiro e nenhum deles nunca é satisfeito por um curso grátis.
+            if (!hasPaidAccess && course.IsFree)
+                hasPaidAccess = await enrollmentRepository.IsEnrolledAsync(request.CurrentUserId.Value, request.CourseId, ct);
+
             if (!hasPaidAccess)
-                throw new ForbiddenException("Compre o curso ou assine um plano para ter acesso a este conteúdo.");
+                throw new ForbiddenException(course.IsFree
+                    ? "Matricule-se neste curso gratuito para assistir a esta aula."
+                    : "Compre o curso ou assine um plano para ter acesso a este conteúdo.");
 
             var paidUrl = isExternal
                 ? video.ExternalUrl!
@@ -82,14 +97,16 @@ public sealed class GetLessonPlayUrlQueryHandler(
                 paidUrl, video.DurationSeconds, video.ThumbnailUrl);
         }
 
-        // 4. Preview — vídeo externo usa a própria URL; upload delega ao streamingService
-        // (mock retorna vídeo de amostra; produção retorna URL pública do Cloudflare Stream).
+        // 4. Preview, ou o próprio criador do curso — vídeo externo usa a própria URL; upload
+        // delega ao streamingService (mock retorna vídeo de amostra; produção retorna URL
+        // pública do Cloudflare Stream). IsPreview no response reflete o dado real da aula (não
+        // fica "true" à toa quando quem está assistindo é o dono de uma aula paga).
         var previewUrl = isExternal
             ? video.ExternalUrl!
             : await streamingService.GetSignedPlaybackUrlAsync(video.CloudflareVideoId!, expirationMinutes: 240, ct);
 
         return new LessonPlayUrlResponse(
-            lesson.Id, lesson.Title, true,
+            lesson.Id, lesson.Title, lesson.IsPreview,
             previewUrl, video.DurationSeconds, video.ThumbnailUrl);
     }
 }
