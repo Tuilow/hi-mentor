@@ -4,19 +4,19 @@ services:
   api:
     build:
       context: .
-      dockerfile: src/DogMaster.API/Dockerfile
-    image: dogmaster-api:latest
-    container_name: dogmaster_api
+      dockerfile: Host/Tuilow.Host.Api/Dockerfile
+    image: tuilow-api:latest
+    container_name: tuilow_api
     ports:
       - "5000:8080"
       - "5001:8081"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
-      - ConnectionStrings__Default=Host=db;Port=5432;Database=dogmaster;Username=postgres;Password=${DB_PASSWORD}
+      - ConnectionStrings__Default=Host=db;Port=5432;Database=tuilow;Username=postgres;Password=${DB_PASSWORD}
       - Jwt__Secret=${JWT_SECRET}
-      - Jwt__Issuer=DogMasterPro
-      - Jwt__Audience=DogMasterPro
+      - Jwt__Issuer=Tuilow
+      - Jwt__Audience=Tuilow
       - Jwt__ExpirationMinutes=15
       - Cloudflare__AccountId=${CF_ACCOUNT_ID}
       - Cloudflare__ApiToken=${CF_API_TOKEN}
@@ -37,7 +37,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - dogmaster_net
+      - tuilow_net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -46,10 +46,10 @@ services:
 
   web:
     build:
-      context: ./src/DogMaster.Web
+      context: ./src/Tuilow.Web
       dockerfile: Dockerfile
-    image: dogmaster-web:latest
-    container_name: dogmaster_web
+    image: tuilow-web:latest
+    container_name: tuilow_web
     ports:
       - "3000:3000"
     environment:
@@ -59,15 +59,15 @@ services:
       - api
     restart: unless-stopped
     networks:
-      - dogmaster_net
+      - tuilow_net
 
   db:
     image: postgres:16-alpine
-    container_name: dogmaster_db
+    container_name: tuilow_db
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: dogmaster
+      POSTGRES_DB: tuilow
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
@@ -75,16 +75,16 @@ services:
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     restart: unless-stopped
     networks:
-      - dogmaster_net
+      - tuilow_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d dogmaster"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tuilow"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: dogmaster_redis
+    container_name: tuilow_redis
     ports:
       - "6379:6379"
     volumes:
@@ -92,7 +92,7 @@ services:
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     restart: unless-stopped
     networks:
-      - dogmaster_net
+      - tuilow_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -106,5 +106,5 @@ volumes:
     driver: local
 
 networks:
-  dogmaster_net:
+  tuilow_net:
     driver: bridge

@@ -1,0 +1,406 @@
+'use client';
+
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { subscriptionsApi } from '@/lib/api';
+import { Plan, Subscription } from '@/types';
+import toast from 'react-hot-toast';
+import { Check, X, Star, Zap, Crown } from 'lucide-react';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const cycleLabel: Record<string, string> = {
+  Monthly:   '/mês',
+  Quarterly: '/trimestre',
+  Annual:    '/ano',
+};
+
+const planIcon = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes('expert') || n.includes('anual')) return <Crown className="w-5 h-5 text-yellow-400" />;
+  if (n.includes('pro')) return <Zap className="w-5 h-5 text-brand-400" />;
+  return <Star className="w-5 h-5 text-zinc-400" />;
+};
+
+const isPlanHighlighted = (name: string) => name.toLowerCase().includes('pro');
+
+// ─── Checkout Modal ───────────────────────────────────────────────────────────
+
+interface CheckoutModalProps {
+  plan: Plan;
+  onClose: () => void;
+  onConfirm: (data: CheckoutData) => void;
+  loading: boolean;
+}
+
+interface CheckoutData {
+  customerName: string;
+  customerEmail: string;
+  cpfCnpj: string;
+  phone?: string;
+}
+
+function CheckoutModal({ plan, onClose, onConfirm, loading }: CheckoutModalProps) {
+  const [form, setForm] = useState<CheckoutData>({
+    customerName: '',
+    customerEmail: '',
+    cpfCnpj: '',
+    phone: '',
+  });
+  const [errors, setErrors] = useState<Partial<CheckoutData>>({});
+
+  const validate = () => {
+    const e: Partial<CheckoutData> = {};
+    if (!form.customerName.trim()) e.customerName = 'Nome obrigatório';
+    if (!form.customerEmail.includes('@')) e.customerEmail = 'E-mail inválido';
+    const digits = form.cpfCnpj.replace(/\D/g, '');
+    if (digits.length !== 11 && digits.length !== 14)
+      e.cpfCnpj = 'CPF (11 dígitos) ou CNPJ (14 dígitos)';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validate()) onConfirm(form);
+  };
+
+  const formatDoc = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 14);
+
+    // CPF: 000.000.000-00
+    if (d.length <= 3)  return d;
+    if (d.length <= 6)  return `${d.slice(0,3)}.${d.slice(3)}`;
+    if (d.length <= 9)  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
+    if (d.length <= 11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+
+    // CNPJ: 00.000.000/0000-00
+    if (d.length <= 12) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8)}`;
+    if (d.length <= 13) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+    return               `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12,14)}`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+          <div>
+            <h2 className="text-lg font-bold text-zinc-100">Finalizar assinatura</h2>
+            <p className="text-sm text-zinc-400 mt-0.5">
+              Plano {plan.name} — R$ {plan.price.toFixed(2).replace('.', ',')}
+              {cycleLabel[plan.billingCycle]}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+              Nome completo *
+            </label>
+            <input
+              className="input-field"
+              placeholder="João da Silva"
+              value={form.customerName}
+              onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
+            />
+            {errors.customerName && (
+              <p className="text-red-400 text-xs mt-1">{errors.customerName}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+              E-mail *
+            </label>
+            <input
+              type="email"
+              className="input-field"
+              placeholder="joao@email.com"
+              value={form.customerEmail}
+              onChange={e => setForm(f => ({ ...f, customerEmail: e.target.value }))}
+            />
+            {errors.customerEmail && (
+              <p className="text-red-400 text-xs mt-1">{errors.customerEmail}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+              CPF ou CNPJ *
+            </label>
+            <input
+              className="input-field"
+              placeholder="000.000.000-00"
+              value={form.cpfCnpj}
+              onChange={e => setForm(f => ({ ...f, cpfCnpj: formatDoc(e.target.value) }))}
+            />
+            {errors.cpfCnpj && (
+              <p className="text-red-400 text-xs mt-1">{errors.cpfCnpj}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+              Telefone (opcional)
+            </label>
+            <input
+              className="input-field"
+              placeholder="(11) 99999-9999"
+              value={form.phone}
+              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+            />
+          </div>
+
+          {/* Trial notice */}
+          {plan.trialDays > 0 && (
+            <div className="flex items-start gap-2 p-3 bg-emerald-950/40 border border-emerald-800/40 rounded-lg">
+              <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-emerald-300">
+                <strong>{plan.trialDays} dias grátis</strong> — você só será cobrado após o período de teste.
+              </p>
+            </div>
+          )}
+
+          {/* Payment methods */}
+          <div className="flex items-center gap-3 py-2">
+            <span className="text-xs text-zinc-500">Formas de pagamento:</span>
+            <span className="text-xs font-medium text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">PIX</span>
+            <span className="text-xs font-medium text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">Cartão</span>
+            <span className="text-xs font-medium text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">Boleto</span>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary w-full py-3 mt-2"
+          >
+            {loading ? 'Processando...' : 'Ir para pagamento →'}
+          </button>
+
+          <p className="text-center text-xs text-zinc-600">
+            Processado com segurança via Asaas. Cancele quando quiser.
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function AssinaturaPage() {
+  const qc = useQueryClient();
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+
+  const { data: plans = [], isLoading: loadingPlans } = useQuery<Plan[]>({
+    queryKey: ['plans'],
+    queryFn: () => subscriptionsApi.getPlans().then(r => r.data),
+  });
+
+  const { data: subscription } = useQuery<Subscription | null>({
+    queryKey: ['my-subscription'],
+    queryFn: () =>
+      subscriptionsApi.getMySubscription().then(r => r.data).catch(() => null),
+  });
+
+  const cancel = useMutation({
+    mutationFn: () => subscriptionsApi.cancel('Solicitado pelo usuário'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-subscription'] });
+      toast.success('Assinatura cancelada. Acesso disponível até o fim do período.');
+    },
+    onError: () => toast.error('Erro ao cancelar assinatura.'),
+  });
+
+  const subscribe = useMutation({
+    mutationFn: (data: { planId: string } & CheckoutData) =>
+      subscriptionsApi.subscribe({
+        planId: data.planId,
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+        cpfCnpj: data.cpfCnpj.replace(/\D/g, ''),
+        phone: data.phone,
+      }),
+    onSuccess: (res) => {
+      setSelectedPlan(null);
+      qc.invalidateQueries({ queryKey: ['my-subscription'] });
+
+      const paymentUrl = res.data?.paymentUrl;
+      if (paymentUrl) {
+        toast.success('Assinatura criada! Redirecionando para pagamento...');
+        setTimeout(() => window.open(paymentUrl, '_blank'), 800);
+      } else {
+        toast.success('Assinatura criada! Você receberá o link de pagamento por e-mail.');
+      }
+    },
+    onError: () => {
+      toast.error('Erro ao criar assinatura. Verifique os dados e tente novamente.');
+    },
+  });
+
+  const handleCheckout = (checkoutData: CheckoutData) => {
+    if (!selectedPlan) return;
+    subscribe.mutate({ planId: selectedPlan.id, ...checkoutData });
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-zinc-100">Assinatura</h1>
+        <p className="text-zinc-400 mt-1">Escolha o plano ideal para você e seu cão.</p>
+      </div>
+
+      {/* Plano ativo */}
+      {subscription?.isActive && (
+        <div className="card border-emerald-800/40 bg-emerald-950/20 mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400
+                                 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                  Ativo
+                </span>
+                <h2 className="font-semibold text-zinc-100">Plano {subscription.planName}</h2>
+              </div>
+              <p className="text-sm text-zinc-400">
+                R$ {subscription.price.toFixed(2).replace('.', ',')}
+                {cycleLabel[subscription.billingCycle] ?? ''}
+                {' '}· Válido até{' '}
+                {new Date(subscription.currentPeriodEnd).toLocaleDateString('pt-BR')}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                if (confirm('Tem certeza que deseja cancelar sua assinatura?'))
+                  cancel.mutate();
+              }}
+              disabled={cancel.isPending}
+              className="text-sm text-red-400 hover:text-red-300 font-medium transition-colors whitespace-nowrap"
+            >
+              {cancel.isPending ? 'Cancelando...' : 'Cancelar assinatura'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Grade de planos */}
+      {loadingPlans ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="card border-zinc-800 animate-pulse h-80" />
+          ))}
+        </div>
+      ) : plans.length === 0 ? (
+        <div className="card border-zinc-800 text-center py-12">
+          <p className="text-zinc-400">Nenhum plano disponível no momento.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {plans.map((plan) => {
+            const highlighted = isPlanHighlighted(plan.name);
+            return (
+              <div
+                key={plan.id}
+                className={`relative flex flex-col rounded-2xl border p-6 transition-all duration-200
+                  ${highlighted
+                    ? 'border-brand-600 bg-brand-950/20 shadow-lg shadow-brand-900/20'
+                    : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
+                  }`}
+              >
+                {highlighted && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="text-xs font-bold text-white bg-brand-600 px-3 py-1 rounded-full">
+                      Mais popular
+                    </span>
+                  </div>
+                )}
+
+                {/* Plan header */}
+                <div className="flex items-center gap-2 mb-3">
+                  {planIcon(plan.name)}
+                  <h3 className="text-lg font-bold text-zinc-100">{plan.name}</h3>
+                </div>
+
+                {plan.description && (
+                  <p className="text-sm text-zinc-400 mb-4 leading-relaxed">{plan.description}</p>
+                )}
+
+                {/* Price */}
+                <div className="mb-1">
+                  <span className={`text-3xl font-extrabold ${highlighted ? 'gradient-text' : 'text-zinc-100'}`}>
+                    R$ {plan.price.toFixed(2).replace('.', ',')}
+                  </span>
+                  <span className="text-sm text-zinc-500 ml-1">{cycleLabel[plan.billingCycle]}</span>
+                </div>
+
+                {plan.trialDays > 0 && (
+                  <span className="text-xs font-medium text-emerald-400 mb-4">
+                    {plan.trialDays} dias grátis
+                  </span>
+                )}
+
+                {/* Features */}
+                <ul className="space-y-2.5 my-5 flex-1">
+                  {plan.features.map((f) => (
+                    <li key={f.featureKey} className="flex items-start gap-2 text-sm text-zinc-300">
+                      <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${highlighted ? 'text-brand-400' : 'text-zinc-500'}`} />
+                      <span>{f.displayName ?? f.featureKey}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA */}
+                <button
+                  onClick={() => !subscription?.isActive && setSelectedPlan(plan)}
+                  disabled={!!subscription?.isActive}
+                  className={`w-full py-2.5 rounded-lg font-medium text-sm transition-all
+                    ${subscription?.isActive
+                      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                      : highlighted
+                        ? 'btn-primary'
+                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700'
+                    }`}
+                >
+                  {subscription?.isActive ? 'Plano já ativo' : 'Assinar agora'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* FAQ rápido */}
+      {!subscription?.isActive && (
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { q: 'Posso cancelar quando quiser?', a: 'Sim. Cancele a qualquer momento e mantenha o acesso até o fim do período pago.' },
+            { q: 'Quais formas de pagamento?', a: 'PIX, cartão de crédito e boleto bancário, processados via Asaas.' },
+            { q: 'Como funciona o período grátis?', a: 'Você teste sem pagar nada. O primeiro pagamento só ocorre ao fim do trial.' },
+          ].map(({ q, a }) => (
+            <div key={q} className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50">
+              <p className="text-sm font-medium text-zinc-200 mb-1">{q}</p>
+              <p className="text-xs text-zinc-500 leading-relaxed">{a}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Checkout modal */}
+      {selectedPlan && (
+        <CheckoutModal
+          plan={selectedPlan}
+          onClose={() => setSelectedPlan(null)}
+          onConfirm={handleCheckout}
+          loading={subscribe.isPending}
+        />
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,26 @@
+namespace Tuilow.SharedKernel.Domain.Common;
+
+/// <summary>
+/// Base de domínio para toda a plataforma. Reaproveitada de Tuilow.Domain.Common.Abstractions.Entity
+/// (comportamento preservado — apenas movida para o SharedKernel para uso por todos os módulos).
+/// </summary>
+public abstract class Entity
+{
+    public Guid Id { get; protected set; } = Guid.NewGuid();
+    public DateTime CreatedAt { get; protected set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; protected set; } = DateTime.UtcNow;
+
+    protected void Touch() => UpdatedAt = DateTime.UtcNow;
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not Entity other) return false;
+        if (ReferenceEquals(this, other)) return true;
+        if (GetType() != other.GetType()) return false;
+        return Id == other.Id;
+    }
+
+    public override int GetHashCode() => Id.GetHashCode();
+    public static bool operator ==(Entity? left, Entity? right) => left?.Equals(right) ?? right is null;
+    public static bool operator !=(Entity? left, Entity? right) => !(left == right);
+}

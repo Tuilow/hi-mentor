@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tuilow.Host.Api</RootNamespace>
+    <UserSecretsId>tuilow-api-secrets</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.4" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="9.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- SharedKernel -->
+    <ProjectReference Include="..\..\SharedKernel\Tuilow.SharedKernel.Domain\Tuilow.SharedKernel.Domain.csproj" />
+    <ProjectReference Include="..\..\SharedKernel\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />
+    <ProjectReference Include="..\..\SharedKernel\Tuilow.SharedKernel.Infrastructure\Tuilow.SharedKernel.Infrastructure.csproj" />
+    <!-- Modulos -->
+    <ProjectReference Include="..\..\Modules\IdentidadeAcesso\Tuilow.IdentidadeAcesso.Api\Tuilow.IdentidadeAcesso.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\Tuilow.Catalog.Api\Tuilow.Catalog.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Learning\Tuilow.Learning.Api\Tuilow.Learning.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Journey\Tuilow.Journey.Api\Tuilow.Journey.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Sales\Tuilow.Sales.Api\Tuilow.Sales.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Streaming\Tuilow.Streaming.Api\Tuilow.Streaming.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Finance\Tuilow.Finance.Api\Tuilow.Finance.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Payout\Tuilow.Payout.Api\Tuilow.Payout.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\CreatorStudio\Tuilow.CreatorStudio.Api\Tuilow.CreatorStudio.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Channel\Tuilow.Channel.Api\Tuilow.Channel.Api.csproj" />
+  </ItemGroup>
+</Project>

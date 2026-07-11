@@ -1,21 +1,22 @@
-# 🐕 DogMaster Pro — Plataforma SaaS de Adestramento Canino
+# 🎓 Tuilow — Plataforma de Cursos Online
 
-Sistema completo construído com **Clean Architecture, DDD, CQRS, ASP.NET Core 9 e Next.js 15**.
+Uma plataforma moderna onde pessoas, profissionais, especialistas e empresas podem criar, publicar, vender e
+gerenciar cursos online. Sistema completo construído com **Clean Architecture, DDD, CQRS, ASP.NET Core 9 e Next.js 15**.
 
 ---
 
 ## 🏗️ Arquitetura
 
 ```
-DogMasterPro/
+Tuilow/
 ├── src/
-│   ├── DogMaster.Domain/          # Entidades, VOs, Eventos de Domínio
-│   ├── DogMaster.Application/     # CQRS (Commands/Queries), Behaviors, Interfaces
-│   ├── DogMaster.Infrastructure/  # EF Core, JWT, Asaas, Cloudflare, Repositórios
-│   └── DogMaster.API/             # Controllers REST, Middleware, Program.cs
-│   └── DogMaster.Web/             # Frontend Next.js 15 + React 19 + Tailwind
+│   ├── Tuilow.Domain/          # Entidades, VOs, Eventos de Domínio
+│   ├── Tuilow.Application/     # CQRS (Commands/Queries), Behaviors, Interfaces
+│   ├── Tuilow.Infrastructure/  # EF Core, JWT, Asaas, Cloudflare, Repositórios
+│   └── Tuilow.API/             # Controllers REST, Middleware, Program.cs
+│   └── Tuilow.Web/             # Frontend Next.js 15 + React 19 + Tailwind
 ├── tests/
-│   └── DogMaster.Domain.Tests/    # Testes unitários xUnit + FluentAssertions
+│   └── Tuilow.Domain.Tests/    # Testes unitários xUnit + FluentAssertions
 ├── scripts/
 │   └── init-db.sql                # Criação dos schemas PostgreSQL
 ├── docker-compose.yml
@@ -49,7 +50,7 @@ Isso sobe: **API (porta 5000)**, **Frontend (porta 3000)**, **PostgreSQL (5432)*
 
 **Backend:**
 ```bash
-cd src/DogMaster.API
+cd src/Tuilow.API
 dotnet run
 # API disponível em https://localhost:7000
 # Swagger: https://localhost:7000/swagger
@@ -57,7 +58,7 @@ dotnet run
 
 **Frontend:**
 ```bash
-cd src/DogMaster.Web
+cd src/Tuilow.Web
 npm install
 cp .env.local.example .env.local
 npm run dev
@@ -67,15 +68,15 @@ npm run dev
 ### 4. Migrations EF Core
 
 ```bash
-cd src/DogMaster.Infrastructure
-dotnet ef migrations add InitialCreate --startup-project ../DogMaster.API
-dotnet ef database update --startup-project ../DogMaster.API
+cd src/Tuilow.Infrastructure
+dotnet ef migrations add InitialCreate --startup-project ../Tuilow.API
+dotnet ef database update --startup-project ../Tuilow.API
 ```
 
 ### 5. Rodar testes
 
 ```bash
-dotnet test tests/DogMaster.Domain.Tests/
+dotnet test tests/Tuilow.Domain.Tests/
 ```
 
 ---
@@ -105,7 +106,7 @@ dotnet test tests/DogMaster.Domain.Tests/
 - **Catalog** — Cursos, módulos, aulas, exercícios, anexos
 - **Learning** — Matrículas, progresso de aulas, certificados
 - **Subscription** — Planos, assinaturas Asaas, histórico de pagamentos
-- **DogProfile** — Perfil dos cães (raça, idade, objetivos)
+- **Profiles** — Perfis de aprendizado dos alunos (categoria, idade, metas)
 - **Streaming** — Vídeos no Cloudflare Stream
 - **Notifications** — Emails transacionais (MailKit)
 
@@ -136,8 +137,8 @@ dotnet test tests/DogMaster.Domain.Tests/
 | POST   | /api/v1/enrollments/{id}/progress     | Registrar progresso          |
 | GET    | /api/v1/subscriptions/plans           | Listar planos disponíveis    |
 | POST   | /api/v1/subscriptions                 | Assinar plano                |
-| GET    | /api/v1/dogs                          | Listar meus cães             |
-| POST   | /api/v1/dogs                          | Cadastrar cão                |
+| GET    | /api/v1/learner-profiles              | Listar meus perfis de aprendizado |
+| POST   | /api/v1/learner-profiles              | Cadastrar perfil de aprendizado   |
 | POST   | /api/v1/webhooks/asaas                | Webhook de pagamentos Asaas  |
 
 Documentação interativa completa: **http://localhost:5000/swagger**

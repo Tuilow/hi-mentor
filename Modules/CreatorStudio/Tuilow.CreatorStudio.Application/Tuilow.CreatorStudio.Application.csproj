@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tuilow.CreatorStudio.Application</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tuilow.CreatorStudio.Domain\Tuilow.CreatorStudio.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />
+    <!--
+      CreatorStudio é, por natureza, um contexto de ORQUESTRAÇÃO/COMPOSIÇÃO: a tela "Meus
+      Produtos" e o dashboard do produto agregam dados de Catalog (dados do produto),
+      Sales (vendas/assinaturas), Learning (alunos matriculados) e Finance (comissão vigente)
+      sem duplicar nenhuma dessas regras — só lê pelos repositórios já existentes de cada módulo
+      (mesmo padrão de acoplamento legítimo documentado em Finance/Payout).
+    -->
+    <ProjectReference Include="..\..\Catalog\Tuilow.Catalog.Domain\Tuilow.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\Sales\Tuilow.Sales.Domain\Tuilow.Sales.Domain.csproj" />
+    <ProjectReference Include="..\..\Learning\Tuilow.Learning.Domain\Tuilow.Learning.Domain.csproj" />
+    <ProjectReference Include="..\..\Finance\Tuilow.Finance.Domain\Tuilow.Finance.Domain.csproj" />
+  </ItemGroup>
+</Project>

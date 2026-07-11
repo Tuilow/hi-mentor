@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tuilow.Channel.Application</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tuilow.Channel.Domain\Tuilow.Channel.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão de CreatorStudio.Application): o Canal do Criador é a
+      vitrine de todos os cursos publicados do criador — precisa ler Catalog (lista de cursos)
+      e Learning (o que o visitante logado já comprou/matriculou, para pintar cadeado/liberado).
+      Nenhuma dessas regras é duplicada aqui, só composição de leitura pelos repositórios já
+      existentes de cada módulo.
+    -->
+    <ProjectReference Include="..\..\Catalog\Tuilow.Catalog.Domain\Tuilow.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\Learning\Tuilow.Learning.Domain\Tuilow.Learning.Domain.csproj" />
+  </ItemGroup>
+</Project>

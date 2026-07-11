@@ -1,0 +1,110 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/DogMaster.API/Dockerfile
+    image: dogmaster-api:latest
+    container_name: dogmaster_api
+    ports:
+      - "5000:8080"
+      - "5001:8081"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__Default=Host=db;Port=5432;Database=dogmaster;Username=postgres;Password=${DB_PASSWORD}
+      - Jwt__Secret=${JWT_SECRET}
+      - Jwt__Issuer=DogMasterPro
+      - Jwt__Audience=DogMasterPro
+      - Jwt__ExpirationMinutes=15
+      - Cloudflare__AccountId=${CF_ACCOUNT_ID}
+      - Cloudflare__ApiToken=${CF_API_TOKEN}
+      - Cloudflare__StreamSigningKey=${CF_STREAM_SIGNING_KEY}
+      - Asaas__BaseUrl=https://sandbox.asaas.com
+      - Asaas__ApiKey=${ASAAS_API_KEY}
+      - Asaas__WebhookSecret=${ASAAS_WEBHOOK_SECRET}
+      - Email__Host=${EMAIL_HOST}
+      - Email__Port=${EMAIL_PORT}
+      - Email__Username=${EMAIL_USERNAME}
+      - Email__Password=${EMAIL_PASSWORD}
+      - FrontendUrl=http://localhost:3000
+      - AllowedOrigins__0=http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - dogmaster_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    build:
+      context: ./src/DogMaster.Web
+      dockerfile: Dockerfile
+    image: dogmaster-web:latest
+    container_name: dogmaster_web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID=${CF_ACCOUNT_ID}
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - dogmaster_net
+
+  db:
+    image: postgres:16-alpine
+    container_name: dogmaster_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: dogmaster
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    restart: unless-stopped
+    networks:
+      - dogmaster_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dogmaster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dogmaster_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    networks:
+      - dogmaster_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+networks:
+  dogmaster_net:
+    driver: bridge
