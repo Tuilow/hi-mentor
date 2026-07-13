@@ -47,6 +47,30 @@ COPY ["Modules/Streaming/Tuilow.Streaming.Application/Tuilow.Streaming.Applicati
 COPY ["Modules/Streaming/Tuilow.Streaming.Infrastructure/Tuilow.Streaming.Infrastructure.csproj", "Modules/Streaming/Tuilow.Streaming.Infrastructure/"]
 COPY ["Modules/Streaming/Tuilow.Streaming.Api/Tuilow.Streaming.Api.csproj", "Modules/Streaming/Tuilow.Streaming.Api/"]
 
+# Modules/Finance
+COPY ["Modules/Finance/Tuilow.Finance.Domain/Tuilow.Finance.Domain.csproj", "Modules/Finance/Tuilow.Finance.Domain/"]
+COPY ["Modules/Finance/Tuilow.Finance.Application/Tuilow.Finance.Application.csproj", "Modules/Finance/Tuilow.Finance.Application/"]
+COPY ["Modules/Finance/Tuilow.Finance.Infrastructure/Tuilow.Finance.Infrastructure.csproj", "Modules/Finance/Tuilow.Finance.Infrastructure/"]
+COPY ["Modules/Finance/Tuilow.Finance.Api/Tuilow.Finance.Api.csproj", "Modules/Finance/Tuilow.Finance.Api/"]
+
+# Modules/Payout
+COPY ["Modules/Payout/Tuilow.Payout.Domain/Tuilow.Payout.Domain.csproj", "Modules/Payout/Tuilow.Payout.Domain/"]
+COPY ["Modules/Payout/Tuilow.Payout.Application/Tuilow.Payout.Application.csproj", "Modules/Payout/Tuilow.Payout.Application/"]
+COPY ["Modules/Payout/Tuilow.Payout.Infrastructure/Tuilow.Payout.Infrastructure.csproj", "Modules/Payout/Tuilow.Payout.Infrastructure/"]
+COPY ["Modules/Payout/Tuilow.Payout.Api/Tuilow.Payout.Api.csproj", "Modules/Payout/Tuilow.Payout.Api/"]
+
+# Modules/CreatorStudio
+COPY ["Modules/CreatorStudio/Tuilow.CreatorStudio.Domain/Tuilow.CreatorStudio.Domain.csproj", "Modules/CreatorStudio/Tuilow.CreatorStudio.Domain/"]
+COPY ["Modules/CreatorStudio/Tuilow.CreatorStudio.Application/Tuilow.CreatorStudio.Application.csproj", "Modules/CreatorStudio/Tuilow.CreatorStudio.Application/"]
+COPY ["Modules/CreatorStudio/Tuilow.CreatorStudio.Infrastructure/Tuilow.CreatorStudio.Infrastructure.csproj", "Modules/CreatorStudio/Tuilow.CreatorStudio.Infrastructure/"]
+COPY ["Modules/CreatorStudio/Tuilow.CreatorStudio.Api/Tuilow.CreatorStudio.Api.csproj", "Modules/CreatorStudio/Tuilow.CreatorStudio.Api/"]
+
+# Modules/Channel
+COPY ["Modules/Channel/Tuilow.Channel.Domain/Tuilow.Channel.Domain.csproj", "Modules/Channel/Tuilow.Channel.Domain/"]
+COPY ["Modules/Channel/Tuilow.Channel.Application/Tuilow.Channel.Application.csproj", "Modules/Channel/Tuilow.Channel.Application/"]
+COPY ["Modules/Channel/Tuilow.Channel.Infrastructure/Tuilow.Channel.Infrastructure.csproj", "Modules/Channel/Tuilow.Channel.Infrastructure/"]
+COPY ["Modules/Channel/Tuilow.Channel.Api/Tuilow.Channel.Api.csproj", "Modules/Channel/Tuilow.Channel.Api/"]
+
 # Host
 COPY ["Host/Tuilow.Host.Api/Tuilow.Host.Api.csproj", "Host/Tuilow.Host.Api/"]
 
