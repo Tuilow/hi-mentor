@@ -18,11 +18,22 @@ using Tuilow.Channel.Api;
 using Tuilow.Host.Api.Data;
 using Tuilow.Host.Api.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ─── HOSTING (Railway/contêiner) ───────────────────────────────────────────────
+// O Railway injeta a variável de ambiente PORT em runtime e espera que a aplicação
+// escute nela em 0.0.0.0. Sem isso, o Kestrel ficaria só na porta fixa da imagem (8080)
+// e o proxy do Railway não encontraria a aplicação.
+var railwayPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(railwayPort))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{railwayPort}");
+}
 
 // ─── SHARED KERNEL + MÓDULOS ──────────────────────────────────────────────────
 builder.Services.AddSharedKernel();
@@ -171,6 +182,18 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// O Railway (e proxies equivalentes) termina o TLS na borda e encaminha para o contêiner
+// em HTTP puro. Sem confiar em X-Forwarded-Proto aqui, UseHttpsRedirection abaixo acharia
+// que toda requisição chegou em HTTP e ficaria redirecionando para HTTPS infinitamente
+// (loop de redirect que quebra chamadas do front-end na Vercel).
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+};
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
@@ -185,8 +208,11 @@ app.MapHealthChecks("/health");
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var seedLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-    if (app.Environment.IsDevelopment())
-        await db.Database.MigrateAsync();
+    // Antes só rodava em Development. No Railway o ambiente é Production por padrão,
+    // então sem isso o banco nunca recebia as migrations e a API quebraria em qualquer
+    // endpoint que tocasse tabela nenhuma existiria. Aplicar migrations no start-up é
+    // seguro aqui (app single-instance, sem múltiplos deploys concorrentes).
+    await db.Database.MigrateAsync();
 
     await DbSeeder.SeedAsync(db, seedLogger, builder.Configuration);
 }
