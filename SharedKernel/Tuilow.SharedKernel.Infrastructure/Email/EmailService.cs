@@ -24,14 +24,15 @@ public sealed class EmailService(
     private readonly string _password = configuration["Email:Password"] ?? "";
     private readonly string _frontendUrl = configuration["FrontendUrl"] ?? "https://app.tuilow.com.br";
 
-    public async Task SendWelcomeAsync(string to, string firstName, string confirmationToken, CancellationToken ct = default)
+    public async Task SendWelcomeAsync(Guid userId, string to, string firstName, string confirmationToken, CancellationToken ct = default)
     {
-        var confirmUrl = $"{_frontendUrl}/confirmar-email?token={confirmationToken}";
+        var confirmUrl = $"{_frontendUrl}/confirmar-email?userId={userId}&token={confirmationToken}";
         var body = $"""
             <h2>Olá, {firstName}! Bem-vindo(a) à Tuilow 🎓</h2>
-            <p>Estamos empolgados em ter você aqui! Confirme seu e-mail para ativar sua conta:</p>
+            <p>Estamos empolgados em ter você aqui! Confirme seu e-mail e acesse sua área
+            (de aluno ou, se for o seu caso, de criador de cursos):</p>
             <a href="{confirmUrl}" style="background:#2563EB;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">
-                Confirmar E-mail
+                Confirmar E-mail e Acessar
             </a>
             <p>Se você não criou esta conta, ignore este e-mail.</p>
             """;

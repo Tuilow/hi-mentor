@@ -37,7 +37,7 @@ public sealed class RegisterUserCommandHandler(
 
         // E-mail de confirmação (assíncrono, não bloqueia resposta)
         _ = emailService.SendWelcomeAsync(
-            user.Email.Value, user.Profile.FirstName,
+            user.Id, user.Email.Value, user.Profile.FirstName,
             user.EmailConfirmationToken!, ct);
 
         var accessToken = jwtService.GenerateAccessToken(user);

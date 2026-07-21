@@ -7,7 +7,12 @@ namespace Tuilow.SharedKernel.Application.Interfaces;
 /// </summary>
 public interface IEmailService
 {
-    Task SendWelcomeAsync(string to, string firstName, string confirmationToken, CancellationToken ct = default);
+    /// <summary>
+    /// userId vai junto porque /auth/confirm-email exige UserId + Token juntos (não existe busca
+    /// de usuário por token de confirmação sozinho) — sem ele o link do e-mail de boas-vindas
+    /// não tinha como funcionar.
+    /// </summary>
+    Task SendWelcomeAsync(Guid userId, string to, string firstName, string confirmationToken, CancellationToken ct = default);
     Task SendPasswordResetAsync(string to, string firstName, string resetToken, CancellationToken ct = default);
     Task SendPaymentConfirmedAsync(string to, string firstName, decimal amount, CancellationToken ct = default);
     Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateUrl, CancellationToken ct = default);
