@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
-import { coursesApi, coursePurchasesApi } from '@/lib/api';
+import { coursesApi, coursePurchasesApi, enrollmentsApi } from '@/lib/api';
 import type { ProductDetail, InstructorCourseSummary } from '@/types';
 
 const levelLabel: Record<string, string> = {
@@ -154,7 +154,11 @@ function CheckoutModal({
  */
 export default function PublicSalesPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
+  // Tri-state (em vez de boolean simples): `null` = ainda não checou o localStorage (primeiro
+  // render/SSR), só depois vira `true`/`false`. Sem isso a checagem de matrícula abaixo correria
+  // o risco de tratar "ainda não sei se está logado" como "não está logado".
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const viewRecordedRef = useRef(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [processingCheckout, setProcessingCheckout] = useState(false);
@@ -173,6 +177,22 @@ export default function PublicSalesPage() {
     queryFn: () => coursesApi.getBySlug(slug).then(r => r.data),
     enabled: !!slug,
   });
+
+  // Esta é a página pública de divulgação (link direto/QR Code/embed da aba "Divulgar") — quem
+  // já é aluno matriculado pode cair aqui de novo (favorito antigo, busca, e-mail) e não deve ver
+  // a página de vendas/checkout de novo. GET /enrollments/courses/{id} devolve a matrícula se
+  // existir, ou erro (tratado como "não matriculado") caso contrário — mesmo padrão já usado em
+  // (dashboard)/cursos/[slug]/page.tsx.
+  const { data: enrollment, isLoading: enrollmentLoading } = useQuery({
+    queryKey: ['enrollment-progress', course?.id],
+    queryFn: () => enrollmentsApi.getProgress(course!.id).then(r => r.data).catch(() => null),
+    enabled: !!course?.id && isLoggedIn === true,
+  });
+  const isEnrolled = !!enrollment;
+
+  useEffect(() => {
+    if (isEnrolled) router.replace(`/cursos/${slug}`);
+  }, [isEnrolled, router, slug]);
 
   // Registra a visualização uma única vez (alimenta o card "Views" do dashboard do criador).
   useEffect(() => {
@@ -259,6 +279,21 @@ export default function PublicSalesPage() {
         <p className="text-4xl">😕</p>
         <p className="text-lg font-medium text-gray-700">Curso não encontrado</p>
         <Link href="/" className="text-brand-600 hover:underline text-sm">← Voltar para o início</Link>
+      </div>
+    );
+  }
+
+  // Aluno já matriculado: em vez de mostrar a página de vendas (mesmo que só por um instante
+  // enquanto o redirect do useEffect acima dispara), mostra um loading dedicado. Evita o "flash"
+  // do botão Comprar/checkout pra quem já é aluno.
+  if (isLoggedIn === true && (enrollmentLoading || isEnrolled)) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-3">
+        <svg className="animate-spin h-8 w-8 text-brand-600" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <p className="text-gray-500 text-sm">Redirecionando para o seu curso...</p>
       </div>
     );
   }
