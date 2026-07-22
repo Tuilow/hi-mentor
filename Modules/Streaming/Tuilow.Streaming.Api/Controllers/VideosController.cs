@@ -1,3 +1,4 @@
+using Tuilow.Streaming.Application.Commands.DeleteVideo;
 using Tuilow.Streaming.Application.Commands.GetVideoUploadUrl;
 using Tuilow.Streaming.Application.Commands.ImportExternalVideo;
 using Tuilow.Streaming.Application.Commands.LinkVideoToLesson;
@@ -72,6 +73,19 @@ public sealed class VideosController(ISender sender, ICurrentUserService current
             videoId, request.IsPreview), ct);
 
         return Ok(new { message = "Vídeo vinculado à aula com sucesso." });
+    }
+
+    /// <summary>
+    /// Remove um vídeo enviado/importado que ainda não foi vinculado a nenhuma aula (ex.:
+    /// descartar um vídeo com erro no download do YouTube, ou um vídeo importado por engano).
+    /// Bloqueia (com erro claro) se o vídeo já estiver vinculado a uma aula.
+    /// </summary>
+    [HttpDelete("{videoId:guid}")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> Delete(Guid videoId, CancellationToken ct)
+    {
+        await sender.Send(new DeleteVideoCommand(videoId, currentUser.UserId!.Value), ct);
+        return Ok(new { message = "Vídeo removido com sucesso." });
     }
 }
 

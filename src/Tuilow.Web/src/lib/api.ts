@@ -180,6 +180,7 @@ export const videosApi = {
   importExternal: (courseId: string, url: string, download?: boolean) =>
     api.post('/videos/import', { courseId, url, download }),
   listByCourse: (courseId: string) => api.get(`/videos/by-course/${courseId}`),
+  delete: (videoId: string) => api.delete(`/videos/${videoId}`),
 };
 
 export const materialsApi = {
