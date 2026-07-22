@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { coursesApi, enrollmentsApi } from '@/lib/api';
 import Link from 'next/link';
+import Hls from 'hls.js';
 
 interface PlayUrlResponse {
   lessonId: string;
@@ -16,13 +17,16 @@ interface PlayUrlResponse {
 }
 
 /**
- * Vídeos importados (YouTube/Vimeo/Drive/...) chegam do backend com a URL ORIGINAL colada pelo
- * criador (ex.: https://www.youtube.com/watch?v=abc123) — essa URL não é um arquivo de vídeo e
- * não funciona numa tag <video src="...">, precisa virar uma URL de EMBED (iframe) própria da
- * plataforma. Cloudflare Stream já vem pronto para iframe (ver checagem abaixo); os demais
- * precisam dessa conversão no front. Retorna null quando não há embed conhecido (Dropbox/
- * OneDrive não têm formato de embed de vídeo universal sem uma chamada de API adicional) — nesse
- * caso mostramos um link para abrir o vídeo na plataforma original em vez de tentar embutir.
+ * Vídeos importados sem download (YouTube/Vimeo/Drive) chegam do backend com a URL ORIGINAL
+ * colada pelo criador (ex.: https://www.youtube.com/watch?v=abc123) — essa URL não é um arquivo
+ * de vídeo e não funciona numa tag <video src="...">, precisa virar uma URL de EMBED (iframe)
+ * própria da plataforma. Retorna null quando não há embed conhecido (Dropbox/OneDrive não têm
+ * formato de embed de vídeo universal sem uma chamada de API adicional) — nesse caso mostramos
+ * um link para abrir o vídeo na plataforma original em vez de tentar embutir.
+ *
+ * Vídeos hospedados no Cloudflare Stream (upload direto ou baixado do YouTube) NÃO entram aqui
+ * — o backend já devolve um manifesto HLS (.m3u8), tratado como <video> comum (ver isHlsUrl
+ * abaixo), não como iframe — assim dá pra salvar/retomar o progresso do aluno.
  */
 function toEmbedUrl(url: string): string | null {
   const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
@@ -34,9 +38,12 @@ function toEmbedUrl(url: string): string | null {
   const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (driveMatch) return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
 
-  if (url.includes('cloudflarestream.com') || url.includes('videodelivery.net')) return url;
-
   return null;
+}
+
+/** Manifesto HLS do Cloudflare Stream — toca numa <video> comum via hls.js (ver useEffect abaixo). */
+function isHlsUrl(url: string): boolean {
+  return url.includes('.m3u8');
 }
 
 interface CourseDetail {
@@ -127,6 +134,30 @@ export default function LessonPlayerPage() {
     hasResumedRef.current = false;
     lastSavedAtRef.current = 0;
   }, [lessonId]);
+
+  // Cloudflare Stream devolve um manifesto HLS (.m3u8), não um arquivo de vídeo direto — a
+  // maioria dos navegadores (Chrome, Firefox, Edge) não sabe tocar isso nativamente numa
+  // <video src="...">, então usamos hls.js para decodificar o manifesto e alimentar a tag via
+  // Media Source Extensions. Safari já toca HLS nativamente, então nesse caso só setamos o src
+  // direto. Isso mantém o player como uma <video> comum (não um iframe), o que é o que permite
+  // ler currentTime e salvar/retomar o progresso do aluno.
+  useEffect(() => {
+    const video = videoRef.current;
+    const url = playData?.playbackUrl;
+    if (!video || !url || !isHlsUrl(url)) return;
+
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      return;
+    }
+
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      return () => hls.destroy();
+    }
+  }, [playData?.playbackUrl]);
 
   const saveProgress = (watchedSeconds: number, totalSeconds: number) => {
     if (!enrollmentProgress?.enrollmentId || !totalSeconds) return;
@@ -235,11 +266,12 @@ export default function LessonPlayerPage() {
                 {(() => {
                   const embedUrl = toEmbedUrl(playData.playbackUrl);
                   if (embedUrl) {
-                    // YouTube/Vimeo/Drive/Cloudflare Stream — todos tocam via iframe de embed.
+                    // YouTube/Vimeo/Drive importados sem download — tocam via iframe de embed.
                     // Não dá pra salvar/retomar posição aqui: o player fica isolado num outro
                     // domínio (iframe) e não expõe currentTime sem integrar a API própria de
-                    // cada plataforma (YouTube IFrame API, Vimeo Player.js etc.) — fora do
-                    // escopo desta correção, que cobre o caso mais comum (vídeo enviado direto).
+                    // cada plataforma (YouTube IFrame API, Vimeo Player.js etc.). Vídeos baixados
+                    // e hospedados no Cloudflare Stream NÃO caíem aqui — vão pelo caso da
+                    // <video> comum abaixo (manifesto HLS via hls.js).
                     return (
                       <iframe
                         src={embedUrl}
@@ -261,13 +293,15 @@ export default function LessonPlayerPage() {
                       </div>
                     );
                   }
-                  // Arquivo de vídeo direto (upload — Cloudflare Stream real ou mock local).
-                  // Único caso em que dá pra controlar currentTime diretamente — retoma de
-                  // resumeSeconds ao carregar e salva a posição periodicamente.
+                  // Arquivo de vídeo direto (upload/download — Cloudflare Stream real via HLS,
+                  // ou mock local servindo o arquivo puro). Único caso em que dá pra controlar
+                  // currentTime diretamente — retoma de resumeSeconds ao carregar e salva a
+                  // posição periodicamente. Para HLS o src é setado pelo useEffect (hls.js/Safari),
+                  // não pela prop — por isso fica undefined nesse caso.
                   return (
                     <video
                       ref={videoRef}
-                      src={playData.playbackUrl}
+                      src={isHlsUrl(playData.playbackUrl) ? undefined : playData.playbackUrl}
                       controls
                       autoPlay
                       className="w-full h-full"
@@ -392,9 +426,6 @@ export default function LessonPlayerPage() {
                                 <p className="text-xs text-gray-400 mt-0.5">
                                   {Math.floor(lesson.durationSeconds / 60)}min
                                 </p>
-                              )}
-                              {lesson.isPreview && (
-                                <span className="text-[10px] text-green-400">Preview</span>
                               )}
                             </div>
                           </Link>

@@ -46,18 +46,20 @@ public sealed class CloudflareStreamService(
     }
 
     /// <summary>
-    /// Retorna URL de playback.
-    /// Em dev (requireSignedURLs=false) usa URL pública do iframe.
-    /// Em produção, gere um par de chaves RS256 via API do Stream e implemente aqui.
+    /// Retorna URL de playback — manifesto HLS direto (não o iframe de embed do Cloudflare).
+    /// Isso permite que o front toque o vídeo numa tag &lt;video&gt; comum (com hls.js nos
+    /// navegadores sem suporte nativo a HLS) em vez de um iframe isolado — só assim dá pra ler
+    /// currentTime e salvar/retomar o progresso do aluno (o iframe não expõe isso sem integrar o
+    /// SDK do Cloudflare Stream Player). Requer requireSignedURLs = false (vídeo público) — mesma
+    /// premissa de antes; para tornar os vídeos privados, gere URLs assinadas via API do Stream.
     /// </summary>
     public Task<string> GetSignedPlaybackUrlAsync(
         string cloudflareVideoId,
         int expirationMinutes = 60,
         CancellationToken ct = default)
     {
-        // URL pública — funciona enquanto requireSignedURLs = false
         return Task.FromResult(
-            $"https://iframe.cloudflarestream.com/{cloudflareVideoId}");
+            $"https://videodelivery.net/{cloudflareVideoId}/manifest/video.m3u8");
     }
 
     public async Task DeleteVideoAsync(string cloudflareVideoId, CancellationToken ct = default)

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Streaming.Application.Interfaces;
 using Tuilow.Streaming.Domain.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -15,10 +16,17 @@ namespace Tuilow.Streaming.Infrastructure.BackgroundJobs;
 /// pipeline (transcodificação, thumbnail, duração, "pronto") já é automático via
 /// CloudflareStreamWebhookController, exatamente como em um upload comum via TUS. Roda no mesmo
 /// processo do Host.Api (sem infraestrutura de fila nova, ver YouTubeDownloadQueue).
+///
+/// Exceção: em Cloudflare:MockMode (dev local sem conta real do Cloudflare), não existe nenhum
+/// webhook de verdade chegando — MockStreamingService só salva o arquivo em mock-videos/{uid} e
+/// não há nada do lado de fora avisando "terminei de processar". Por isso, em mock mode, este
+/// worker já marca o vídeo como pronto na hora (mesma solução que o MockTusController usa para o
+/// fluxo de upload via TUS no navegador).
 /// </summary>
 public sealed class YouTubeDownloadWorker(
     YouTubeDownloadQueue queue,
     IServiceScopeFactory scopeFactory,
+    IConfiguration configuration,
     ILogger<YouTubeDownloadWorker> logger
 ) : BackgroundService
 {
@@ -65,6 +73,15 @@ public sealed class YouTubeDownloadWorker(
             }
 
             video.SetCloudflareVideoId(cloudflareVideoId);
+
+            if (configuration.GetValue<bool>("Cloudflare:MockMode"))
+            {
+                // Sem Cloudflare real, sem webhook — marca pronto direto (ver comentário na
+                // classe). Duração fixa de 60s só para a UI local não ficar sem valor nenhum;
+                // em produção (Cloudflare real) o webhook manda a duração de verdade.
+                video.MarkReady(durationSeconds: 60, thumbnailUrl: null);
+            }
+
             videoRepository.Update(video);
             await uow.SaveChangesAsync(ct);
 
