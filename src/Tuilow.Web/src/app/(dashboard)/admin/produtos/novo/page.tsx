@@ -312,6 +312,17 @@ function ProductWizard() {
     }
   };
 
+  const handleDeleteVideo = async (videoId: string) => {
+    try {
+      await videosApi.delete(videoId);
+      setVideos(v => v.filter(item => item.videoId !== videoId));
+      toast.success('Vídeo removido.');
+    } catch (err: unknown) {
+      const anyErr = err as { response?: { data?: { title?: string } } };
+      toast.error(anyErr.response?.data?.title ?? 'Não foi possível remover esse vídeo — ele já pode estar vinculado a uma aula.');
+    }
+  };
+
   // ─── Passo 3 ────────────────────────────────────────────────────────────
   const handleAddModule = async (title: string) => {
     if (!courseId || !title.trim()) return;
@@ -593,8 +604,13 @@ function ProductWizard() {
                       <span className="badge ml-auto bg-red-50 text-red-700">Erro ao baixar</span>
                     )}
                     {(!v.status || v.status === 'Ready') && (
-                      <span className="badge ml-auto">{v.source}</span>
+                      <span className={v.status === 'Error' ? 'badge' : 'badge ml-auto'}>{v.source}</span>
                     )}
+                    <button type="button" onClick={() => handleDeleteVideo(v.videoId)}
+                      title="Remover vídeo"
+                      className={`text-gray-400 hover:text-red-500 transition-colors px-1 ${v.status === 'Error' ? '' : 'ml-0'}`}>
+                      ✕
+                    </button>
                   </li>
                 ))}
               </ul>
