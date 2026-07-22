@@ -15,5 +15,6 @@ public sealed record VideoSummaryResponse(
     string Source,
     int? DurationSeconds,
     string? ThumbnailUrl,
-    bool IsLinkedToLesson
+    bool IsLinkedToLesson,
+    string Status
 );

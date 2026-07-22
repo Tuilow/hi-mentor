@@ -69,4 +69,32 @@ public sealed class CloudflareStreamService(
         if (response.StatusCode != System.Net.HttpStatusCode.NotFound)
             response.EnsureSuccessStatusCode();
     }
+
+    /// <summary>
+    /// Upload direto (não-TUS) — usado pelo YouTubeDownloadWorker depois de baixar o vídeo com
+    /// yt-dlp: o arquivo inteiro já está em disco, então um POST multipart simples é mais direto
+    /// que simular um cliente TUS no servidor. Mesmo endpoint aceita tanto "uid" (upload de
+    /// arquivo) quanto o direct_upload (TUS) usado no fluxo do navegador.
+    /// </summary>
+    public async Task<string> UploadFileAsync(Stream fileStream, string fileName, CancellationToken ct = default)
+    {
+        using var content = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(fileStream);
+        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("video/mp4");
+        content.Add(streamContent, "file", fileName);
+
+        var response = await httpClient.PostAsync(
+            $"/client/v4/accounts/{_accountId}/stream", content, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException(
+                $"Cloudflare Stream API (upload) retornou {(int)response.StatusCode}: {errorBody}");
+        }
+
+        var responseBody = await response.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(responseBody);
+        return doc.RootElement.GetProperty("result").GetProperty("uid").GetString()!;
+    }
 }

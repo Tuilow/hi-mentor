@@ -7,8 +7,20 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
+import { AxiosError } from 'axios';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { authApi } from '@/lib/api';
+
+// Mesmo padrão usado em outras páginas (ex: cursos/[slug]/page.tsx): o backend
+// (ExceptionHandlingMiddleware) devolve a mensagem real do erro em "title" (e
+// validações de campo em "errors"); "detail"/"message" cobrem outros formatos
+// (ex: ProblemDetails padrão do ASP.NET), caso apareçam.
+const errorMessage = (e: unknown, fallback: string) => {
+  const data = (e as AxiosError<{ title?: string; detail?: string; message?: string; errors?: Record<string, string[]> }>)
+    .response?.data;
+  const firstFieldError = data?.errors && Object.values(data.errors).flat()[0];
+  return firstFieldError ?? data?.detail ?? data?.title ?? data?.message ?? fallback;
+};
 
 const schema = z.object({
   firstName: z.string().min(2, 'Nome muito curto'),
@@ -42,8 +54,8 @@ function RegisterForm() {
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Conta criada! Verifique seu e-mail.');
       router.push(returnUrl || '/dashboard');
-    } catch {
-      toast.error('Erro ao criar conta. Verifique os dados.');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Erro ao criar conta. Verifique os dados.'));
     } finally {
       setLoading(false);
     }
@@ -61,8 +73,8 @@ function RegisterForm() {
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Conta criada com Google!');
       router.push(returnUrl || '/dashboard');
-    } catch {
-      toast.error('Falha no cadastro com Google. Tente novamente.');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Falha no cadastro com Google. Tente novamente.'));
     } finally {
       setGoogleLoading(false);
     }

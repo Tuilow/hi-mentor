@@ -55,4 +55,24 @@ public sealed class MockStreamingService(
 
     public Task DeleteVideoAsync(string cloudflareVideoId, CancellationToken ct = default)
         => Task.CompletedTask;
+
+    /// <summary>
+    /// Mock do upload direto usado pelo YouTubeDownloadWorker: salva o arquivo já baixado em
+    /// mock-videos/{uid} (mesma pasta/convenção do MockTusController), servido pelo mesmo GET
+    /// /api/v1/mock/videos/{uid}. Diferente do fluxo TUS, aqui não há webhook do Cloudflare pra
+    /// marcar o vídeo como pronto — em modo mock o vídeo fica em "Processing" (arquivo já
+    /// acessível via GetSignedPlaybackUrlAsync, mas o status na UI não avança sozinho). Isso é
+    /// aceitável: MockMode é só para desenvolvimento local sem credenciais reais do Cloudflare.
+    /// </summary>
+    public async Task<string> UploadFileAsync(Stream fileStream, string fileName, CancellationToken ct = default)
+    {
+        var fakeUid = Guid.NewGuid().ToString("N");
+        var mockVideosDir = Path.Combine(Directory.GetCurrentDirectory(), "mock-videos");
+        Directory.CreateDirectory(mockVideosDir);
+
+        await using var fs = new FileStream(Path.Combine(mockVideosDir, fakeUid), FileMode.Create, FileAccess.Write, FileShare.None);
+        await fileStream.CopyToAsync(fs, ct);
+
+        return fakeUid;
+    }
 }

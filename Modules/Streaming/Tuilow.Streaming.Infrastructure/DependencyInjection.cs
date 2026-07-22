@@ -1,5 +1,6 @@
 using Tuilow.Streaming.Application.Interfaces;
 using Tuilow.Streaming.Domain.Interfaces;
+using Tuilow.Streaming.Infrastructure.BackgroundJobs;
 using Tuilow.Streaming.Infrastructure.Repositories;
 using Tuilow.Streaming.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
@@ -39,8 +40,20 @@ public static class DependencyInjection
                 var apiToken = configuration["Cloudflare:ApiToken"];
                 if (!string.IsNullOrWhiteSpace(apiToken))
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiToken}");
+
+                // Timeout padrão do HttpClientFactory é 100s — curto demais pro upload direto
+                // (UploadFileAsync) de um vídeo baixado do YouTube, que pode ter várias
+                // centenas de MB. Só afeta esse client (Streaming), não o resto da aplicação.
+                client.Timeout = TimeSpan.FromMinutes(30);
             });
         }
+
+        // Fila (em memória) + worker do "baixar vídeo do YouTube e hospedar no Cloudflare
+        // Stream" — YouTubeDownloadQueue precisa ser singleton (mesma instância entre quem
+        // escreve — o handler de importação, por requisição — e quem lê — o worker).
+        services.AddSingleton<YouTubeDownloadQueue>();
+        services.AddSingleton<IYouTubeDownloadQueue>(sp => sp.GetRequiredService<YouTubeDownloadQueue>());
+        services.AddHostedService<YouTubeDownloadWorker>();
 
         return services;
     }

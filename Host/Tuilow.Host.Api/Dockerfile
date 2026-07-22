@@ -3,6 +3,16 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
+# yt-dlp + ffmpeg — usados pelo YouTubeDownloadWorker (Streaming) para baixar vídeos do YouTube
+# quando o criador marca a opção "baixar vídeo" no passo 2 do assistente. ffmpeg via apt (junta
+# áudio+vídeo quando o yt-dlp baixa formatos separados); yt-dlp via binário standalone oficial
+# (não depende de Python instalado separadamente).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl \
+    && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp \
+    && rm -rf /var/lib/apt/lists/*
+
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 

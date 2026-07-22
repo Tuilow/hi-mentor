@@ -36,10 +36,15 @@ public sealed class GetLessonPlayUrlQueryHandler(
         var video = await videoRepository.GetByIdAsync(lesson.VideoId.Value, ct)
             ?? throw new NotFoundException("Vídeo", lesson.VideoId.Value);
 
-        // Vídeo importado de plataforma externa (YouTube/Vimeo/Drive/...) já nasce Ready, sem
-        // CloudflareVideoId — a "URL de playback" é a própria URL externa (embed), não passa
-        // pelo streamingService (que só sabe assinar URLs do Cloudflare Stream/mock).
-        var isExternal = video.Source != VideoSource.Upload;
+        // Vídeo importado de plataforma externa (YouTube/Vimeo/Drive/...) sem pedido de download
+        // já nasce Ready, sem CloudflareVideoId — a "URL de playback" é a própria URL externa
+        // (embed), não passa pelo streamingService (que só sabe assinar URLs do Cloudflare
+        // Stream/mock). Já um vídeo do YouTube BAIXADO (checkbox "baixar vídeo") ganha um
+        // CloudflareVideoId assim que o YouTubeDownloadWorker termina de subir o arquivo — a
+        // partir daí ele tem que ser tratado como um vídeo "nosso" (Cloudflare), não mais como
+        // link externo, senão o aluno continuaria vendo a URL do YouTube mesmo depois do vídeo
+        // já estar hospedado na plataforma.
+        var isExternal = video.Source != VideoSource.Upload && string.IsNullOrEmpty(video.CloudflareVideoId);
 
         if (!isExternal && string.IsNullOrEmpty(video.CloudflareVideoId))
             throw new BusinessException("O vídeo ainda está sendo processado. Tente novamente em instantes.");

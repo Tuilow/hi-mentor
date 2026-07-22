@@ -68,6 +68,7 @@ interface LocalVideo {
   title: string;
   source: string;
   durationSeconds?: number | null;
+  status?: string;
 }
 
 interface TestimonialDraft {
@@ -106,6 +107,7 @@ function ProductWizard() {
   const [videos, setVideos] = useState<LocalVideo[]>([]);
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
+  const [downloadVideo, setDownloadVideo] = useState(false);
 
   // Passo 3
   const [modules, setModules] = useState<ModuleDetail[]>([]);
@@ -137,11 +139,30 @@ function ProductWizard() {
   useEffect(() => {
     if (!courseId) return;
     videosApi.listByCourse(courseId).then(({ data }) => {
-      setVideos(data.map((v: { videoId: string; title: string | null; source: string; durationSeconds: number | null }) => ({
-        videoId: v.videoId, title: v.title ?? '(sem título)', source: v.source, durationSeconds: v.durationSeconds,
+      setVideos(data.map((v: { videoId: string; title: string | null; source: string; durationSeconds: number | null; status?: string }) => ({
+        videoId: v.videoId, title: v.title ?? '(sem título)', source: v.source, durationSeconds: v.durationSeconds, status: v.status,
       })));
     }).catch(() => { /* melhor deixar a lista vazia do que travar o assistente */ });
   }, [courseId]);
+
+  // Enquanto algum vídeo estiver "Baixando..."/"Processando" (checkbox de download do YouTube
+  // marcado), consulta a lista de novo a cada poucos segundos pra atualizar o status na tela —
+  // sem isso, o criador não teria nenhum feedback de quando o download termina.
+  useEffect(() => {
+    if (!courseId) return;
+    const hasPending = videos.some(v => v.status === 'Uploading' || v.status === 'Processing');
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      videosApi.listByCourse(courseId).then(({ data }) => {
+        setVideos(data.map((v: { videoId: string; title: string | null; source: string; durationSeconds: number | null; status?: string }) => ({
+          videoId: v.videoId, title: v.title ?? '(sem título)', source: v.source, durationSeconds: v.durationSeconds, status: v.status,
+        })));
+      }).catch(() => { /* próxima tentativa resolve */ });
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [courseId, videos]);
 
   // Hidrata o assistente ao editar um rascunho existente
   useEffect(() => {
@@ -244,13 +265,18 @@ function ProductWizard() {
     if (!importUrl.trim() || !courseId) return;
     setImporting(true);
     try {
-      const { data } = await videosApi.importExternal(courseId, importUrl.trim());
+      const { data } = await videosApi.importExternal(courseId, importUrl.trim(), downloadVideo);
       setVideos(v => [...v, {
         videoId: data.videoId, title: data.title ?? importUrl, source: data.source,
-        durationSeconds: data.durationSeconds,
+        durationSeconds: data.durationSeconds, status: data.status,
       }]);
       setImportUrl('');
-      toast.success('Vídeo importado com sucesso.');
+      setDownloadVideo(false);
+      toast.success(
+        data.status === 'Uploading'
+          ? 'Baixando o vídeo do YouTube — acompanhe o status na lista abaixo.'
+          : 'Vídeo importado com sucesso.'
+      );
     } catch {
       toast.error('Não foi possível importar esse vídeo. Verifique a URL.');
     } finally {
@@ -533,6 +559,15 @@ function ProductWizard() {
               </button>
             </div>
 
+            {/youtube\.com|youtu\.be/.test(importUrl) && (
+              <label className="flex items-start gap-2 text-sm text-gray-600 -mt-2">
+                <input type="checkbox" className="mt-0.5" checked={downloadVideo}
+                  onChange={e => setDownloadVideo(e.target.checked)} />
+                Baixar o vídeo e hospedar na plataforma (recomendado — o aluno assiste sem sair
+                daqui e sem ver sugestões do YouTube; pode levar alguns minutos)
+              </label>
+            )}
+
             <div className="flex items-center gap-2">
               <div className="divider flex-1" /> <span className="text-xs text-gray-400">ou</span> <div className="divider flex-1" />
             </div>
@@ -548,7 +583,18 @@ function ProductWizard() {
                 {videos.map(v => (
                   <li key={v.videoId} className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2">
                     <Video className="w-4 h-4 text-brand-600" /> {v.title}
-                    <span className="badge ml-auto">{v.source}</span>
+                    {(v.status === 'Uploading' || v.status === 'Processing') && (
+                      <span className="badge ml-auto flex items-center gap-1 bg-amber-50 text-amber-700">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        {v.status === 'Uploading' ? 'Baixando do YouTube...' : 'Processando...'}
+                      </span>
+                    )}
+                    {v.status === 'Error' && (
+                      <span className="badge ml-auto bg-red-50 text-red-700">Erro ao baixar</span>
+                    )}
+                    {(!v.status || v.status === 'Ready') && (
+                      <span className="badge ml-auto">{v.source}</span>
+                    )}
                   </li>
                 ))}
               </ul>

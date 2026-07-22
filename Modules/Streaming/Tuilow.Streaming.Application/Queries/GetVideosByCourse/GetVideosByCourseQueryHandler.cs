@@ -31,6 +31,7 @@ public sealed class GetVideosByCourseQueryHandler(
             v.Source.ToString(),
             v.DurationSeconds,
             v.ThumbnailUrl,
-            linkedVideoIds.Contains(v.Id)));
+            linkedVideoIds.Contains(v.Id),
+            v.Status.ToString()));
     }
 }

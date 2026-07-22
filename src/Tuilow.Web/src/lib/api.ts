@@ -131,7 +131,7 @@ export const authApi = {
   login: (data: LoginRequest) => api.post('/auth/login', data),
   googleLogin: (idToken: string) => api.post('/auth/google', { idToken }),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
-  confirmEmail: (userId: string, token: string) => api.post('/auth/confirm-email', { userId, token }),
+  confirmEmail: (token: string) => api.post('/auth/confirm-email', { token }),
   me: () => api.get('/auth/me'),
   // Edita nome/telefone/bio/avatar — usado, entre outras telas, pelo editor do Canal do Criador.
   updateProfile: (data: {
@@ -177,7 +177,8 @@ export const videosApi = {
   getUploadUrl: (courseId: string) => api.post('/videos/upload-url', { courseId }),
   linkVideo: (videoId: string, data: { courseId: string; moduleId: string; lessonId: string; isPreview?: boolean }) =>
     api.post(`/videos/${videoId}/link-lesson`, data),
-  importExternal: (courseId: string, url: string) => api.post('/videos/import', { courseId, url }),
+  importExternal: (courseId: string, url: string, download?: boolean) =>
+    api.post('/videos/import', { courseId, url, download }),
   listByCourse: (courseId: string) => api.get(`/videos/by-course/${courseId}`),
 };
 

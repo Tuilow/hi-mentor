@@ -63,6 +63,32 @@ public sealed class Video : AggregateRoot
         return video;
     }
 
+    /// <summary>
+    /// Vídeo do YouTube que o criador pediu para BAIXAR e hospedar na plataforma (checkbox no
+    /// passo 2 do assistente), em vez de só referenciar o link (CreateFromExternal). Diferente
+    /// de CreateFromExternal: nasce Uploading (não Ready) e IsProtected=true — o
+    /// YouTubeDownloadWorker baixa o arquivo e chama SetCloudflareVideoId, e daí em diante o
+    /// vídeo segue o mesmo ciclo de vida de um upload comum (Processing → Ready via webhook do
+    /// Cloudflare). ExternalUrl/ExternalId/Title continuam preenchidos com a URL original, só
+    /// como referência/auditoria de onde o conteúdo veio.
+    /// </summary>
+    public static Video CreateDownloading(
+        VideoSource source, string externalUrl, string? externalId, string? title, Guid? courseId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalUrl);
+
+        return new Video
+        {
+            Source = source,
+            ExternalUrl = externalUrl,
+            ExternalId = externalId,
+            Title = title,
+            Status = VideoStatus.Uploading,
+            IsProtected = true, // vai virar conteúdo hospedado (e protegido) no Cloudflare Stream
+            CourseId = courseId
+        };
+    }
+
     public void SetCloudflareVideoId(string videoId)
     {
         CloudflareVideoId = videoId;

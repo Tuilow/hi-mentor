@@ -25,4 +25,12 @@ public interface IStreamingService
 
     /// <summary>Remove o vídeo do Cloudflare Stream.</summary>
     Task DeleteVideoAsync(string cloudflareVideoId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sobe um arquivo já em disco/memória diretamente pro Cloudflare Stream, do lado do
+    /// servidor — usado pelo YouTubeDownloadWorker (o vídeo já foi baixado com yt-dlp; não faz
+    /// sentido reenviar via TUS pelo navegador). Retorna o uid do vídeo no Cloudflare Stream,
+    /// mesmo formato usado em DirectUploadResult.CloudflareVideoId.
+    /// </summary>
+    Task<string> UploadFileAsync(Stream fileStream, string fileName, CancellationToken ct = default);
 }
