@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -31,7 +32,45 @@ const currency = (v: number) =>
 export default function MeusProdutosPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [openMenu, setOpenMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // O menu "⋮" é renderizado num portal (fora da tabela) porque a tabela tem overflow-x-auto
+  // (necessário pro scroll horizontal em telas estreitas) — um dropdown absolute dentro dela
+  // ficava cortado/rolando junto com a tabela em vez de flutuar por cima. Fecha ao clicar fora
+  // ou rolar a página (a posição é calculada uma vez, em pixels da viewport, e não acompanha
+  // scroll — mais simples e seguro do que recalcular, já que é raro rolar com o menu aberto).
+  useEffect(() => {
+    if (!openMenu) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const button = menuButtonRefs.current[openMenu.id];
+      if (menuRef.current?.contains(e.target as Node)) return;
+      if (button?.contains(e.target as Node)) return;
+      setOpenMenu(null);
+    };
+    const handleScroll = () => setOpenMenu(null);
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [openMenu]);
+
+  const toggleMenu = (productId: string) => {
+    if (openMenu?.id === productId) {
+      setOpenMenu(null);
+      return;
+    }
+    const button = menuButtonRefs.current[productId];
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    // w-48 = 12rem = 192px — alinha a borda direita do menu com a borda direita do botão.
+    setOpenMenu({ id: productId, top: rect.bottom + 4, left: rect.right - 192 });
+  };
 
   const { data: products = [], isLoading, error } = useQuery<ProductListItem[]>({
     queryKey: ['my-products'],
@@ -146,53 +185,12 @@ export default function MeusProdutosPage() {
                   <td className="py-3 pr-4 text-right text-gray-700">{currency(product.revenueGenerated)}</td>
                   <td className="py-3 relative">
                     <button
-                      onClick={() => setOpenMenuId(openMenuId === product.id ? null : product.id)}
+                      ref={el => { menuButtonRefs.current[product.id] = el; }}
+                      onClick={() => toggleMenu(product.id)}
                       className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
-                    {openMenuId === product.id && (
-                      <div
-                        className="absolute right-0 top-8 z-10 w-48 bg-white border border-gray-200
-                                   rounded-xl shadow-lg py-1"
-                        onMouseLeave={() => setOpenMenuId(null)}
-                      >
-                        <Link
-                          href={`/admin/produtos/novo?courseId=${product.id}`}
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <Pencil className="w-3.5 h-3.5" /> Editar
-                        </Link>
-                        {product.status === 'Published' && (
-                          <Link
-                            href={`/admin/produtos/${product.id}/dashboard`}
-                            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <BarChart3 className="w-3.5 h-3.5" /> Dashboard
-                          </Link>
-                        )}
-                        <button
-                          onClick={() => { duplicateMutation.mutate(product.id); setOpenMenuId(null); }}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <Copy className="w-3.5 h-3.5" /> Duplicar
-                        </button>
-                        {product.status !== 'Archived' && (
-                          <button
-                            onClick={() => { archiveMutation.mutate(product.id); setOpenMenuId(null); }}
-                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <Archive className="w-3.5 h-3.5" /> Arquivar
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { handleDelete(product); setOpenMenuId(null); }}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Excluir
-                        </button>
-                      </div>
-                    )}
                   </td>
                 </tr>
               ))}
@@ -204,6 +202,58 @@ export default function MeusProdutosPage() {
       <p className="text-xs text-gray-400 mt-6 flex items-center gap-1.5">
         <Rocket className="w-3.5 h-3.5" /> Publique produtos ilimitados, sem mensalidade — a Tuilow só cobra uma comissão sobre cada venda.
       </p>
+
+      {openMenu && typeof document !== 'undefined' && createPortal(
+        (() => {
+          const product = products.find(p => p.id === openMenu.id);
+          if (!product) return null;
+          return (
+            <div
+              ref={menuRef}
+              style={{ position: 'fixed', top: openMenu.top, left: openMenu.left }}
+              className="z-50 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1"
+            >
+              <Link
+                href={`/admin/produtos/novo?courseId=${product.id}`}
+                onClick={() => setOpenMenu(null)}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Editar
+              </Link>
+              {product.status === 'Published' && (
+                <Link
+                  href={`/admin/produtos/${product.id}/dashboard`}
+                  onClick={() => setOpenMenu(null)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" /> Dashboard
+                </Link>
+              )}
+              <button
+                onClick={() => { duplicateMutation.mutate(product.id); setOpenMenu(null); }}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Copy className="w-3.5 h-3.5" /> Duplicar
+              </button>
+              {product.status !== 'Archived' && (
+                <button
+                  onClick={() => { archiveMutation.mutate(product.id); setOpenMenu(null); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <Archive className="w-3.5 h-3.5" /> Arquivar
+                </button>
+              )}
+              <button
+                onClick={() => { handleDelete(product); setOpenMenu(null); }}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Excluir
+              </button>
+            </div>
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 }
