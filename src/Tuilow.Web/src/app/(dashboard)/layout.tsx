@@ -20,6 +20,13 @@ const adminNavItems = [
   { href: '/estudio',        label: 'Estúdio do Criador', icon: '🎙️' },
 ];
 
+// Painel do dono da plataforma — distinto da área "Administração" do Criador acima (que apesar
+// do nome é a área de gestão de produtos do próprio Criador, não do dono do Tuilow).
+const platformNavItems = [
+  { href: '/plataforma',          label: 'Visão Geral', icon: '📊' },
+  { href: '/plataforma/usuarios', label: 'Usuários',    icon: '👥' },
+];
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
@@ -48,7 +55,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
     : '?';
 
-  const isAdmin = user?.roles?.includes('Admin') || user?.roles?.includes('Creator');
+  // Separado em duas flags: isCreator controla a área "Administração" (produtos/cursos do
+  // próprio Criador, nome legado); isPlatformAdmin controla a nova área "Plataforma" (painel do
+  // dono do Tuilow — gestão de todos os usuários). Antes eram conflados em um único isAdmin,
+  // o que fazia um Criador comum ver conteúdo que deveria ser exclusivo do dono da plataforma.
+  const isCreator = user?.roles?.includes('Creator');
+  const isPlatformAdmin = user?.roles?.includes('Admin');
 
   const NavLink = ({ href, label, icon }: { href: string; label: string; icon: string }) => {
     const active = pathname === href || pathname.startsWith(href + '/');
@@ -100,8 +112,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <NavLink key={item.href} {...item} />
           ))}
 
-          {/* Admin section */}
-          {isAdmin && (
+          {/* Admin section (Criador) */}
+          {isCreator && (
             <>
               <div className="pt-4 pb-1">
                 <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -109,6 +121,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </p>
               </div>
               {adminNavItems.map(item => (
+                <NavLink key={item.href} {...item} />
+              ))}
+            </>
+          )}
+
+          {/* Platform section (dono da plataforma) */}
+          {isPlatformAdmin && (
+            <>
+              <div className="pt-4 pb-1">
+                <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Plataforma
+                </p>
+              </div>
+              {platformNavItems.map(item => (
                 <NavLink key={item.href} {...item} />
               ))}
             </>
@@ -129,9 +155,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <p className="text-xs text-gray-400 truncate">{user?.email}</p>
             </div>
           </div>
-          {isAdmin && (
+          {(isCreator || isPlatformAdmin) && (
             <p className="text-xs text-accent-600 font-medium px-1 mb-2">
-              {user?.roles?.includes('Admin') ? '👑 Administrador' : '🎬 Criador de conteúdo'}
+              {isPlatformAdmin ? '👑 Administrador' : '🎬 Criador de conteúdo'}
             </p>
           )}
           <button

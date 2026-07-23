@@ -14,5 +14,12 @@
   <ItemGroup>
     <ProjectReference Include="..\Tuilow.IdentidadeAcesso.Domain\Tuilow.IdentidadeAcesso.Domain.csproj" />
     <ProjectReference Include="..\..\..\SharedKernel\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />
+    <!-- Acoplamento legítimo: o painel do dono da plataforma (GetPlatformStatsQuery) precisa
+         contar cursos publicados e vídeos, e a exclusão de conta em cascata (DeleteUserCommand)
+         precisa enumerar e apagar os cursos/vídeos do criador excluído — mesma relação de negócio
+         já usada por Streaming.Application ao referenciar Catalog.Domain no DeleteVideoCommandHandler. -->
+    <ProjectReference Include="..\..\Catalog\Tuilow.Catalog.Domain\Tuilow.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\Streaming\Tuilow.Streaming.Domain\Tuilow.Streaming.Domain.csproj" />
+    <ProjectReference Include="..\..\Streaming\Tuilow.Streaming.Application\Tuilow.Streaming.Application.csproj" />
   </ItemGroup>
 </Project>

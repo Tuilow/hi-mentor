@@ -296,19 +296,22 @@ export const channelApi = {
 
 // "Meus Perfis" (learnerProfilesApi) removido temporariamente da experiência do usuário — era
 // um conceito de perfil de aprendizado sem relação com o modelo de negócio atual. O módulo
-// backend (Journey) foi preservado intacto, só desligado do pipeline (ver Host/Program.cs).
+// backend (Journey) foi preserva
 
-// ─── Types ───────────────────────────────────────────────────────
-interface RegisterRequest {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-}
-interface LoginRequest { email: string; password: string; }
-interface ListCoursesParams {
-  level?: string;
+// Painel do dono da plataforma — listagem/gestão de usuários (ativar, suspender, excluir) e
+// visão geral de estatísticas. Ver AdminUsersController (api/v1/admin/users).
+export interface ListUsersParams {
   search?: string;
+  role?: string;
+  status?: string;
   page?: number;
   pageSize?: number;
 }
+
+export const adminUsersApi = {
+  list: (params?: ListUsersParams) => api.get('/admin/users', { params }),
+  getStats: () => api.get('/admin/users/stats'),
+  suspend: (userId: string) => api.put(`/admin/users/${userId}/suspend`),
+  reactivate: (userId: string) => api.put(`/admin/users/${userId}/reactivate`),
+  delete: (userId: string) => api.delete(`/admin/users/${userId}`),
+};

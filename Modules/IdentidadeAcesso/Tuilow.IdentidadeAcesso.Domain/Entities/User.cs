@@ -228,9 +228,36 @@ public sealed class User : AggregateRoot
     public bool HasRole(string roleName) =>
         _userRoles.Any(ur => string.Equals(ur.Role.Name, roleName, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// Suspende a conta (bloqueia login) e revoga qualquer sessão ativa — sem revogar os
+    /// refresh tokens, a pessoa continuaria logada até o token expirar naturalmente.
+    /// </summary>
     public void Suspend()
     {
         Status = UserStatus.Suspended;
+        foreach (var rt in _refreshTokens.Where(t => t.IsActive))
+            rt.Revoke();
+        Touch();
+    }
+
+    /// <summary>Reverte uma suspensão (ou reativa uma conta previamente excluída) — volta a poder logar.</summary>
+    public void Reactivate()
+    {
+        Status = UserStatus.Active;
+        Touch();
+    }
+
+    /// <summary>
+    /// Exclusão via painel do dono da plataforma: soft-delete (preserva a linha no banco para
+    /// histórico financeiro/fiscal — ver PlatformFeeConfiguration, comissões, compras já feitas),
+    /// bloqueia login e revoga qualquer sessão ativa. Vídeos/cursos são tratados à parte por
+    /// DeleteUserCommandHandler (Streaming/Catalog), não é responsabilidade do agregado User.
+    /// </summary>
+    public void MarkDeleted()
+    {
+        Status = UserStatus.Deleted;
+        foreach (var rt in _refreshTokens.Where(t => t.IsActive))
+            rt.Revoke();
         Touch();
     }
 }
