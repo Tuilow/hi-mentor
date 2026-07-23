@@ -4,6 +4,21 @@ export interface AuthTokens {
   expiresIn: number;
 }
 
+// Corpo de POST /auth/register — reflete o formulário em app/(auth)/registro/page.tsx
+// (que envia todos os campos do schema exceto confirmPassword).
+export interface RegisterRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+}
+
+// Corpo de POST /auth/login — reflete o formulário em app/(auth)/login/page.tsx.
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
 export type RoleName = 'Student' | 'Creator' | 'Admin' | 'ChannelMember';
 
 export interface UserProfile {

@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import type { RegisterRequest, LoginRequest } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 
@@ -145,6 +146,11 @@ export const authApi = {
   consumeMagicLink: (token: string) => api.post('/auth/magic-link/consume', { token }),
   refreshToken: (refreshToken: string) => api.post('/auth/refresh-token', { refreshToken }),
 };
+
+export interface ListCoursesParams {
+  search?: string;
+  level?: string;
+}
 
 export const coursesApi = {
   list: (params?: ListCoursesParams) => api.get('/courses', { params }),
