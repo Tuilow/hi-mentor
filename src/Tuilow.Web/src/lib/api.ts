@@ -131,7 +131,8 @@ export const authApi = {
   login: (data: LoginRequest) => api.post('/auth/login', data),
   googleLogin: (idToken: string) => api.post('/auth/google', { idToken }),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
-  confirmEmail: (token: string) => api.post('/auth/confirm-email', { token }),
+  // Backend exige userId + token juntos (ConfirmEmailCommand) — ver app/confirmar-email/page.tsx.
+  confirmEmail: (userId: string, token: string) => api.post('/auth/confirm-email', { userId, token }),
   me: () => api.get('/auth/me'),
   // Edita nome/telefone/bio/avatar — usado, entre outras telas, pelo editor do Canal do Criador.
   updateProfile: (data: {
