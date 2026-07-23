@@ -132,6 +132,11 @@ export const authApi = {
   login: (data: LoginRequest) => api.post('/auth/login', data),
   googleLogin: (idToken: string) => api.post('/auth/google', { idToken }),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  // Consome o token do link de "/redefinir-senha?token=..." enviado por e-mail (ver
+  // EmailService.SendPasswordResetAsync). Só token + nova senha — sem userId, diferente de
+  // confirmEmail, porque não há sessão nem userId disponível nesse fluxo.
+  resetPassword: (token: string, newPassword: string) =>
+    api.post('/auth/reset-password', { token, newPassword }),
   // Backend exige userId + token juntos (ConfirmEmailCommand) — ver app/confirmar-email/page.tsx.
   confirmEmail: (userId: string, token: string) => api.post('/auth/confirm-email', { userId, token }),
   me: () => api.get('/auth/me'),

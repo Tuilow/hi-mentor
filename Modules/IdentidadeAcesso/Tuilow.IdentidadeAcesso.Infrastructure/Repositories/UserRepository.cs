@@ -86,6 +86,14 @@ public sealed class UserRepository(DbContext context) : IUserRepository
     public async Task AddMagicLinkTokenAsync(MagicLinkToken token, CancellationToken ct = default) =>
         await context.Set<MagicLinkToken>().AddAsync(token, ct);
 
+    // PasswordResetToken é uma coluna simples do próprio User (não uma coleção filha como
+    // MagicLinkTokens), então a busca é direta pelo campo — mesmo padrão de GetByEmailAsync.
+    public async Task<User?> GetByPasswordResetTokenAsync(string token, CancellationToken ct = default) =>
+        await context.Set<User>()
+            .Include(u => u.Profile)
+            .Include(u => u.UserRoleAssignments).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.PasswordResetToken == token, ct);
+
     /// <summary>
     /// Listagem paginada do painel do dono da plataforma. Inclui RefreshTokens porque a query
     /// handler (camada de aplicação) calcula o "último login" a partir do CreatedAt mais recente

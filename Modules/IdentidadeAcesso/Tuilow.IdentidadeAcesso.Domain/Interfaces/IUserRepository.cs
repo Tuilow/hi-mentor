@@ -17,6 +17,13 @@ public interface IUserRepository : IRepository<User>
     Task AddMagicLinkTokenAsync(MagicLinkToken token, CancellationToken ct = default);
 
     /// <summary>
+    /// Localiza o usuário pelo token de redefinição de senha (ver User.RequestPasswordReset) —
+    /// o link do e-mail carrega só o token, sem UserId, então a busca precisa ser por token
+    /// sozinho (mesmo padrão de GetByMagicLinkTokenAsync).
+    /// </summary>
+    Task<User?> GetByPasswordResetTokenAsync(string token, CancellationToken ct = default);
+
+    /// <summary>
     /// Listagem paginada para o painel do dono da plataforma — inclui roles e refresh tokens
     /// (usados pela query handler para calcular o "último login" de cada usuário). Busca por
     /// e-mail ou nome/sobrenome (case-insensitive), filtro opcional por role e por status.

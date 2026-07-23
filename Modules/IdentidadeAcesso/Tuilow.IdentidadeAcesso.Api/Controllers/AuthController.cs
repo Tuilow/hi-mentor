@@ -6,6 +6,7 @@ using Tuilow.IdentidadeAcesso.Application.Commands.GoogleLogin;
 using Tuilow.IdentidadeAcesso.Application.Commands.LoginUser;
 using Tuilow.IdentidadeAcesso.Application.Commands.RefreshToken;
 using Tuilow.IdentidadeAcesso.Application.Commands.RegisterUser;
+using Tuilow.IdentidadeAcesso.Application.Commands.ResetPassword;
 using Tuilow.IdentidadeAcesso.Application.Commands.UpdateProfile;
 using Tuilow.IdentidadeAcesso.Application.Queries.GetUserProfile;
 using Tuilow.SharedKernel.Application.Interfaces;
@@ -89,6 +90,16 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
     {
         await sender.Send(command, ct);
         return Ok(new { message = "Se este e-mail existe, você receberá as instruções em breve." });
+    }
+
+    /// <summary>Redefine a senha usando o token recebido por e-mail (ver /auth/forgot-password).</summary>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordCommand command, CancellationToken ct)
+    {
+        await sender.Send(command, ct);
+        return Ok(new { message = "Senha redefinida com sucesso." });
     }
 
     /// <summary>Retorna perfil do usuário autenticado.</summary>
