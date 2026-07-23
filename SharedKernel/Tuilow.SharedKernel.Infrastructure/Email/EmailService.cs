@@ -1,27 +1,40 @@
+using System.Net.Http.Headers;
+using System.Text;
 using Tuilow.SharedKernel.Application.Interfaces;
-using MailKit.Net.Smtp;
-using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using MimeKit;
 
 namespace Tuilow.SharedKernel.Infrastructure.Email;
 
 /// <summary>
 /// Reaproveitado de Tuilow.Infrastructure.Services.Email.EmailService — movido para o
 /// SharedKernel porque IEmailService é usado por múltiplos módulos (IdentidadeAcesso, Sales, Learning).
+///
+/// Envia via API HTTP do Mailgun (porta 443) em vez de SMTP (porta 587/465) — trocado porque em
+/// produção (Railway) a conexão SMTP não estava nem chegando ao Mailgun (nenhum registro aparecia
+/// nos Logs do Mailgun para as tentativas), possivelmente porque o container encerra a tarefa em
+/// segundo plano do e-mail (fire-and-forget, ver RegisterUserCommandHandler) antes do handshake
+/// SMTP terminar. A API HTTP é uma chamada única e rápida, sem handshake de conexão demorado,
+/// então tem muito mais chance de completar antes do processo seguir em frente.
 /// </summary>
 public sealed class EmailService(
     IConfiguration configuration,
+    IHttpClientFactory httpClientFactory,
     ILogger<EmailService> logger
 ) : IEmailService
 {
+    private readonly HttpClient _httpClient = httpClientFactory.CreateClient();
     private readonly string _from = configuration["Email:From"] ?? "noreply@tuilow.com.br";
     private readonly string _fromName = configuration["Email:FromName"] ?? "Tuilow";
-    private readonly string _host = configuration["Email:Host"] ?? "smtp.mailgun.org";
-    private readonly int _port = int.Parse(configuration["Email:Port"] ?? "587");
-    private readonly string _username = configuration["Email:Username"] ?? "";
-    private readonly string _password = configuration["Email:Password"] ?? "";
+    // Domínio cadastrado no Mailgun (Sending > Domains) — NÃO é necessariamente igual ao domínio
+    // do endereço "From" acima, embora normalmente sejam o mesmo.
+    private readonly string _domain = configuration["Email:Domain"] ?? "tuilow.com.br";
+    // Chave de API do Mailgun (Settings > API Keys > Private API key) — DIFERENTE da senha SMTP
+    // usada antes. Precisa ser configurada em Email__ApiKey no Railway.
+    private readonly string _apiKey = configuration["Email:ApiKey"] ?? "";
+    // https://api.mailgun.net para contas US, https://api.eu.mailgun.net para contas EU (mesma
+    // região do host SMTP antigo — smtp.mailgun.org = US, smtp.eu.mailgun.org = EU).
+    private readonly string _apiBaseUrl = configuration["Email:ApiBaseUrl"] ?? "https://api.mailgun.net";
     private readonly string _frontendUrl = configuration["FrontendUrl"] ?? "https://app.tuilow.com.br";
 
     public async Task SendWelcomeAsync(Guid userId, string to, string firstName, string confirmationToken, CancellationToken ct = default)
@@ -110,20 +123,25 @@ public sealed class EmailService(
     {
         try
         {
-            var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(_fromName, _from));
-            message.To.Add(MailboxAddress.Parse(to));
-            message.Subject = subject;
-            message.Body = new TextPart(MimeKit.Text.TextFormat.Html) { Text = htmlBody };
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_apiBaseUrl}/v3/{_domain}/messages");
+            request.Headers.Authorization = new AuthenticationHeaderValue(
+                "Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"api:{_apiKey}")));
+            request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["from"] = $"{_fromName} <{_from}>",
+                ["to"] = to,
+                ["subject"] = subject,
+                ["html"] = htmlBody,
+            });
 
-            using var client = new SmtpClient();
-            // Auto detecta o modo de segurança certo pela porta: 587/25 -> STARTTLS,
-            // 465 -> SSL direto na conexão. Antes estava fixo em StartTls, o que quebra
-            // se algum dia a porta 465 for usada (ver Email:Port no Railway).
-            await client.ConnectAsync(_host, _port, SecureSocketOptions.Auto, ct);
-            await client.AuthenticateAsync(_username, _password, ct);
-            await client.SendAsync(message, ct);
-            await client.DisconnectAsync(true, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                logger.LogError(
+                    "Erro ao enviar e-mail para {To} via Mailgun API ({Status}): {Body}",
+                    to, response.StatusCode, responseBody);
+            }
         }
         catch (Exception ex)
         {

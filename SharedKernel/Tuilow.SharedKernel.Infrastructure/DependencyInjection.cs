@@ -12,6 +12,8 @@ public static class DependencyInjection
     public static IServiceCollection AddSharedKernel(this IServiceCollection services)
     {
         services.AddSingleton<IClock, SystemClock>();
+        // IHttpClientFactory usado pelo EmailService para chamar a API HTTP do Mailgun.
+        services.AddHttpClient();
         services.AddScoped<IEmailService, EmailService>();
         // Sem provedor configurado ainda — troque por uma implementação real quando houver
         // credencial (Twilio/Z-API/WhatsApp Business API). Ver comentário em IWhatsAppService.

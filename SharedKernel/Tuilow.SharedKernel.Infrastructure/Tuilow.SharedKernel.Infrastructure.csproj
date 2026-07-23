@@ -9,7 +9,9 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
-    <PackageReference Include="MailKit" Version="4.12.1" />
+    <!-- Troquei o envio de e-mail de SMTP (MailKit) para a API HTTP do Mailgun — ver comentário
+         em Email/EmailService.cs. IHttpClientFactory vem deste pacote. -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />
