@@ -35,10 +35,17 @@ public sealed class RegisterUserCommandHandler(
         await userRepository.AddAsync(user, ct);
         await uow.SaveChangesAsync(ct);
 
-        // E-mail de confirmação (assíncrono, não bloqueia resposta)
+        // E-mail de confirmação (assíncrono, não bloqueia resposta).
+        // IMPORTANTE: usar CancellationToken.None aqui, NUNCA o `ct` da requisição — este envio
+        // continua rodando depois que a resposta HTTP já foi devolvida ao cliente, e o `ct` da
+        // requisição é cancelado quando a conexão termina (em produção, atrás do proxy/load
+        // balancer do Railway isso acontece rápido o suficiente para abortar o handshake SMTP
+        // no meio, gerando TaskCanceledException dentro do MailKit ConnectAsync — foi
+        // exatamente esse o bug: localmente a conexão ficava aberta tempo suficiente por sorte,
+        // em produção não).
         _ = emailService.SendWelcomeAsync(
             user.Id, user.Email.Value, user.Profile.FirstName,
-            user.EmailConfirmationToken!, ct);
+            user.EmailConfirmationToken!, CancellationToken.None);
 
         var accessToken = jwtService.GenerateAccessToken(user);
         return new AuthTokens(
