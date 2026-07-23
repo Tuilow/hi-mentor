@@ -117,7 +117,10 @@ public sealed class EmailService(
             message.Body = new TextPart(MimeKit.Text.TextFormat.Html) { Text = htmlBody };
 
             using var client = new SmtpClient();
-            await client.ConnectAsync(_host, _port, SecureSocketOptions.StartTls, ct);
+            // Auto detecta o modo de segurança certo pela porta: 587/25 -> STARTTLS,
+            // 465 -> SSL direto na conexão. Antes estava fixo em StartTls, o que quebra
+            // se algum dia a porta 465 for usada (ver Email:Port no Railway).
+            await client.ConnectAsync(_host, _port, SecureSocketOptions.Auto, ct);
             await client.AuthenticateAsync(_username, _password, ct);
             await client.SendAsync(message, ct);
             await client.DisconnectAsync(true, ct);
