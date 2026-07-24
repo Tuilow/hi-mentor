@@ -7,6 +7,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import { coursesApi, coursePurchasesApi, courseSubscriptionPlansApi, enrollmentsApi, subscriptionsApi } from '@/lib/api';
+import { commercializationLabel, isFreeState } from '@/lib/courseCommercialization';
 import type { ProductDetail, InstructorCourseSummary } from '@/types';
 
 const levelLabel: Record<string, string> = {
@@ -203,9 +204,11 @@ export default function PublicSalesPage() {
     enabled: !!course?.id,
   });
   const activePlan: { price: number; billingCycle: string } | undefined = plans?.[0];
-  // Fonte de verdade sobre o curso ser gratuito de fato: Course.IsFree só é confiável quando não
-  // existe um plano de assinatura sobrepondo o preço.
-  const isFree = !!course?.isFree && !activePlan;
+  // Fonte de verdade sobre o curso ser gratuito de fato: vem pronta do backend
+  // (course.commercializationState — ver CourseCommercializationResolver), não é mais derivada
+  // aqui cruzando course.isFree com a query de planos acima (essa combinação local era
+  // exatamente o tipo de regra duplicada no front-end que o backend agora resolve uma única vez).
+  const isFree = isFreeState(course?.commercializationState, !!course?.isFree);
 
   // Esta é a página pública de divulgação (link direto/QR Code/embed da aba "Divulgar") — quem
   // já é aluno matriculado pode cair aqui de novo (favorito antigo, busca, e-mail) e não deve ver
@@ -612,7 +615,9 @@ export default function PublicSalesPage() {
                   )}
                   <div className="py-3 pr-3 min-w-0">
                     <p className="text-sm font-semibold text-gray-800 truncate">{c.title}</p>
-                    <p className="text-xs text-gray-400 mt-1">{formatPrice(c.price)}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {commercializationLabel(c.commercializationState, c.price, c.isFree)}
+                    </p>
                   </div>
                 </Link>
               ))}

@@ -1,7 +1,6 @@
 using Tuilow.SharedKernel.Application.Exceptions;
+using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Catalog.Domain.Interfaces;
-using Tuilow.Learning.Domain.Interfaces;
-using Tuilow.Sales.Domain.Interfaces;
 using Tuilow.Streaming.Application.Interfaces;
 using Tuilow.Streaming.Domain.Enums;
 using Tuilow.Streaming.Domain.Interfaces;
@@ -12,9 +11,7 @@ namespace Tuilow.Streaming.Application.Queries.GetLessonPlayUrl;
 public sealed class GetLessonPlayUrlQueryHandler(
     ICourseRepository courseRepository,
     IVideoRepository videoRepository,
-    ICoursePurchaseRepository coursePurchaseRepository,
-    ISubscriptionRepository subscriptionRepository,
-    IEnrollmentRepository enrollmentRepository,
+    IUserCourseAccessService courseAccessService,
     IStreamingService streamingService
 ) : IRequestHandler<GetLessonPlayUrlQuery, LessonPlayUrlResponse>
 {
@@ -60,35 +57,15 @@ public sealed class GetLessonPlayUrlQueryHandler(
             if (request.CurrentUserId is null)
                 throw new UnauthorizedException("Faça login para assistir este conteúdo.");
 
-            // Mesma checagem de 3 caminhos usada em Learning.SalesCourseAccessChecker: compra
-            // individual → assinatura por produto → assinatura legada da plataforma (fallback).
-            // Sem isso, quem comprou o curso avulso ou assinou o plano do produto (mas nunca
-            // teve assinatura da plataforma) não conseguia pegar a URL de playback mesmo já
-            // tendo sido matriculado pelo Learning.
-            var hasPaidAccess = await coursePurchaseRepository.HasConfirmedPurchaseAsync(
+            // Única checagem de acesso da plataforma (matrícula → compra avulsa → assinatura por
+            // produto → assinatura legada da plataforma, nesta ordem) — ver
+            // IUserCourseAccessService para a regra completa. Antes, este handler reimplementava
+            // essa mesma checagem de forma duplicada e ligeiramente diferente da usada em
+            // Learning/Channel; centralizar aqui elimina o risco de as duas regras divergirem.
+            var hasAccess = await courseAccessService.HasAccessAsync(
                 request.CurrentUserId.Value, request.CourseId, ct);
 
-            if (!hasPaidAccess)
-            {
-                var courseSubscription = await subscriptionRepository.GetActiveByUserForCourseAsync(
-                    request.CurrentUserId.Value, request.CourseId, ct);
-                hasPaidAccess = courseSubscription is not null && courseSubscription.IsActive;
-            }
-
-            if (!hasPaidAccess)
-            {
-                var subscription = await subscriptionRepository.GetActiveByUserAsync(request.CurrentUserId.Value, ct);
-                hasPaidAccess = subscription is not null && subscription.IsActive;
-            }
-
-            // Curso grátis não gera CoursePurchase/Subscription nenhuma (não há o que cobrar) —
-            // aqui o "acesso pago" equivalente é simplesmente estar matriculado (Learning). Sem
-            // isso, quem se matriculava de graça nunca conseguia assistir: os 3 caminhos acima
-            // são todos sobre dinheiro e nenhum deles nunca é satisfeito por um curso grátis.
-            if (!hasPaidAccess && course.IsFree)
-                hasPaidAccess = await enrollmentRepository.IsEnrolledAsync(request.CurrentUserId.Value, request.CourseId, ct);
-
-            if (!hasPaidAccess)
+            if (!hasAccess)
                 throw new ForbiddenException(course.IsFree
                     ? "Matricule-se neste curso gratuito para assistir a esta aula."
                     : "Compre o curso ou assine um plano para ter acesso a este conteúdo.");

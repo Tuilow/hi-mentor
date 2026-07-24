@@ -30,7 +30,11 @@ public sealed record CourseDetailResponse(
     string? SalesPageVideoUrl,
     IEnumerable<TestimonialResponse> Testimonials,
     int? GuaranteeDays,
-    string? GuaranteeText
+    string? GuaranteeText,
+    // Estado real de comercialização ("Free"/"Paid"/"Subscription"/"Hidden") — ver
+    // CourseCommercializationResolver. Price/IsFree seguem existindo (compatibilidade), mas o
+    // front-end deve exibir "Grátis"/preço a partir deste campo, nunca derivar de novo.
+    string CommercializationState
 );
 
 public sealed record FaqItemResponse(

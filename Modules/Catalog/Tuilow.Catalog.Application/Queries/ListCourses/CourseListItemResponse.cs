@@ -12,5 +12,9 @@ public sealed record CourseListItemResponse(
     int TotalDurationMinutes,
     DateTime? PublishedAt,
     string? Category,
-    string ProductType
+    string ProductType,
+    // Estado real de comercialização ("Free"/"Paid"/"Subscription"/"Hidden") — ver
+    // CourseCommercializationResolver. Price/IsFree seguem existindo (compatibilidade), mas o
+    // front-end deve exibir "Grátis"/preço a partir deste campo, nunca derivar de novo.
+    string CommercializationState
 );

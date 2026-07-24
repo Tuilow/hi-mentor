@@ -41,6 +41,10 @@ export interface Course {
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   price: number;
   isFree: boolean;
+  // Estado real de comercialização ("Free"/"Paid"/"Subscription"/"Hidden") — fonte da verdade
+  // para exibir "Grátis"/preço; isFree sozinho não é confiável (ver CourseCommercializationResolver
+  // no backend: um curso no modo "Assinatura" grava price=0 mas não é grátis).
+  commercializationState?: string;
   totalLessons: number;
   totalDuration: number;
   rating?: number;
@@ -202,6 +206,8 @@ export interface ProductDetail {
   thumbnailUrl?: string;
   price: number;
   isFree: boolean;
+  // Ver Course.commercializationState acima — mesma regra, mesma fonte de verdade.
+  commercializationState?: string;
   level: string;
   totalDurationMinutes: number;
   publishedAt?: string;
@@ -286,6 +292,8 @@ export interface InstructorCourseSummary {
   thumbnailUrl?: string;
   price: number;
   isFree: boolean;
+  // Ver Course.commercializationState acima — mesma regra, mesma fonte de verdade.
+  commercializationState?: string;
   level: string;
 }
 
@@ -314,6 +322,8 @@ export interface PublicChannelCourseItem {
   price: number;
   isFree: boolean;
   isUnlocked: boolean;
+  // Ver Course.commercializationState acima — mesma regra, mesma fonte de verdade.
+  commercializationState: string;
 }
 
 export interface PublicChannel {

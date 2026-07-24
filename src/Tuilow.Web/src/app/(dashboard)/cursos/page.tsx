@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { coursesApi, enrollmentsApi } from '@/lib/api';
 import { Course, MyEnrollment } from '@/types';
+import { commercializationLabel, isFreeState } from '@/lib/courseCommercialization';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -132,6 +133,8 @@ export default function CoursesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {data?.items?.map((course: Course) => {
               const isEnrolled = enrolledIds.has(course.id);
+              // Nunca deriva "grátis" de course.isFree isolado — ver courseCommercialization.ts.
+              const isCourseFree = isFreeState(course.commercializationState, course.isFree);
               return (
                 <div key={course.id}
                   className="card border-gray-200 hover:border-gray-300 transition-all duration-200 flex flex-col">
@@ -148,7 +151,7 @@ export default function CoursesPage() {
                     <span className={levelColor[course.level] || 'badge-purple'}>
                       {levelLabel[course.level] ?? course.level}
                     </span>
-                    {course.isFree && <span className="badge-green">Grátis</span>}
+                    {isCourseFree && <span className="badge-green">Grátis</span>}
                     {isEnrolled && <span className="badge-green">Matriculado</span>}
                   </div>
 
@@ -156,13 +159,18 @@ export default function CoursesPage() {
                   <p className="text-sm text-gray-500 mb-4 line-clamp-2 flex-1">{course.shortDescription}</p>
 
                   <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-200">
-                    <span className="text-xs text-gray-400">{course.totalLessons} aulas</span>
+                    <span className="text-xs text-gray-400">
+                      {course.totalLessons} aulas
+                      {!isCourseFree && (
+                        <> · {commercializationLabel(course.commercializationState, course.price, course.isFree)}</>
+                      )}
+                    </span>
                     {isEnrolled ? (
                       <Link href={`/cursos/${course.slug}`}
                         className="text-sm text-brand-600 font-medium hover:text-brand-700 transition-colors">
                         Continuar →
                       </Link>
-                    ) : course.isFree ? (
+                    ) : isCourseFree ? (
                       <button onClick={() => enroll(course.id)} className="btn-primary text-xs py-1.5 px-4">
                         Matricular
                       </button>

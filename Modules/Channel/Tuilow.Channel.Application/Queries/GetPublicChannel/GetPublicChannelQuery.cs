@@ -31,5 +31,9 @@ public sealed record PublicChannelCourse(
     string? ThumbnailUrl,
     decimal Price,
     bool IsFree,
-    bool IsUnlocked
+    bool IsUnlocked,
+    // Estado real de comercialização ("Free"/"Paid"/"Subscription"/"Hidden") — ver
+    // CourseCommercializationResolver. Price/IsFree seguem existindo (compatibilidade), mas o
+    // front-end deve exibir "Grátis"/preço a partir deste campo, nunca derivar de novo.
+    string CommercializationState
 );

@@ -1,6 +1,9 @@
+using Tuilow.SharedKernel.Application.Common;
 using Tuilow.SharedKernel.Application.Exceptions;
 using Tuilow.Catalog.Application.Interfaces;
+using Tuilow.Catalog.Domain.Enums;
 using Tuilow.Catalog.Domain.Interfaces;
+using Tuilow.Sales.Domain.Interfaces;
 using MediatR;
 
 namespace Tuilow.Catalog.Application.Queries.GetCourseBySlug;
@@ -13,6 +16,7 @@ namespace Tuilow.Catalog.Application.Queries.GetCourseBySlug;
 /// </summary>
 public sealed class GetCourseBySlugQueryHandler(
     ICourseRepository courseRepository,
+    ISubscriptionRepository subscriptionRepository,
     IInstructorLookup instructorLookup
 ) : IRequestHandler<GetCourseBySlugQuery, CourseDetailResponse>
 {
@@ -20,6 +24,15 @@ public sealed class GetCourseBySlugQueryHandler(
     {
         var course = await courseRepository.GetBySlugAsync(request.Slug, ct)
             ?? throw new NotFoundException("Curso", request.Slug);
+
+        // Estado real de comercialização — ver CourseCommercializationResolver. Antes, o
+        // front-end (/c/[slug]/page.tsx) buscava os planos de assinatura separadamente e
+        // recalculava isso do zero para corrigir o bug "curso pago aparece como Grátis"; agora
+        // o backend já devolve o estado pronto, uma única vez, para qualquer consumidor.
+        var hasActivePlan = (await subscriptionRepository.GetPlansByCourseAsync(course.Id, ct))
+            .Any(p => p.IsActive);
+        var commercializationState = CourseCommercializationResolver.Resolve(
+            course.Status == CourseStatus.Published, course.IsFree, hasActivePlan);
 
         var modules = course.Modules
             .OrderBy(m => m.Order)
@@ -46,6 +59,7 @@ public sealed class GetCourseBySlugQueryHandler(
             course.ViewCount, course.SalesPageHeadline, course.SalesPageSubheadline, course.SalesPageCtaText,
             course.SalesPageBenefits, faqItems,
             course.InstructorId, instructor?.DisplayName, instructor?.AvatarUrl, instructor?.Bio,
-            course.SalesPageVideoUrl, testimonials, course.GuaranteeDays, course.GuaranteeText);
+            course.SalesPageVideoUrl, testimonials, course.GuaranteeDays, course.GuaranteeText,
+            commercializationState.ToString());
     }
 }

@@ -16,12 +16,18 @@
     <ProjectReference Include="..\..\..\SharedKernel\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />
     <!--
       Acoplamento legítimo (mesmo padrão de CreatorStudio.Application): o Canal do Criador é a
-      vitrine de todos os cursos publicados do criador — precisa ler Catalog (lista de cursos)
-      e Learning (o que o visitante logado já comprou/matriculou, para pintar cadeado/liberado).
-      Nenhuma dessas regras é duplicada aqui, só composição de leitura pelos repositórios já
-      existentes de cada módulo.
+      vitrine de todos os cursos publicados do criador — precisa ler Catalog (lista de cursos).
+      "O visitante já tem acesso?" (cadeado) não é mais checado aqui diretamente contra Learning
+      — passou a usar IUserCourseAccessService (SharedKernel.Application, acima), o único serviço
+      de acesso da plataforma; por isso a referência a Learning.Domain foi removida.
     -->
     <ProjectReference Include="..\..\Catalog\Tuilow.Catalog.Domain\Tuilow.Catalog.Domain.csproj" />
-    <ProjectReference Include="..\..\Learning\Tuilow.Learning.Domain\Tuilow.Learning.Domain.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão de Sales.Application -> Catalog.Domain, na direção
+      inversa): para saber se um curso está no modo "Assinatura" (Course.Price = 0 por design
+      nesse caso — ver Course.SetPrice), a vitrine precisa checar se existe um Plan ativo para
+      o produto no módulo Sales.
+    -->
+    <ProjectReference Include="..\..\Sales\Tuilow.Sales.Domain\Tuilow.Sales.Domain.csproj" />
   </ItemGroup>
 </Project>

@@ -1,12 +1,17 @@
+using Tuilow.SharedKernel.Application.Common;
 using Tuilow.SharedKernel.Application.Exceptions;
 using Tuilow.Catalog.Application.Queries.GetCourseBySlug;
+using Tuilow.Catalog.Domain.Enums;
 using Tuilow.Catalog.Domain.Interfaces;
+using Tuilow.Sales.Domain.Interfaces;
 using MediatR;
 
 namespace Tuilow.Catalog.Application.Queries.GetCourseByIdAdmin;
 
-public sealed class GetCourseByIdAdminQueryHandler(ICourseRepository courseRepository)
-    : IRequestHandler<GetCourseByIdAdminQuery, CourseDetailResponse>
+public sealed class GetCourseByIdAdminQueryHandler(
+    ICourseRepository courseRepository,
+    ISubscriptionRepository subscriptionRepository
+) : IRequestHandler<GetCourseByIdAdminQuery, CourseDetailResponse>
 {
     public async Task<CourseDetailResponse> Handle(GetCourseByIdAdminQuery request, CancellationToken ct)
     {
@@ -18,6 +23,14 @@ public sealed class GetCourseByIdAdminQueryHandler(ICourseRepository courseRepos
         // Id (IDOR), mesmo sem aparecer na própria listagem "Gerenciar Cursos".
         if (course.InstructorId != request.InstructorId)
             throw new ForbiddenException("Apenas o criador pode acessar este curso.");
+
+        // Mesmo cálculo de GetCourseBySlugQueryHandler — ver CourseCommercializationResolver.
+        // Aqui é a tela de edição do próprio criador, então "Oculto" cobre também Draft/InReview,
+        // que é o esperado (o próprio Status já aparece separadamente no card de edição).
+        var hasActivePlan = (await subscriptionRepository.GetPlansByCourseAsync(course.Id, ct))
+            .Any(p => p.IsActive);
+        var commercializationState = CourseCommercializationResolver.Resolve(
+            course.Status == CourseStatus.Published, course.IsFree, hasActivePlan);
 
         var modules = course.Modules
             .OrderBy(m => m.Order)
@@ -45,6 +58,7 @@ public sealed class GetCourseByIdAdminQueryHandler(ICourseRepository courseRepos
             // quem é), só InstructorId (já é propriedade direta de Course, sem exigir o
             // ICreatorProfileLookup/IInstructorLookup usado na página de vendas pública).
             course.InstructorId, null, null, null,
-            course.SalesPageVideoUrl, testimonials, course.GuaranteeDays, course.GuaranteeText);
+            course.SalesPageVideoUrl, testimonials, course.GuaranteeDays, course.GuaranteeText,
+            commercializationState.ToString());
     }
 }

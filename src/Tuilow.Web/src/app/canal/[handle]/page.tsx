@@ -6,12 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { channelApi } from '@/lib/api';
 import type { PublicChannel } from '@/types';
-
-function formatPrice(price: number): string {
-  return price === 0
-    ? 'Grátis'
-    : price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+import { commercializationLabel } from '@/lib/courseCommercialization';
 
 /**
  * Converte a URL colada pelo criador (YouTube/Vimeo) numa URL de embed — mesma lógica de
@@ -148,6 +143,12 @@ export default function PublicChannelPage() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-4">
+            {/* Regra principal (Problema 3): "visualizar" (aparecer nesta grade) ≠ "possuir
+                acesso" — todos os cursos publicados do criador aparecem aqui, mas só quem tem
+                acesso de fato (course.isUnlocked, calculado no backend por IUserCourseAccessService)
+                pode assistir. Vai sempre para /c/{slug}: a própria página de vendas já resolve
+                "já matriculado → entra direto no curso" ou "ainda não → matricula/paga", sem
+                duplicar essa lógica aqui. */}
             {channel.courses.map(course => (
               <Link key={course.id} href={`/c/${course.slug}`}
                 className="card border-gray-200 hover:border-brand-300 transition-colors p-0 overflow-hidden">
@@ -166,7 +167,12 @@ export default function PublicChannelPage() {
                 </div>
                 <div className="p-4">
                   <p className="text-sm font-semibold text-gray-800 line-clamp-2">{course.title}</p>
-                  <p className="text-sm gradient-text font-bold mt-2">{formatPrice(course.price)}</p>
+                  <p className="text-sm gradient-text font-bold mt-2">
+                    {commercializationLabel(course.commercializationState, course.price, course.isFree)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {course.isUnlocked ? 'Continuar assistindo →' : '🔒 Comprar curso →'}
+                  </p>
                 </div>
               </Link>
             ))}

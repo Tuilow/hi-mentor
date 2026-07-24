@@ -4,6 +4,7 @@ using Tuilow.Catalog.Domain.Interfaces;
 using Tuilow.Learning.Application.Interfaces;
 using Tuilow.Learning.Domain.Entities;
 using Tuilow.Learning.Domain.Interfaces;
+using Tuilow.Sales.Domain.Interfaces;
 using MediatR;
 
 namespace Tuilow.Learning.Application.Commands.EnrollStudent;
@@ -12,6 +13,7 @@ public sealed class EnrollStudentCommandHandler(
     ICourseRepository courseRepository,
     IEnrollmentRepository enrollmentRepository,
     ICourseAccessChecker accessChecker,
+    ISubscriptionRepository subscriptionRepository,
     IUnitOfWork uow
 ) : IRequestHandler<EnrollStudentCommand, Guid>
 {
@@ -23,9 +25,19 @@ public sealed class EnrollStudentCommandHandler(
         if (await enrollmentRepository.IsEnrolledAsync(request.UserId, request.CourseId, ct))
             throw new InvalidOperationException("Aluno já está matriculado neste curso.");
 
-        // Verifica acesso: curso gratuito OU compra confirmada deste curso específico
-        // (ou assinatura ativa legada — ver SalesCourseAccessChecker).
-        if (!course.IsFree)
+        // Curso REALMENTE gratuito = Course.IsFree E sem nenhum Plan de assinatura ativo. Um
+        // curso no modo "Assinatura" (passo Preço do assistente) grava Course.Price = 0 por
+        // design — ver Course.SetPrice —, então checar só "course.IsFree" deixava qualquer
+        // pessoa se matricular de graça em um curso de assinatura, pulando o pagamento por
+        // completo (o mesmo dado que causava o curso aparecer como "Grátis" na tela também
+        // liberava o acesso de graça aqui — ver CourseCommercializationResolver).
+        var hasActiveSubscriptionPlan = (await subscriptionRepository.GetPlansByCourseAsync(request.CourseId, ct))
+            .Any(p => p.IsActive);
+        var isActuallyFree = course.IsFree && !hasActiveSubscriptionPlan;
+
+        // Verifica acesso: curso realmente gratuito OU compra confirmada deste curso específico
+        // (ou assinatura ativa — ver SalesCourseAccessChecker).
+        if (!isActuallyFree)
         {
             var hasAccess = await accessChecker.HasActivePaidAccessAsync(request.UserId, request.CourseId, ct);
             if (!hasAccess)

@@ -1,3 +1,4 @@
+using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Learning.Application.Interfaces;
 using Tuilow.Learning.Domain.Interfaces;
 using Tuilow.Learning.Infrastructure.Repositories;
@@ -13,6 +14,9 @@ public static class DependencyInjection
     {
         services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
         services.AddScoped<ICourseAccessChecker, SalesCourseAccessChecker>();
+        // Serviço único de "o usuário tem acesso a este curso?" (SharedKernel — consumido por
+        // Learning, Streaming e Channel). Ver IUserCourseAccessService para a regra completa.
+        services.AddScoped<IUserCourseAccessService, LearningCourseAccessService>();
         services.AddScoped<IUserContactLookup, IdentidadeAcessoUserContactLookup>();
         services.AddScoped<IMagicLinkIssuer, IdentidadeAcessoMagicLinkIssuer>();
         return services;

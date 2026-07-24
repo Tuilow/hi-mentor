@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { authApi } from '@/lib/api';
+import { authApi, enrollmentsApi } from '@/lib/api';
+import { MyEnrollment } from '@/types';
 
 // "Cursos" e "Assinatura" foram removidos do menu (Sprint Item 5): a plataforma não é uma
 // vitrine pública de cursos — o acesso é sempre por link/canal/página de vendas de um Creator
@@ -43,6 +44,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     queryKey: ['user-profile'],
     queryFn: () => authApi.me().then(res => res.data),
   });
+
+  // Problema 2 da sprint (Biblioteca do usuário): "Meus Cursos" só aparece no menu para quem já
+  // possui pelo menos um curso com acesso — nenhum visitante recém-cadastrado vê um menu vazio.
+  // Mesma query key usada em /cursos e /meus-cursos: compartilhar o cache evita uma chamada
+  // redundante a GET /enrollments/me a cada navegação.
+  const { data: myEnrollments = [] } = useQuery<MyEnrollment[]>({
+    queryKey: ['my-enrollments'],
+    queryFn: () => enrollmentsApi.getMyEnrollments().then(r => r.data),
+    enabled: !!user,
+  });
+  const hasAnyCourseAccess = myEnrollments.length > 0;
 
   useEffect(() => {
     if (isError) router.push('/login');
@@ -114,6 +126,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {navItems.map(item => (
             <NavLink key={item.href} {...item} />
           ))}
+
+          {/* "Meus Cursos" (biblioteca) só aparece para quem já tem acesso a pelo menos um
+              curso — compra, matrícula, assinatura ativa ou liberação manual (a mesma lista de
+              GET /enrollments/me, que É o registro de acesso da plataforma). Nunca mostra a
+              vitrine/catálogo público aqui — ver (dashboard)/meus-cursos/page.tsx. */}
+          {hasAnyCourseAccess && (
+            <NavLink href="/meus-cursos" label="Meus Cursos" icon="🎓" />
+          )}
 
           {/* Admin section (Criador) */}
           {isCreator && (
