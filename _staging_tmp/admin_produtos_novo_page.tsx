@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Sparkles, Upload, Link2, Plus, Video, Check, Loader2,
@@ -10,9 +9,8 @@ import {
   BookOpen, Briefcase,
 } from 'lucide-react';
 import {
-  coursesApi, videosApi, materialsApi, creatorStudioApi, courseSubscriptionPlansApi, categoriesApi,
+  coursesApi, videosApi, materialsApi, creatorStudioApi, courseSubscriptionPlansApi,
 } from '@/lib/api';
-import { CategoryAutocomplete } from '@/components/ui/CategoryAutocomplete';
 import type {
   ProductDetail, PublicationChecklist, ModuleDetail, LessonDetail, ProductType,
 } from '@/types';
@@ -104,18 +102,6 @@ function ProductWizard() {
   const [shortDescription, setShortDescription] = useState('');
   const [fullDescription, setFullDescription] = useState('');
   const [generatingCopy, setGeneratingCopy] = useState(false);
-
-  // Sugestões de Categoria/Subcategoria (autocomplete) — lista curada + o que já existe em
-  // outros cursos (ver GetCategoriesQueryHandler). Falha silenciosa: sem a lista, os campos
-  // continuam funcionando como texto livre, só sem sugestões.
-  const { data: categoryOptions = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => categoriesApi.list().then(r => r.data),
-    staleTime: 5 * 60 * 1000,
-  });
-  const matchedCategory = categoryOptions.find(
-    c => c.name.toLowerCase() === category.trim().toLowerCase()
-  );
 
   // Passo 2
   const [videos, setVideos] = useState<LocalVideo[]>([]);
@@ -533,20 +519,16 @@ function ProductWizard() {
                 placeholder="Ex.: Curso de Excel para Iniciantes" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <CategoryAutocomplete
-                label="Categoria"
-                value={category}
-                onChange={setCategory}
-                options={categoryOptions.map(c => c.name)}
-                placeholder="Ex.: Produtividade"
-              />
-              <CategoryAutocomplete
-                label="Subcategoria"
-                value={subcategory}
-                onChange={setSubcategory}
-                options={matchedCategory?.subcategories ?? []}
-                placeholder="Ex.: Excel"
-              />
+              <div>
+                <label className="text-sm font-medium text-gray-600">Categoria</label>
+                <input className="input-field mt-1" value={category} onChange={e => setCategory(e.target.value)}
+                  placeholder="Ex.: Produtividade" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Subcategoria</label>
+                <input className="input-field mt-1" value={subcategory} onChange={e => setSubcategory(e.target.value)}
+                  placeholder="Ex.: Excel" />
+              </div>
             </div>
             <button onClick={handleGenerateCopy} disabled={generatingCopy}
               className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-60">

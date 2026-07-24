@@ -9,7 +9,11 @@ public sealed class ListCoursesAdminQueryHandler(ICourseRepository courseReposit
     public async Task<IEnumerable<CourseAdminResponse>> Handle(
         ListCoursesAdminQuery request, CancellationToken ct)
     {
-        var courses = await courseRepository.ListAllForAdminAsync(ct);
+        // Mesmo método já usado pela tela "Meus Produtos" (ver comentário em
+        // ICourseRepository.ListByInstructorAsync) — antes este handler chamava
+        // ListAllForAdminAsync (sem filtro nenhum), o que vazava cursos de outros criadores
+        // para qualquer Creator autenticado no painel "Gerenciar Cursos".
+        var courses = await courseRepository.ListByInstructorAsync(request.InstructorId, ct);
 
         return courses.Select(c => new CourseAdminResponse(
             c.Id,

@@ -57,6 +57,23 @@ public sealed class CourseRepository(DbContext context) : ICourseRepository
             .OrderByDescending(c => c.CreatedAt)
             .ToListAsync(ct);
 
+    /// <summary>Alimenta o autocomplete de categorias (GetCategoriesQueryHandler) com o que os
+    /// criadores já digitaram de verdade — sem isso, uma categoria fora da lista curada nunca
+    /// apareceria como sugestão para os próximos cursos.</summary>
+    public async Task<IEnumerable<CourseCategoryUsage>> GetDistinctCategoriesAsync(CancellationToken ct = default)
+    {
+        // Projeta pra um tipo anônimo e materializa antes de mapear pro record — evita depender
+        // do provider EF conseguir traduzir "new CourseCategoryUsage(...)" (chamada de construtor)
+        // dentro da árvore de expressão do SELECT.
+        var pairs = await context.Set<Course>()
+            .Where(c => c.Category != null)
+            .Select(c => new { c.Category, c.Subcategory })
+            .Distinct()
+            .ToListAsync(ct);
+
+        return pairs.Select(p => new CourseCategoryUsage(p.Category!, p.Subcategory));
+    }
+
     public async Task<IEnumerable<Course>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default) =>
         await context.Set<Course>()
             .Where(c => ids.Contains(c.Id))

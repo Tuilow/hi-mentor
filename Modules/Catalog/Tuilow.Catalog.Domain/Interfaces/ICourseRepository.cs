@@ -15,6 +15,13 @@ public interface ICourseRepository : IRepository<Course>
     /// <summary>Lista os produtos do criador (tela "Meus Produtos") — inclui todos os status.</summary>
     Task<IEnumerable<Course>> ListByInstructorAsync(Guid instructorId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Pares (Categoria, Subcategoria) distintos já usados em cursos existentes — alimenta o
+    /// autocomplete de GetCategoriesQueryHandler junto com a lista curada (CourseCategoryTaxonomy),
+    /// para nenhuma categoria real "sumir" do autocomplete só por não estar na lista curada.
+    /// </summary>
+    Task<IEnumerable<CourseCategoryUsage>> GetDistinctCategoriesAsync(CancellationToken ct = default);
+
     /// <summary>Busca em lote por Id — usado por outros módulos (ex.: Learning, tela "meus cursos
     /// matriculados") para resolver os dados de exibição de uma lista de CourseIds de uma vez.</summary>
     Task<IEnumerable<Course>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
@@ -45,3 +52,6 @@ public interface ICourseRepository : IRepository<Course>
     /// </summary>
     void RemoveFaqItem(CourseFaqItem faqItem);
 }
+
+/// <summary>Par (Categoria, Subcategoria) realmente usado por algum curso — ver GetDistinctCategoriesAsync.</summary>
+public sealed record CourseCategoryUsage(string Category, string? Subcategory);

@@ -185,6 +185,18 @@ export const coursesApi = {
     api.post(`/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/attachments`, data),
 };
 
+export interface CategoryOption {
+  name: string;
+  subcategories: string[];
+}
+
+// Alimenta o autocomplete de Categoria/Subcategoria do passo 1 do assistente (ver
+// CategoryAutocomplete e admin/produtos/novo/page.tsx). Lista curada + o que os criadores já
+// digitaram em cursos existentes (ver GetCategoriesQueryHandler no backend).
+export const categoriesApi = {
+  list: () => api.get<CategoryOption[]>('/categories'),
+};
+
 export const videosApi = {
   getUploadUrl: (courseId: string) => api.post('/videos/upload-url', { courseId }),
   linkVideo: (videoId: string, data: { courseId: string; moduleId: string; lessonId: string; isPreview?: boolean }) =>

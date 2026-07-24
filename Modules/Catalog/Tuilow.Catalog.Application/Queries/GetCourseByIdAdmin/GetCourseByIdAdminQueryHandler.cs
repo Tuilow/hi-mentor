@@ -13,6 +13,12 @@ public sealed class GetCourseByIdAdminQueryHandler(ICourseRepository courseRepos
         var course = await courseRepository.GetByIdAsync(request.CourseId, ct)
             ?? throw new NotFoundException("Curso", request.CourseId);
 
+        // Mesmo padrão de AddModuleCommandHandler/PublishCourseCommandHandler etc. — sem essa
+        // checagem, qualquer Creator autenticado conseguia abrir o curso de outro só sabendo o
+        // Id (IDOR), mesmo sem aparecer na própria listagem "Gerenciar Cursos".
+        if (course.InstructorId != request.InstructorId)
+            throw new ForbiddenException("Apenas o criador pode acessar este curso.");
+
         var modules = course.Modules
             .OrderBy(m => m.Order)
             .Select(m => new ModuleResponse(
