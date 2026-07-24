@@ -6,11 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { authApi } from '@/lib/api';
 
+// "Cursos" e "Assinatura" foram removidos do menu (Sprint Item 5): a plataforma não é uma
+// vitrine pública de cursos — o acesso é sempre por link/canal/página de vendas de um Creator
+// específico, então não faz sentido oferecer navegação pra "ver todos os cursos" ou "gerenciar
+// assinaturas" no menu principal. As páginas em si continuam existindo (/cursos, /assinatura)
+// e seguem acessíveis pelos CTAs do dashboard e do histórico — só o item de menu saiu.
 const navItems = [
   { href: '/dashboard', label: 'Início',      icon: '🏠' },
-  { href: '/cursos',    label: 'Cursos',      icon: '📚' },
   { href: '/historico', label: 'Histórico',   icon: '🕒' },
-  { href: '/assinatura',label: 'Assinatura',  icon: '💎' },
 ];
 
 const adminNavItems = [

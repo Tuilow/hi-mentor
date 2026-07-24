@@ -47,9 +47,10 @@ export default function HomePage() {
       <header className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <span className="text-lg font-bold gradient-text">🎓 Tuilow</span>
+          {/* "Cursos" removido do menu (Sprint Item 5) — a plataforma não é uma vitrine pública
+              de cursos, o acesso é sempre via link/canal/página de vendas de um Creator. */}
           <nav className="hidden md:flex items-center gap-6 text-sm text-gray-500">
             <Link href="#features" className="hover:text-gray-800 transition-colors">Recursos</Link>
-            <Link href="#cursos" className="hover:text-gray-800 transition-colors">Cursos</Link>
           </nav>
           <div className="flex items-center gap-3">
             <Link href="/login" className="btn-ghost text-sm">Entrar</Link>

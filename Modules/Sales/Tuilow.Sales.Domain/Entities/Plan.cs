@@ -44,6 +44,21 @@ public sealed class Plan : AggregateRoot
     public void SetDescription(string description) { Description = description?.Trim(); Touch(); }
     public void SetAsaasPlanId(string id) { AsaasPlanId = id; Touch(); }
     public void Deactivate() { IsActive = false; Touch(); }
+    public void Reactivate() { IsActive = true; Touch(); }
+
+    /// <summary>
+    /// Atualiza preço/ciclo/trial de um plano já existente — usado quando o criador edita o preço
+    /// da assinatura do produto. Reaproveita a mesma linha (mesmo Slug) em vez de desativar e criar
+    /// um novo Plan, o que violaria IX_plans_Slug (Slug é derivado do nome do produto, então seria
+    /// idêntico ao do plano anterior, ainda presente na tabela mesmo desativado).
+    /// </summary>
+    public void UpdatePricing(decimal price, BillingCycle billingCycle, int trialDays)
+    {
+        Price = Money.Of(price);
+        BillingCycle = billingCycle;
+        TrialDays = trialDays;
+        Touch();
+    }
 
     public void AddFeature(string key, string value, string displayName)
     {

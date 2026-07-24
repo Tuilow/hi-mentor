@@ -21,20 +21,29 @@ public sealed class CreateCourseSubscriptionPlanCommandHandler(
         if (course.InstructorId != request.InstructorId)
             throw new ForbiddenException("Apenas o criador pode definir o preço deste produto.");
 
-        // Desativa planos de assinatura antigos deste produto (assinantes já ativos continuam
-        // no plano antigo até cancelar — Deactivate() só impede NOVAS assinaturas nele).
-        // Os planos vêm rastreados pelo EF (mesma query/DbContext) — só mutar já basta, o
-        // DetectChanges do SaveChangesAsync marca como Modified automaticamente.
+        // Um produto tem no máximo um plano de assinatura (ver ISubscriptionRepository.
+        // GetPlansByCourseAsync). Reaproveita o plano existente em vez de desativá-lo e criar um
+        // novo: o Slug é derivado do nome do produto (determinístico), então criar um novo plano
+        // sempre gerava o MESMO Slug do plano anterior — que continuava na tabela mesmo desativado
+        // (Deactivate() é soft, não apaga a linha) — e a inserção estourava IX_plans_Slug (23505)
+        // toda vez que o criador reabria o passo de preço e salvava de novo.
         var existingPlans = await subscriptionRepository.GetPlansByCourseAsync(request.CourseId, ct);
-        foreach (var oldPlan in existingPlans.Where(p => p.IsActive))
-            oldPlan.Deactivate();
+        var plan = existingPlans.FirstOrDefault();
 
-        // Nome curto do produto + trecho do CourseId garante slug único mesmo com títulos repetidos.
-        var planName = $"Assinatura - {course.Title} ({course.Id.ToString()[..8]})";
-        var plan = Plan.Create(planName, request.Price, request.BillingCycle, request.TrialDays, request.CourseId);
-        plan.SetDescription($"Assinatura recorrente do produto \"{course.Title}\".");
+        if (plan is not null)
+        {
+            plan.UpdatePricing(request.Price, request.BillingCycle, request.TrialDays);
+            if (!plan.IsActive) plan.Reactivate();
+        }
+        else
+        {
+            // Nome curto do produto + trecho do CourseId garante slug único mesmo com títulos repetidos.
+            var planName = $"Assinatura - {course.Title} ({course.Id.ToString()[..8]})";
+            plan = Plan.Create(planName, request.Price, request.BillingCycle, request.TrialDays, request.CourseId);
+            plan.SetDescription($"Assinatura recorrente do produto \"{course.Title}\".");
+            await subscriptionRepository.AddPlanAsync(plan, ct);
+        }
 
-        await subscriptionRepository.AddPlanAsync(plan, ct);
         await uow.SaveChangesAsync(ct);
 
         return plan.Id;

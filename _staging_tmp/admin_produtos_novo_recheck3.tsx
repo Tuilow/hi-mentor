@@ -178,20 +178,10 @@ function ProductWizard() {
     return () => clearInterval(interval);
   }, [courseId, videos]);
 
-  // Hidrata o assistente ao editar um rascunho existente. Busca o curso e o plano de assinatura
-  // em paralelo: quando o preço é "Assinatura", o preço do CURSO fica 0 (ver handleSavePricing
-  // mais abaixo, que sempre chama coursesApi.setPrice(courseId, 0) nesse modo) — então "isFree"
-  // sozinho não distingue Grátis de Assinatura, e a tela sempre reabria marcada como "Grátis"
-  // mesmo com uma assinatura ativa configurada. O plano é a fonte de verdade quando existe.
+  // Hidrata o assistente ao editar um rascunho existente
   useEffect(() => {
     if (!existingCourseId) return;
-    Promise.all([
-      coursesApi.getByIdAdmin(existingCourseId),
-      courseSubscriptionPlansApi.getByCourse(existingCourseId),
-    ]).then(([courseRes, plansRes]) => {
-      const data = courseRes.data as ProductDetail;
-      const activePlan = plansRes.data[0];
-
+    coursesApi.getByIdAdmin(existingCourseId).then(({ data }: { data: ProductDetail }) => {
       setName(data.title);
       setProductType(data.productType);
       setCategory(data.category ?? '');
@@ -199,14 +189,8 @@ function ProductWizard() {
       setShortDescription(data.shortDescription ?? '');
       setFullDescription(data.description);
       setModules(data.modules);
-      if (activePlan) {
-        setPricingMode('subscription');
-        setPrice(activePlan.price);
-        setBillingCycle(activePlan.billingCycle);
-      } else {
-        setPrice(data.price || 97);
-        setPricingMode(data.isFree ? 'free' : 'onetime');
-      }
+      setPrice(data.price || 97);
+      setPricingMode(data.isFree ? 'free' : 'onetime');
       setHeadline(data.salesPageHeadline ?? '');
       setSubheadline(data.salesPageSubheadline ?? '');
       setCtaText(data.salesPageCtaText ?? '');
@@ -1019,28 +1003,4 @@ function MaterialsStep({
                       onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(m.id, l.id, f); }} />
                   </label>
                 </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex justify-between pt-2">
-        <button onClick={onBack} className="btn-ghost flex items-center gap-2">
-          <ChevronLeft className="w-4 h-4" /> Voltar
-        </button>
-        <button onClick={onNext} className="btn-primary flex items-center gap-2">
-          Avançar <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export default function NovoProdutoPage() {
-  return (
-    <Suspense fallback={<p className="text-gray-400 text-sm">Carregando...</p>}>
-      <ProductWizard />
-    </Suspense>
-  );
-}
+            
