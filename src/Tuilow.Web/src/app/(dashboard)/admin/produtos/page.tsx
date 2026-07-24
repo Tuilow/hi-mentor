@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
-  Plus, MoreVertical, Pencil, Copy, Archive, Trash2, Rocket, BarChart3,
+  Plus, MoreVertical, Pencil, Copy, Archive, Trash2, Rocket, BarChart3, Megaphone,
 } from 'lucide-react';
 import { creatorStudioApi, coursesApi } from '@/lib/api';
 import { ProductListItem, ProductStatus } from '@/types';
@@ -162,6 +162,7 @@ export default function MeusProdutosPage() {
                 <th className="pb-3 pr-4 font-medium">Criado em</th>
                 <th className="pb-3 pr-4 font-medium text-right">Vendas</th>
                 <th className="pb-3 pr-4 font-medium text-right">Receita</th>
+                <th className="pb-3 pr-4 font-medium"></th>
                 <th className="pb-3 font-medium"></th>
               </tr>
             </thead>
@@ -183,6 +184,25 @@ export default function MeusProdutosPage() {
                   </td>
                   <td className="py-3 pr-4 text-right text-gray-700">{product.totalSales}</td>
                   <td className="py-3 pr-4 text-right text-gray-700">{currency(product.revenueGenerated)}</td>
+                  <td className="py-3 pr-4">
+                    {/* Atalho direto pra aba "Divulgar" do dashboard do produto (Kit de
+                        Divulgação + Central de Divulgação por IA) — antes só dava pra chegar lá
+                        clicando em "Dashboard" no menu "⋮" e depois trocando de aba manualmente.
+                        Só existe pra produtos Publicados: rascunho/arquivado não tem link público
+                        de vendas ativo pra divulgar (mesma regra do item "Dashboard" no menu "⋮"). */}
+                    {product.status === 'Published' ? (
+                      <Link
+                        href={`/admin/produtos/${product.id}/dashboard?tab=divulgar`}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-600
+                                   border border-brand-200 hover:bg-brand-50 hover:border-brand-300
+                                   rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap"
+                      >
+                        <Megaphone className="w-3.5 h-3.5" /> Divulgar
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                  </td>
                   <td className="py-3 relative">
                     <button
                       ref={el => { menuButtonRefs.current[product.id] = el; }}

@@ -894,6 +894,11 @@ function OrganizationStep({
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
 
+  // Sem isso, dava pra avançar pro passo de Materiais (e dali até Publicação) com um produto
+  // sem nenhum módulo/aula — só ia falhar (silenciosamente pro usuário) lá na frente, no
+  // checklist de publicação. Exige pelo menos 1 módulo com pelo menos 1 aula dentro.
+  const canAdvance = modules.some(m => m.lessons.length > 0);
+
   return (
     <div className="space-y-5">
       <h2 className="font-bold text-gray-800 text-lg">3. Organização</h2>
@@ -973,13 +978,19 @@ function OrganizationStep({
         </button>
       </div>
 
-      <div className="flex justify-between pt-2">
-        <button onClick={onBack} className="btn-ghost flex items-center gap-2">
-          <ChevronLeft className="w-4 h-4" /> Voltar
-        </button>
-        <button onClick={onNext} className="btn-primary flex items-center gap-2">
-          Avançar <ChevronRight className="w-4 h-4" />
-        </button>
+      <div className="flex flex-col items-end gap-1.5 pt-2">
+        <div className="flex justify-between w-full">
+          <button onClick={onBack} className="btn-ghost flex items-center gap-2">
+            <ChevronLeft className="w-4 h-4" /> Voltar
+          </button>
+          <button onClick={onNext} disabled={!canAdvance}
+            className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            Avançar <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        {!canAdvance && (
+          <p className="text-xs text-gray-400">Crie pelo menos um módulo com uma aula para continuar.</p>
+        )}
       </div>
     </div>
   );

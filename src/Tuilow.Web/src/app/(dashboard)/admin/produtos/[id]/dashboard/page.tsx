@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   Eye, Users, GraduationCap, ShoppingCart, DollarSign, Percent, Wallet, ChevronLeft,
   Copy, QrCode, Code2, Instagram, MessageCircle, Mail, Megaphone, Type,
@@ -47,10 +47,15 @@ const CHANNELS: { key: MarketingChannel; label: string; icon: React.ElementType 
   { key: 'Headline', label: 'Headlines', icon: Type },
 ];
 
-export default function ProductDashboardPage() {
+function ProductDashboardContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const [tab, setTab] = useState<'performance' | 'divulgar'>('performance');
+  const searchParams = useSearchParams();
+  // Permite abrir direto na aba "Divulgar" via link (?tab=divulgar) — usado pelo botão
+  // "Divulgar" da tabela de Meus Produtos, sem precisar passar pela aba "Desempenho" primeiro.
+  const [tab, setTab] = useState<'performance' | 'divulgar'>(
+    searchParams.get('tab') === 'divulgar' ? 'divulgar' : 'performance'
+  );
   const [origin, setOrigin] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [marketingResults, setMarketingResults] = useState<Partial<Record<MarketingChannel, MarketingCopySuggestion>>>({});
@@ -245,7 +250,7 @@ export default function ProductDashboardPage() {
                           </button>
                         </div>
                         <p className="text-sm text-gray-600 whitespace-pre-wrap">{result.content}</p>
-                        {result.cta && <p className="text-sm font-medium text-brand-600 mt-2">{result.cta}</p>}
+                        {result.cta && <p className="text-sm text-brand-600 font-medium mt-2">{result.cta}</p>}
                       </div>
                     );
                   })}
@@ -256,5 +261,13 @@ export default function ProductDashboardPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function ProductDashboardPage() {
+  return (
+    <Suspense fallback={<p className="text-gray-400 text-sm">Carregando...</p>}>
+      <ProductDashboardContent />
+    </Suspense>
   );
 }
