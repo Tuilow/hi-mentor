@@ -9,6 +9,7 @@ namespace Tuilow.Sales.Application.Commands.CreateSubscription;
 
 public sealed class CreateSubscriptionCommandHandler(
     ISubscriptionRepository subscriptionRepository,
+    IUserProvisioningService userProvisioningService,
     IPaymentService paymentService,
     IUnitOfWork uow
 ) : IRequestHandler<CreateSubscriptionCommand, CreateSubscriptionResponse>
@@ -21,22 +22,24 @@ public sealed class CreateSubscriptionCommandHandler(
         if (!plan.IsActive)
             throw new InvalidOperationException("Este plano não está mais disponível.");
 
-        // Cria ou recupera customer no Asaas
+        // Checkout anônimo: mesmo modelo da compra avulsa de curso.
+        var userId = request.UserId
+            ?? await userProvisioningService.FindOrCreateStudentAsync(
+                request.CustomerEmail, request.CustomerName, ct);
+
         var customer = await paymentService.CreateOrGetCustomerAsync(
             new(request.CustomerName, request.CustomerEmail, request.CpfCnpj, request.Phone), ct);
 
-        // Cria assinatura no Asaas
         var asaasSubscription = await paymentService.CreateSubscriptionAsync(
             new(customer.Id, plan.AsaasPlanId!, plan.BillingCycle, plan.Price.Amount), ct);
 
         var subscription = SubscriptionEntity.Create(
-            request.UserId, plan.Id, plan.BillingCycle,
+            userId, plan.Id, plan.BillingCycle,
             customer.Id, asaasSubscription.Id, plan.TrialDays);
 
         await subscriptionRepository.AddAsync(subscription, ct);
         await uow.SaveChangesAsync(ct);
 
-        // Busca o link de pagamento do primeiro charge gerado pelo Asaas
         var paymentUrl = await paymentService.GetSubscriptionPaymentUrlAsync(asaasSubscription.Id, ct);
 
         return new CreateSubscriptionResponse(subscription.Id, asaasSubscription.Id, paymentUrl);

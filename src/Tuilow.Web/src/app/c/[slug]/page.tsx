@@ -6,13 +6,22 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
-import { coursesApi, coursePurchasesApi, enrollmentsApi } from '@/lib/api';
+import { coursesApi, coursePurchasesApi, courseSubscriptionPlansApi, enrollmentsApi, subscriptionsApi } from '@/lib/api';
 import type { ProductDetail, InstructorCourseSummary } from '@/types';
 
 const levelLabel: Record<string, string> = {
   Beginner: 'Iniciante',
   Intermediate: 'Intermediário',
   Advanced: 'Avançado',
+};
+
+// Mesmos rótulos usados no seletor de Recorrência do assistente de criação
+// (admin/produtos/novo/page.tsx), só que como sufixo pra exibir "R$200/mês" etc.
+const billingCycleSuffix: Record<string, string> = {
+  Monthly: '/mês',
+  Quarterly: '/trimestre',
+  Semiannual: '/semestre',
+  Annual: '/ano',
 };
 
 function formatPrice(price: number): string {
@@ -162,8 +171,15 @@ export default function PublicSalesPage() {
   const viewRecordedRef = useRef(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [processingCheckout, setProcessingCheckout] = useState(false);
-  const [createdPurchase, setCreatedPurchase] = useState<{ id: string; paymentUrl?: string } | null>(null);
+  // `kind` distingue compra avulsa de assinatura de produto: cada uma tem seu próprio endpoint
+  // de simulação de pagamento (ver handleSimulatePayment) — sem isso não haveria como saber qual
+  // dos dois chamar depois que o pedido já foi criado.
+  const [createdOrder, setCreatedOrder] = useState<{ id: string; kind: 'purchase' | 'subscription'; paymentUrl?: string } | null>(null);
   const [simulating, setSimulating] = useState(false);
+  // Curso grátis: evita chamar POST /enrollments mais de uma vez (efeito abaixo) enquanto a
+  // matrícula automática está em andamento ou já foi tentada nesta sessão da página.
+  const [enrolling, setEnrolling] = useState(false);
+  const autoEnrollAttemptedRef = useRef(false);
   // Endpoint de simulação só existe no backend em Development (404 em produção) — este check
   // evita mostrar o atalho de sandbox à toa fora de ambiente de dev.
   const isDevEnv = process.env.NODE_ENV !== 'production';
@@ -177,6 +193,19 @@ export default function PublicSalesPage() {
     queryFn: () => coursesApi.getBySlug(slug).then(r => r.data),
     enabled: !!slug,
   });
+
+  // Curso no modo "Assinatura" (ver admin/produtos/novo/page.tsx) grava Course.Price como 0 — o
+  // preço real só existe no Plan, no módulo Sales. Sem esta busca, a página achava que o curso
+  // era grátis (Price === 0) mesmo quando o criador configurou uma assinatura paga.
+  const { data: plans } = useQuery({
+    queryKey: ['course-subscription-plan', course?.id],
+    queryFn: () => courseSubscriptionPlansApi.getByCourse(course!.id).then(r => r.data),
+    enabled: !!course?.id,
+  });
+  const activePlan: { price: number; billingCycle: string } | undefined = plans?.[0];
+  // Fonte de verdade sobre o curso ser gratuito de fato: Course.IsFree só é confiável quando não
+  // existe um plano de assinatura sobrepondo o preço.
+  const isFree = !!course?.isFree && !activePlan;
 
   // Esta é a página pública de divulgação (link direto/QR Code/embed da aba "Divulgar") — quem
   // já é aluno matriculado pode cair aqui de novo (favorito antigo, busca, e-mail) e não deve ver
@@ -193,6 +222,22 @@ export default function PublicSalesPage() {
   useEffect(() => {
     if (isEnrolled) router.replace(`/cursos/${slug}`);
   }, [isEnrolled, router, slug]);
+
+  // Curso grátis: fluxo pedido é "a pessoa se loga e se matricula automaticamente no curso" —
+  // sem clique extra em "Matricular-se". Como (dashboard)/cursos/[slug]/page.tsx não é o ponto de
+  // entrada aqui, o returnUrl do cadastro/login (ver ctaHref abaixo) traz o visitante de volta
+  // para esta própria página; assim que a sessão estiver logada e a checagem de matrícula
+  // resolver "não matriculado", este efeito matricula e redireciona para o curso.
+  useEffect(() => {
+    if (
+      isFree && isLoggedIn === true && !enrollmentLoading && !isEnrolled &&
+      !autoEnrollAttemptedRef.current && course
+    ) {
+      autoEnrollAttemptedRef.current = true;
+      attemptAutoEnroll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFree, isLoggedIn, enrollmentLoading, isEnrolled, course]);
 
   // Registra a visualização uma única vez (alimenta o card "Views" do dashboard do criador).
   useEffect(() => {
@@ -215,17 +260,39 @@ export default function PublicSalesPage() {
     ?? (e as AxiosError<{ title?: string; detail?: string; message?: string }>).response?.data?.message
     ?? fallback;
 
+  // Matrícula automática do curso grátis — chamada tanto pelo efeito acima (volta de
+  // /registro já logado) quanto por um clique manual no CTA (usuário que já estava logado).
+  const attemptAutoEnroll = async () => {
+    if (!course) return;
+    setEnrolling(true);
+    try {
+      await enrollmentsApi.enroll(course.id);
+      router.replace(`/cursos/${slug}`);
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Erro ao se matricular.'));
+      setEnrolling(false);
+    }
+  };
+
   // Grátis continua exigindo conta (matrícula é um endpoint autenticado) — leva para o
-  // cadastro, que já volta pra cá com returnUrl. Pago: checkout embutido, sem sair da página
-  // e sem precisar de conta prévia (o diferencial da Tuilow — ver PurchaseCourseCommandHandler).
-  const ctaHref = course && course.isFree
-    ? (isLoggedIn ? `/cursos/${slug}` : `/registro?returnUrl=${encodeURIComponent(`/cursos/${slug}`)}`)
+  // cadastro, que já volta pra cá (não para /cursos/slug direto) com returnUrl: é aqui que o
+  // efeito de matrícula automática acima dispara assim que a sessão estiver logada. Pago:
+  // checkout embutido, sem sair da página e sem precisar de conta prévia (o diferencial da
+  // Tuilow — ver PurchaseCourseCommandHandler/SubscribeToCourseCommandHandler).
+  // Usa `isFree` (que já descarta o caso de assinatura ativa), não `course.isFree` puro.
+  const ctaHref = course && isFree && isLoggedIn === false
+    ? `/registro?returnUrl=${encodeURIComponent(`/c/${slug}`)}`
     : undefined;
 
   const handleCtaClick = () => {
     if (!course) return;
-    if (course.isFree) return; // navegação normal via <a href>
-    setCreatedPurchase(null);
+    if (isFree) {
+      // Já logado: o efeito acima normalmente já disparou a matrícula automática antes mesmo
+      // do usuário ter chance de clicar; este clique manual é só uma rede de segurança.
+      if (isLoggedIn === true) attemptAutoEnroll();
+      return;
+    }
+    setCreatedOrder(null);
     setCheckoutOpen(true);
   };
 
@@ -233,15 +300,31 @@ export default function PublicSalesPage() {
     if (!course) return;
     setProcessingCheckout(true);
     try {
-      const { data: purchase } = await coursePurchasesApi.purchase({ courseId: course.id, ...data });
+      // Curso no modo "Assinatura" (activePlan presente) usa o endpoint de assinatura por
+      // produto em vez de compra avulsa — antes disso o checkout sempre chamava o endpoint de
+      // compra avulsa, que rejeitava qualquer curso com Course.IsFree=true (sempre o caso para
+      // cursos de assinatura, já que o preço mora no Plan, não no Course).
+      const kind: 'purchase' | 'subscription' = activePlan ? 'subscription' : 'purchase';
+      const { data: order } = activePlan
+        ? await subscriptionsApi.subscribeToCourse(course.id, data)
+        : await coursePurchasesApi.purchase({ courseId: course.id, ...data });
+      const orderId: string = activePlan ? order.subscriptionId : order.coursePurchaseId;
+
       setCheckoutOpen(false);
-      setCreatedPurchase({ id: purchase.coursePurchaseId, paymentUrl: purchase.paymentUrl });
-      if (purchase.paymentUrl) {
+      setCreatedOrder({ id: orderId, kind, paymentUrl: order.paymentUrl });
+      if (order.paymentUrl) {
         toast.success('Pedido criado! Redirecionando para pagamento...');
-        setTimeout(() => window.open(purchase.paymentUrl, '_blank'), 800);
+        setTimeout(() => window.open(order.paymentUrl, '_blank'), 800);
       } else {
         toast.success('Pedido criado! Você receberá o link de pagamento por e-mail.');
       }
+
+      // Sandbox/dev: confirma o pagamento automaticamente assim que o pedido é criado, sem
+      // exigir o clique manual no botão de simulação — fecha o loop "clica em pagar → já ganha
+      // acesso" pedido pelo fluxo "Quero começar agora". Passa orderId/kind explicitamente (não
+      // depende do estado createdOrder, que só seria atualizado no próximo render). O botão
+      // manual abaixo continua disponível como fallback.
+      if (isDevEnv) await handleSimulatePayment(orderId, kind);
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Erro ao processar a compra.'));
     } finally {
@@ -250,13 +333,29 @@ export default function PublicSalesPage() {
   };
 
   // SANDBOX/DEV: substitui o webhook do Asaas (que não alcança localhost), disponível mesmo
-  // sem login — fecha o loop compra anônima → pagamento confirmado → conta criada → Magic Link
-  // por e-mail, tudo testável direto da própria Landing Page.
-  const handleSimulatePayment = async () => {
-    if (!createdPurchase) return;
+  // sem login — fecha o loop compra/assinatura anônima → pagamento confirmado → conta criada →
+  // Magic Link por e-mail, tudo testável direto da própria Landing Page. Aceita orderId/kind
+  // explícitos (chamada automática logo após handleCheckout) ou usa o estado createdOrder
+  // (clique manual no botão de fallback, quando a simulação automática falhou ou está desligada).
+  const handleSimulatePayment = async (orderId?: string, kind?: 'purchase' | 'subscription') => {
+    const id = orderId ?? createdOrder?.id;
+    const orderKind = kind ?? createdOrder?.kind;
+    if (!id || !orderKind) return;
     setSimulating(true);
     try {
-      await coursePurchasesApi.simulatePayment(createdPurchase.id);
+      if (orderKind === 'subscription') {
+        await subscriptionsApi.simulateSubscriptionPayment(id);
+      } else {
+        await coursePurchasesApi.simulatePayment(id);
+      }
+      // Já logado nesta mesma sessão do navegador (ex.: quem tinha conta e comprou de novo):
+      // não precisa esperar o e-mail com Magic Link, entra direto — mesmo destino de quem se
+      // matricula num curso grátis.
+      if (isLoggedIn === true) {
+        toast.success('Pagamento confirmado! 🎉');
+        router.replace(`/cursos/${slug}`);
+        return;
+      }
       toast.success('Pagamento confirmado! Verifique o e-mail informado: chegou um link de acesso direto (Magic Link). 🎉');
     } catch (e: unknown) {
       toast.error(errorMessage(e, 'Erro ao simular pagamento.'));
@@ -283,10 +382,10 @@ export default function PublicSalesPage() {
     );
   }
 
-  // Aluno já matriculado: em vez de mostrar a página de vendas (mesmo que só por um instante
-  // enquanto o redirect do useEffect acima dispara), mostra um loading dedicado. Evita o "flash"
-  // do botão Comprar/checkout pra quem já é aluno.
-  if (isLoggedIn === true && (enrollmentLoading || isEnrolled)) {
+  // Aluno já matriculado (ou matrícula automática do curso grátis em andamento): em vez de
+  // mostrar a página de vendas (mesmo que só por um instante enquanto o redirect dispara),
+  // mostra um loading dedicado. Evita o "flash" do botão Comprar/checkout pra quem já é aluno.
+  if (isLoggedIn === true && (enrollmentLoading || isEnrolled || enrolling)) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-3">
         <svg className="animate-spin h-8 w-8 text-brand-600" fill="none" viewBox="0 0 24 24">
@@ -301,7 +400,10 @@ export default function PublicSalesPage() {
   const totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
   const headline = course.salesPageHeadline || course.title;
   const subheadline = course.salesPageSubheadline || course.shortDescription;
-  const ctaText = course.salesPageCtaText || (course.isFree ? 'Começar grátis' : 'Quero este curso');
+  // "Quero começar agora" para os dois fluxos (grátis e pago) — o que muda é o que acontece
+  // depois do clique, não o texto do botão. `salesPageCtaText` (gerado pela IA de página de
+  // vendas) continua tendo prioridade quando o criador personalizou.
+  const ctaText = course.salesPageCtaText || 'Quero começar agora';
 
   return (
     <div className="min-h-screen bg-white">
@@ -321,7 +423,7 @@ export default function PublicSalesPage() {
         <div className="text-center max-w-2xl mx-auto mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             <span className="badge-purple">{levelLabel[course.level] ?? course.level}</span>
-            {course.isFree && <span className="badge-green">Grátis</span>}
+            {isFree && <span className="badge-green">Grátis</span>}
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-3">{headline}</h1>
           {subheadline && <p className="text-gray-500 text-lg">{subheadline}</p>}
@@ -347,7 +449,11 @@ export default function PublicSalesPage() {
         )}
 
         <div className="flex flex-col items-center gap-2 mb-10">
-          <p className="text-3xl font-bold gradient-text">{formatPrice(course.price)}</p>
+          <p className="text-3xl font-bold gradient-text">
+            {activePlan
+              ? `${formatPrice(activePlan.price)}${billingCycleSuffix[activePlan.billingCycle] ?? ''}`
+              : formatPrice(course.price)}
+          </p>
           {ctaHref ? (
             <a href={ctaHref} className="btn-primary px-8 py-3 text-base">{ctaText} →</a>
           ) : (
@@ -360,23 +466,23 @@ export default function PublicSalesPage() {
             </p>
           )}
 
-          {createdPurchase && (
+          {createdOrder && (
             <div className="w-full max-w-sm mt-4 card border-brand-200 bg-brand-50/40 text-center">
               <p className="text-sm font-medium text-gray-700">
-                {createdPurchase.paymentUrl ? '⏳ Aguardando confirmação do pagamento' : '⏳ Pedido criado'}
+                {createdOrder.paymentUrl ? '⏳ Aguardando confirmação do pagamento' : '⏳ Pedido criado'}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 Assim que o pagamento for confirmado, você recebe um Magic Link por e-mail e entra direto no curso, sem senha.
               </p>
-              {createdPurchase.paymentUrl && (
-                <a href={createdPurchase.paymentUrl} target="_blank" rel="noopener noreferrer"
+              {createdOrder.paymentUrl && (
+                <a href={createdOrder.paymentUrl} target="_blank" rel="noopener noreferrer"
                   className="text-xs text-brand-600 hover:underline mt-2 inline-block">
                   Abrir pagamento novamente →
                 </a>
               )}
               {isDevEnv && (
                 <button
-                  onClick={handleSimulatePayment}
+                  onClick={() => handleSimulatePayment()}
                   disabled={simulating}
                   className="btn-primary text-xs py-2 px-4 mt-3 disabled:opacity-50"
                 >
@@ -526,7 +632,9 @@ export default function PublicSalesPage() {
       {checkoutOpen && course && (
         <CheckoutModal
           title={`Comprar ${course.title}`}
-          priceLabel={formatPrice(course.price)}
+          priceLabel={activePlan
+            ? `${formatPrice(activePlan.price)}${billingCycleSuffix[activePlan.billingCycle] ?? ''}`
+            : formatPrice(course.price)}
           onClose={() => setCheckoutOpen(false)}
           onConfirm={handleCheckout}
           loading={processingCheckout}

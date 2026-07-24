@@ -301,6 +301,14 @@ export const subscriptionsApi = {
   getMySubscription: () => api.get('/subscriptions/me'),
   subscribe: (data: unknown) => api.post('/subscriptions', data),
   cancel: (reason?: string) => api.delete('/subscriptions/me', { data: { reason } }),
+  // Assinatura de UM produto específico, comprada da Página de Vendas pública (/c/[slug]) — não
+  // exige login (checkout anônimo, ver SubscribeToCourseCommandHandler). Diferente de `subscribe`
+  // acima (assinatura da plataforma/plano legado, exige login e PlanId direto).
+  subscribeToCourse: (courseId: string, data: { customerName: string; customerEmail: string; cpfCnpj?: string; phone?: string }) =>
+    api.post(`/subscriptions/course/${courseId}`, data),
+  // SANDBOX/DEV apenas — 404 fora de Development no backend. Substitui o webhook do Asaas (que
+  // não alcança localhost) para permitir testar o fluxo de assinatura de produto ponta a ponta.
+  simulateSubscriptionPayment: (subscriptionId: string) => api.post(`/subscriptions/${subscriptionId}/simulate-payment`),
 };
 
 // Compra avulsa de curso (pagamento único) — modelo principal de monetização do Tuilow.

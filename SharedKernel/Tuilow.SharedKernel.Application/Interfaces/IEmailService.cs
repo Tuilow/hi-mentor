@@ -27,9 +27,15 @@ public interface IEmailService
 
     /// <summary>
     /// Disparado no lugar de <see cref="SendCourseAccessGrantedAsync"/> quando há um Magic Link
-    /// disponível (compra avulsa de curso confirmada) — o botão do e-mail já entra o aluno
-    /// direto na área do curso, sem senha. Cobre tanto quem já tinha conta quanto quem acabou
-    /// de ser criado automaticamente no checkout anônimo.
+    /// disponível (compra avulsa de curso confirmada ou assinatura do produto confirmada) — o
+    /// botão do e-mail já entra o aluno direto na área liberada, sem senha. Cobre tanto quem já
+    /// tinha conta quanto quem acabou de ser criado automaticamente no checkout anônimo.
+    ///
+    /// channelHandle: quando o criador do curso tem um Canal público (Modules/Channel), o
+    /// comprador entra direto em /canal/{handle} — a vitrine com todos os cursos do criador,
+    /// onde o curso comprado já aparece destravado e os demais ficam com cadeado — em vez de
+    /// cair só na página do curso individual. Null (sem canal configurado) preserva o
+    /// comportamento antigo, indo direto para /cursos/{courseSlug}.
     /// </summary>
-    Task SendMagicLinkAccessAsync(string to, string firstName, string courseTitle, string courseSlug, string magicLinkToken, CancellationToken ct = default);
+    Task SendMagicLinkAccessAsync(string to, string firstName, string courseTitle, string courseSlug, string magicLinkToken, CancellationToken ct = default, string? channelHandle = null);
 }

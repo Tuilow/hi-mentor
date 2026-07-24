@@ -23,5 +23,11 @@
       confirmado) para liberar o acesso ao curso automaticamente.
     -->
     <ProjectReference Include="..\..\Sales\Tuilow.Sales.Domain\Tuilow.Sales.Domain.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão acima): ao liberar acesso após compra/assinatura
+      confirmada, os EventHandlers consultam o Canal do criador (Modules/Channel) para levar o
+      comprador direto para /canal/{handle} em vez de só para o curso individual.
+    -->
+    <ProjectReference Include="..\..\Channel\Tuilow.Channel.Domain\Tuilow.Channel.Domain.csproj" />
   </ItemGroup>
 </Project>

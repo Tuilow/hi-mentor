@@ -100,9 +100,13 @@ public sealed class EmailService(
         await SendAsync(to, $"Acesso liberado: {courseTitle} — Tuilow", body, ct);
     }
 
-    public async Task SendMagicLinkAccessAsync(string to, string firstName, string courseTitle, string courseSlug, string magicLinkToken, CancellationToken ct = default)
+    public async Task SendMagicLinkAccessAsync(string to, string firstName, string courseTitle, string courseSlug, string magicLinkToken, CancellationToken ct = default, string? channelHandle = null)
     {
-        var magicLinkUrl = $"{_frontendUrl}/acesso?token={magicLinkToken}&redirect={Uri.EscapeDataString($"/cursos/{courseSlug}")}";
+        // Com Canal do Criador configurado, o comprador entra na vitrine do criador (todos os
+        // cursos dele, o comprado já destravado e os demais com cadeado) em vez de só no curso
+        // individual — ver comentário em IEmailService.SendMagicLinkAccessAsync.
+        var redirectPath = channelHandle is not null ? $"/canal/{channelHandle}" : $"/cursos/{courseSlug}";
+        var magicLinkUrl = $"{_frontendUrl}/acesso?token={magicLinkToken}&redirect={Uri.EscapeDataString(redirectPath)}";
         var body = $"""
             <h2>Pagamento confirmado! 🎉</h2>
             <p>Olá, {firstName}! Seu acesso ao curso <strong>{courseTitle}</strong> já está liberado.</p>

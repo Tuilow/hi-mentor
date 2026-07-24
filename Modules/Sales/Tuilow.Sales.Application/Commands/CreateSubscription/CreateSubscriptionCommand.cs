@@ -3,7 +3,7 @@ using MediatR;
 namespace Tuilow.Sales.Application.Commands.CreateSubscription;
 
 public sealed record CreateSubscriptionCommand(
-    Guid UserId,
+    Guid? UserId,
     Guid PlanId,
     string CustomerName,
     string CustomerEmail,

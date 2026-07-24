@@ -1,5 +1,6 @@
 using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Catalog.Domain.Interfaces;
+using Tuilow.Channel.Domain.Interfaces;
 using Tuilow.Learning.Application.Interfaces;
 using Tuilow.Learning.Domain.Entities;
 using Tuilow.Learning.Domain.Interfaces;
@@ -17,6 +18,12 @@ namespace Tuilow.Learning.Application.EventHandlers;
 /// avisava o comprador — ele só ganhava acesso se voltasse à plataforma e clicasse em
 /// "Matricular-se" por conta própria. Mesmo padrão de Tuilow.Finance.Application.EventHandlers
 /// (que credita a carteira do criador reagindo ao mesmo evento).
+///
+/// Se o criador do curso tem um Canal público (Modules/Channel — vitrine com todos os cursos
+/// dele), o comprador entra direto em /canal/{handle} em vez de só no curso comprado: assim,
+/// caso o criador tenha outros vídeos/cursos, eles aparecem com cadeado (destravam com nova
+/// compra) e o comprado já vem destravado — ver ICreatorChannelRepository e
+/// GetPublicChannelQueryHandler (Channel.Application), que já calcula esse "IsUnlocked".
 /// </summary>
 public sealed class CoursePurchaseConfirmedEventHandler(
     ICourseRepository courseRepository,
@@ -25,6 +32,7 @@ public sealed class CoursePurchaseConfirmedEventHandler(
     IMagicLinkIssuer magicLinkIssuer,
     IEmailService emailService,
     IWhatsAppService whatsAppService,
+    ICreatorChannelRepository creatorChannelRepository,
     IUnitOfWork uow,
     ILogger<CoursePurchaseConfirmedEventHandler> logger
 ) : INotificationHandler<CoursePurchaseConfirmedDomainEvent>
@@ -47,6 +55,8 @@ public sealed class CoursePurchaseConfirmedEventHandler(
             await uow.SaveChangesAsync(ct);
         }
 
+        var channel = await creatorChannelRepository.GetByCreatorIdAsync(course.InstructorId, ct);
+
         var contact = await userContactLookup.GetContactAsync(notification.StudentId, ct);
         if (contact is not null)
         {
@@ -55,11 +65,13 @@ public sealed class CoursePurchaseConfirmedEventHandler(
             if (magicLinkToken is not null)
             {
                 await emailService.SendMagicLinkAccessAsync(
-                    contact.Email, contact.FirstName, course.Title, course.Slug.Value, magicLinkToken, ct);
+                    contact.Email, contact.FirstName, course.Title, course.Slug.Value, magicLinkToken, ct,
+                    channelHandle: channel?.Handle.Value);
 
                 if (!string.IsNullOrWhiteSpace(contact.Phone))
                 {
-                    var magicLinkUrl = $"/acesso?token={magicLinkToken}&redirect=/cursos/{course.Slug.Value}";
+                    var redirectPath = channel is not null ? $"/canal/{channel.Handle.Value}" : $"/cursos/{course.Slug.Value}";
+                    var magicLinkUrl = $"/acesso?token={magicLinkToken}&redirect={redirectPath}";
                     // Best-effort: hoje é um no-op (sem provedor configurado) — nunca deve
                     // bloquear a liberação de acesso nem o e-mail, que já foi enviado acima.
                     await whatsAppService.SendCourseAccessGrantedAsync(

@@ -1,5 +1,6 @@
 using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Catalog.Domain.Interfaces;
+using Tuilow.Channel.Domain.Interfaces;
 using Tuilow.Learning.Application.Interfaces;
 using Tuilow.Learning.Domain.Entities;
 using Tuilow.Learning.Domain.Interfaces;
@@ -15,16 +16,21 @@ namespace Tuilow.Learning.Application.EventHandlers;
 /// liberar o acesso automaticamente — mesmo objetivo de
 /// <see cref="CoursePurchaseConfirmedEventHandler"/>, mas para o modelo "Assinatura" (passo
 /// Preço do assistente): se o plano é de um produto específico (Plan.CourseId preenchido),
-/// cria a matrícula naquele curso; se é o plano legado da plataforma (CourseId nulo, dá acesso
-/// a tudo), não há um único curso pra matricular — o acesso continua resolvido dinamicamente
-/// por SalesCourseAccessChecker, então aqui só avisamos o pagamento por e-mail.
+/// cria a matrícula naquele curso, emite Magic Link (checkout anônimo também é suportado aqui —
+/// ver Sales.Application.Commands.SubscribeToCourse) e leva o assinante para o Canal do criador
+/// (/canal/{handle}, com os demais cursos do mesmo criador com cadeado), mesmo padrão do fluxo
+/// de compra avulsa; se é o plano legado da plataforma (CourseId nulo, dá acesso a tudo), não há
+/// um único curso pra matricular — o acesso continua resolvido dinamicamente por
+/// SalesCourseAccessChecker, então aqui só avisamos o pagamento por e-mail.
 /// </summary>
 public sealed class SubscriptionPaymentConfirmedEventHandler(
     ISubscriptionRepository subscriptionRepository,
     ICourseRepository courseRepository,
     IEnrollmentRepository enrollmentRepository,
     IUserContactLookup userContactLookup,
+    IMagicLinkIssuer magicLinkIssuer,
     IEmailService emailService,
+    ICreatorChannelRepository creatorChannelRepository,
     IUnitOfWork uow,
     ILogger<SubscriptionPaymentConfirmedEventHandler> logger
 ) : INotificationHandler<PaymentConfirmedDomainEvent>
@@ -69,7 +75,23 @@ public sealed class SubscriptionPaymentConfirmedEventHandler(
         }
 
         if (contact is not null)
-            await emailService.SendCourseAccessGrantedAsync(contact.Email, contact.FirstName, course.Title, course.Slug.Value, ct);
+        {
+            var magicLinkToken = await magicLinkIssuer.IssueAsync(notification.UserId, ct);
+
+            if (magicLinkToken is not null)
+            {
+                var channel = await creatorChannelRepository.GetByCreatorIdAsync(course.InstructorId, ct);
+                await emailService.SendMagicLinkAccessAsync(
+                    contact.Email, contact.FirstName, course.Title, course.Slug.Value, magicLinkToken, ct,
+                    channelHandle: channel?.Handle.Value);
+            }
+            else
+            {
+                // Fallback raríssimo (usuário sumiu entre a checagem de contato e a emissão do
+                // link) — ainda assim avisa por e-mail com o link comum, sem magic link.
+                await emailService.SendCourseAccessGrantedAsync(contact.Email, contact.FirstName, course.Title, course.Slug.Value, ct);
+            }
+        }
 
         logger.LogInformation(
             "Acesso liberado automaticamente via assinatura: assinante {UserId}, curso {CourseId}.",

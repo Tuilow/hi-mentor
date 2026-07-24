@@ -1,12 +1,15 @@
 using Tuilow.Sales.Application.Commands.CancelSubscription;
 using Tuilow.Sales.Application.Commands.CreateCourseSubscriptionPlan;
 using Tuilow.Sales.Application.Commands.CreateSubscription;
+using Tuilow.Sales.Application.Commands.SimulateCourseSubscriptionPayment;
+using Tuilow.Sales.Application.Commands.SubscribeToCourse;
 using Tuilow.Sales.Application.Queries.GetUserSubscription;
 using Tuilow.Sales.Domain.Interfaces;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 
 namespace Tuilow.Sales.Api.Controllers;
 
@@ -16,7 +19,8 @@ namespace Tuilow.Sales.Api.Controllers;
 public sealed class SubscriptionsController(
     ISender sender,
     ICurrentUserService currentUser,
-    ISubscriptionRepository subscriptionRepo
+    ISubscriptionRepository subscriptionRepo,
+    IHostEnvironment env
 ) : ControllerBase
 {
     /// <summary>Lista planos disponíveis.</summary>
@@ -89,8 +93,44 @@ public sealed class SubscriptionsController(
             command with { CourseId = courseId, InstructorId = currentUser.UserId!.Value }, ct);
         return Ok(new { id = planId });
     }
+
+    /// <summary>
+    /// Assina o plano de um produto específico direto da Página de Vendas pública. Não exige
+    /// login: o visitante assina com nome/e-mail, e a conta é localizada ou criada
+    /// automaticamente (checkout anônimo — ver SubscribeToCourseCommandHandler). Espelha
+    /// CoursePurchasesController.Purchase (compra avulsa), só que para o modelo "Assinatura".
+    /// </summary>
+    [HttpPost("course/{courseId:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SubscribeToCourse(Guid courseId,
+        [FromBody] SubscribeToCourseRequest request, CancellationToken ct)
+    {
+        var result = await sender.Send(new SubscribeToCourseCommand(
+            currentUser.UserId, courseId,
+            request.CustomerName, request.CustomerEmail,
+            request.CpfCnpj, request.Phone), ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// SANDBOX/DEV apenas: simula a confirmação do pagamento da primeira cobrança da assinatura
+    /// no lugar do webhook do Asaas, que não alcança localhost. Indisponível fora de Development
+    /// (404) — nunca existe em produção. Não exige login, pelo mesmo motivo de
+    /// CoursePurchasesController.SimulatePayment (checkout anônimo).
+    /// </summary>
+    [HttpPost("{id:guid}/simulate-payment")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SimulateSubscriptionPayment(Guid id, CancellationToken ct)
+    {
+        if (!env.IsDevelopment()) return NotFound();
+
+        await sender.Send(new SimulateCourseSubscriptionPaymentCommand(currentUser.UserId, id), ct);
+        return Ok();
+    }
 }
 
 public sealed record SubscribeRequest(Guid PlanId, string CustomerName, string CustomerEmail,
+    string? CpfCnpj = null, string? Phone = null);
+public sealed record SubscribeToCourseRequest(string CustomerName, string CustomerEmail,
     string? CpfCnpj = null, string? Phone = null);
 public sealed record CancelRequest(string? Reason);
