@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { authApi } from '@/lib/api';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 
 // Mesmo padrão usado em outras páginas (ex: cursos/[slug]/page.tsx): o backend
 // (ExceptionHandlingMiddleware) devolve a mensagem real do erro em "title" (e
@@ -49,11 +50,13 @@ function RegisterForm() {
   const onSubmit = async ({ confirmPassword: _, ...data }: FormData) => {
     try {
       setLoading(true);
-      const res = await authApi.register(data);
-      localStorage.setItem('access_token', res.data.accessToken);
-      localStorage.setItem('refresh_token', res.data.refreshToken);
-      toast.success('Conta criada! Verifique seu e-mail.');
-      router.push(returnUrl || '/dashboard');
+      await authApi.register(data);
+      toast.success('Conta criada! Enviamos um código de confirmação para o seu e-mail.');
+      // Sprint Item 4: cadastro não faz mais login automático — a conta só é liberada pra
+      // login depois que o código enviado por e-mail é confirmado (ver confirmar-email/page.tsx).
+      const params = new URLSearchParams({ email: data.email });
+      if (returnUrl) params.set('returnUrl', returnUrl);
+      router.push(`/confirmar-email?${params.toString()}`);
     } catch (err) {
       toast.error(errorMessage(err, 'Erro ao criar conta. Verifique os dados.'));
     } finally {
@@ -147,13 +150,13 @@ function RegisterForm() {
 
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1.5">Senha</label>
-              <input {...register('password')} type="password" placeholder="Mínimo 8 caracteres" className="input-field" />
+              <PasswordInput {...register('password')} placeholder="Mínimo 8 caracteres" className="input-field" />
               {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1.5">Confirmar senha</label>
-              <input {...register('confirmPassword')} type="password" placeholder="••••••••" className="input-field" />
+              <PasswordInput {...register('confirmPassword')} placeholder="••••••••" className="input-field" />
               {errors.confirmPassword && <p className="text-red-400 text-xs mt-1">{errors.confirmPassword.message}</p>}
             </div>
 

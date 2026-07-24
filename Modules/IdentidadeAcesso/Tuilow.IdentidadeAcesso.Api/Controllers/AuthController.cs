@@ -22,15 +22,19 @@ namespace Tuilow.IdentidadeAcesso.Api.Controllers;
 [Produces("application/json")]
 public sealed class AuthController(ISender sender, ICurrentUserService currentUser) : ControllerBase
 {
-    /// <summary>Registra novo usuário com e-mail e senha.</summary>
+    /// <summary>
+    /// Registra novo usuário com e-mail e senha. Não faz login automático (Sprint Item 4) — a
+    /// conta nasce pendente de confirmação; um código de 6 dígitos é enviado por e-mail e deve
+    /// ser confirmado em /auth/confirm-email antes que /auth/login funcione para esta conta.
+    /// </summary>
     [HttpPost("register")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Register([FromBody] RegisterUserCommand command, CancellationToken ct)
     {
-        var tokens = await sender.Send(command, ct);
-        return Ok(tokens);
+        var result = await sender.Send(command, ct);
+        return Ok(result);
     }
 
     /// <summary>Autentica usuário com e-mail e senha.</summary>
@@ -76,7 +80,7 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
         return Ok(tokens);
     }
 
-    /// <summary>Confirma e-mail do usuário.</summary>
+    /// <summary>Confirma e-mail do usuário com o código de 6 dígitos enviado no cadastro.</summary>
     [HttpPost("confirm-email")]
     public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailCommand command, CancellationToken ct)
     {

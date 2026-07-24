@@ -43,7 +43,10 @@ public sealed class User : AggregateRoot
         {
             Email = Email.Create(email),
             Password = Password.CreateFromPlainText(password),
-            EmailConfirmationToken = Guid.NewGuid().ToString("N")
+            // Código numérico de 6 dígitos (Sprint Item 4: dupla confirmação por e-mail antes de
+            // permitir login) — antes era um GUID, mas um GUID não dá pra digitar manualmente;
+            // o e-mail agora mostra este código pro usuário confirmar (ver EmailService.SendWelcomeAsync).
+            EmailConfirmationToken = Random.Shared.Next(100000, 1000000).ToString()
         };
 
         user.Profile = UserProfile.Create(user.Id, firstName, lastName);

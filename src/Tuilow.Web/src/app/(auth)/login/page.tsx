@@ -7,8 +7,20 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
+import { AxiosError } from 'axios';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { authApi } from '@/lib/api';
+import { PasswordInput } from '@/components/ui/PasswordInput';
+
+// Mesmo padrão usado em app/(auth)/registro/page.tsx — extrai a mensagem real que o back-end
+// devolveu (ex.: "Credenciais inválidas.", vinda do ExceptionHandlingMiddleware) em vez de exibir
+// sempre um texto genérico fixo, que escondia a causa real do erro.
+const errorMessage = (e: unknown, fallback: string) => {
+  const data = (e as AxiosError<{ title?: string; detail?: string; message?: string; errors?: Record<string, string[]> }>)
+    .response?.data;
+  const firstFieldError = data?.errors && Object.values(data.errors).flat()[0];
+  return firstFieldError ?? data?.detail ?? data?.title ?? data?.message ?? fallback;
+};
 
 const schema = z.object({
   email: z.string().email('E-mail inválido'),
@@ -38,8 +50,8 @@ function LoginForm() {
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Bem-vindo de volta!');
       router.push(returnUrl || '/dashboard');
-    } catch {
-      toast.error('E-mail ou senha incorretos.');
+    } catch (err) {
+      toast.error(errorMessage(err, 'E-mail ou senha incorretos.'));
     } finally {
       setLoading(false);
     }
@@ -126,7 +138,7 @@ function LoginForm() {
                   Esqueceu a senha?
                 </Link>
               </div>
-              <input {...register('password')} type="password" placeholder="••••••••"
+              <PasswordInput {...register('password')} placeholder="••••••••"
                 className="input-field" />
               {errors.password && <p className="text-red-400 text-xs mt-1.5">{errors.password.message}</p>}
             </div>

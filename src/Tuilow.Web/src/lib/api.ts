@@ -85,7 +85,16 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !original._retry) {
+    // Endpoints públicos de autenticação: um 401 aqui significa credenciais inválidas (ou refresh
+    // token expirado), não "access token expirado" — tentar renovar token e, em caso de falha,
+    // redirecionar via window.location.href pra essas mesmas telas estava recarregando a página
+    // de login/registro ANTES do catch do formulário conseguir exibir a mensagem de erro real
+    // vinda do back-end (ex.: "Credenciais inválidas."), fazendo o erro nunca aparecer na tela.
+    const isPublicAuthEndpoint = ['/auth/login', '/auth/google', '/auth/refresh-token'].some(
+      (path) => original.url?.includes(path)
+    );
+
+    if (error.response?.status === 401 && !original._retry && !isPublicAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -138,7 +147,10 @@ export const authApi = {
   resetPassword: (token: string, newPassword: string) =>
     api.post('/auth/reset-password', { token, newPassword }),
   // Backend exige userId + token juntos (ConfirmEmailCommand) — ver app/confirmar-email/page.tsx.
-  confirmEmail: (userId: string, token: string) => api.post('/auth/confirm-email', { userId, token }),
+  // Antes era (userId, token) — trocado para (email, code) porque o e-mail de cadastro agora
+  // manda um código curto de 6 dígitos (ver User.Register no backend), digitável manualmente
+  // na tela de confirmação, em vez de um GUID que só funcionava embutido num link.
+  confirmEmail: (email: string, code: string) => api.post('/auth/confirm-email', { email, code }),
   me: () => api.get('/auth/me'),
   // Edita nome/telefone/bio/avatar — usado, entre outras telas, pelo editor do Canal do Criador.
   updateProfile: (data: {

@@ -39,17 +39,24 @@ public sealed class EmailService(
 
     public async Task SendWelcomeAsync(Guid userId, string to, string firstName, string confirmationToken, CancellationToken ct = default)
     {
-        var confirmUrl = $"{_frontendUrl}/confirmar-email?userId={userId}&token={confirmationToken}";
+        // Sprint Item 4: dupla confirmação por e-mail antes de liberar login — confirmationToken
+        // agora é um código curto de 6 dígitos (ver User.Register), não mais um GUID. O link
+        // abaixo continua funcionando (confirma automaticamente ao clicar), mas o código também
+        // é exibido em destaque pra quem preferir digitá-lo manualmente na tela de confirmação.
+        var confirmUrl = $"{_frontendUrl}/confirmar-email?email={Uri.EscapeDataString(to)}&code={confirmationToken}";
         var body = $"""
             <h2>Olá, {firstName}! Bem-vindo(a) à Tuilow 🎓</h2>
-            <p>Estamos empolgados em ter você aqui! Confirme seu e-mail e acesse sua área
-            (de aluno ou, se for o seu caso, de criador de cursos):</p>
+            <p>Use o código abaixo para confirmar seu e-mail e ativar sua conta:</p>
+            <div style="font-size:32px;font-weight:bold;letter-spacing:6px;background:#F3F4F6;color:#111827;padding:16px 24px;border-radius:8px;text-align:center;margin:16px 0;">
+                {confirmationToken}
+            </div>
+            <p>Ou, se preferir, clique no botão abaixo para confirmar automaticamente:</p>
             <a href="{confirmUrl}" style="background:#2563EB;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">
                 Confirmar E-mail e Acessar
             </a>
             <p>Se você não criou esta conta, ignore este e-mail.</p>
             """;
-        await SendAsync(to, $"Bem-vindo(a) à Tuilow, {firstName}!", body, ct);
+        await SendAsync(to, $"Seu código de confirmação Tuilow: {confirmationToken}", body, ct);
     }
 
     public async Task SendPasswordResetAsync(string to, string firstName, string resetToken, CancellationToken ct = default)

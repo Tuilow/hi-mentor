@@ -9,6 +9,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import { authApi } from '@/lib/api';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 
 // Mesmo padrão de app/(auth)/registro/page.tsx: o backend (ExceptionHandlingMiddleware) devolve
 // a mensagem real do erro em "title" — aqui é como a tela sabe dizer "link expirado" em vez de
@@ -104,14 +105,14 @@ function ResetPasswordForm() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1.5">Nova senha</label>
-              <input {...register('password')} type="password" placeholder="••••••••"
+              <PasswordInput {...register('password')} placeholder="••••••••"
                 className="input-field" autoFocus />
               {errors.password && <p className="text-red-400 text-xs mt-1.5">{errors.password.message}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1.5">Confirmar nova senha</label>
-              <input {...register('confirmPassword')} type="password" placeholder="••••••••"
+              <PasswordInput {...register('confirmPassword')} placeholder="••••••••"
                 className="input-field" />
               {errors.confirmPassword && <p className="text-red-400 text-xs mt-1.5">{errors.confirmPassword.message}</p>}
             </div>

@@ -11,10 +11,10 @@ public sealed class ConfirmEmailCommandHandler(
 {
     public async Task<bool> Handle(ConfirmEmailCommand request, CancellationToken ct)
     {
-        var user = await userRepository.GetByIdAsync(request.UserId, ct)
-            ?? throw new NotFoundException("Usuário", request.UserId);
+        var user = await userRepository.GetByEmailAsync(request.Email, ct)
+            ?? throw new NotFoundException("Usuário", request.Email);
 
-        user.ConfirmEmail(request.Token);
+        user.ConfirmEmail(request.Code);
         userRepository.Update(user);
         await uow.SaveChangesAsync(ct);
         return true;
