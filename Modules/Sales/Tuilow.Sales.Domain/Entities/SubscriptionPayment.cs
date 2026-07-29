@@ -29,6 +29,8 @@ public sealed class SubscriptionPayment : Entity
 
     public void Confirm()
     {
+        if (Status == PaymentStatus.Confirmed) return; // idempotente (webhook pode repetir evento)
+
         Status = PaymentStatus.Confirmed;
         PaidAt = DateTime.UtcNow;
         Touch();

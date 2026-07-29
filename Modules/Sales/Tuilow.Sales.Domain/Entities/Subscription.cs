@@ -19,7 +19,17 @@ public sealed class Subscription : AggregateRoot
     public string? AsaasCustomerId { get; private set; }
     public BillingCycle BillingCycle { get; private set; }
 
-    public bool IsActive => Status is SubscriptionStatus.Active or SubscriptionStatus.Trial;
+    // Cancelamento não revoga o acesso na hora: o aluno mantém acesso até o fim do período já
+    // pago (CurrentPeriodEnd), mesmo com Status já em Cancelled — consistente com a mensagem
+    // exibida no cancelamento ("você terá acesso até o fim do período pago"). Depois de
+    // CurrentPeriodEnd deixa de contar como ativo naturalmente, sem precisar de job agendado
+    // para efetivar o cancelamento numa data futura.
+    public bool IsActive => Status switch
+    {
+        SubscriptionStatus.Active or SubscriptionStatus.Trial => true,
+        SubscriptionStatus.Cancelled => CurrentPeriodEnd > DateTime.UtcNow,
+        _ => false
+    };
     public IReadOnlyCollection<SubscriptionPayment> Payments => _payments.AsReadOnly();
 
     private Subscription() { }
@@ -52,6 +62,14 @@ public sealed class Subscription : AggregateRoot
     public SubscriptionPayment? ConfirmPayment(string asaasPaymentId, decimal amount)
     {
         var payment = _payments.SingleOrDefault(p => p.AsaasPaymentId == asaasPaymentId);
+
+        // Idempotente: o mesmo pagamento já confirmado antes (reenvio de webhook, comportamento
+        // normal de retry da Asaas) não deve reiniciar o período pago nem disparar de novo o
+        // evento de confirmação (que reenviaria e-mail/magic link a cada retentativa) — mesma
+        // guarda que já existe em CoursePurchase.ConfirmPayment.
+        if (payment is not null && payment.Status == PaymentStatus.Confirmed)
+            return null;
+
         SubscriptionPayment? newPayment = null;
         if (payment is null)
         {
@@ -95,6 +113,8 @@ public sealed class Subscription : AggregateRoot
 
     public void Cancel(string? reason = null)
     {
+        if (Status == SubscriptionStatus.Cancelled) return;
+
         Status = SubscriptionStatus.Cancelled;
         CancelledAt = DateTime.UtcNow;
         CancelReason = reason;

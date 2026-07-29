@@ -1,6 +1,7 @@
 using Tuilow.SharedKernel.Application.Exceptions;
 using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Sales.Application.Interfaces;
+using Tuilow.Sales.Domain.Enums;
 using Tuilow.Sales.Domain.Interfaces;
 using MediatR;
 
@@ -16,6 +17,9 @@ public sealed class CancelSubscriptionCommandHandler(
     {
         var subscription = await subscriptionRepository.GetActiveByUserAsync(request.UserId, ct)
             ?? throw new NotFoundException("Assinatura ativa", request.UserId);
+
+        if (subscription.Status == SubscriptionStatus.Cancelled)
+            return;
 
         if (subscription.AsaasSubscriptionId is not null)
             await paymentService.CancelSubscriptionAsync(subscription.AsaasSubscriptionId, ct);

@@ -244,14 +244,29 @@ public sealed class AsaasPaymentService(
 
     // ─── Webhook ──────────────────────────────────────────────────────────────
 
-    public bool ValidateWebhookSignature(string payload, string signature)
+    public bool ValidateWebhookSignature(string accessToken)
     {
-        if (string.IsNullOrEmpty(_webhookSecret)) return true; // Dev: aceita sem verificar
+        if (string.IsNullOrEmpty(_webhookSecret))
+        {
+            // Sem secret configurado: Program.cs falha o startup fora de Development quando
+            // Asaas:WebhookSecret vem vazio, então isto só deveria ser alcançado em
+            // desenvolvimento local, antes de configurar o webhook de verdade na Asaas.
+            logger.LogWarning(
+                "Asaas:WebhookSecret vazio — aceitando webhook sem validação (esperado só em Development).");
+            return true;
+        }
 
-        var hmac     = HMACSHA256.HashData(
-            Encoding.UTF8.GetBytes(_webhookSecret),
-            Encoding.UTF8.GetBytes(payload));
-        var computed = Convert.ToHexString(hmac).ToLowerInvariant();
-        return computed == signature.ToLowerInvariant();
+        if (string.IsNullOrEmpty(accessToken)) return false;
+
+        // A Asaas NÃO assina o corpo da requisição do webhook: ela apenas ecoa de volta, no
+        // header "asaas-access-token", o mesmo token estático cadastrado no painel ao criar o
+        // webhook. A validação correta é comparar esse token diretamente contra o secret
+        // configurado, em tempo constante (evita vazar informação por timing) — calcular um
+        // HMAC do corpo (como antes) nunca bate de forma legítima, pois a Asaas nunca assina
+        // o payload dessa forma.
+        var expected = Encoding.UTF8.GetBytes(_webhookSecret);
+        var actual = Encoding.UTF8.GetBytes(accessToken);
+
+        return expected.Length == actual.Length && CryptographicOperations.FixedTimeEquals(expected, actual);
     }
 }

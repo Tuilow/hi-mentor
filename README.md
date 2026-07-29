@@ -117,7 +117,7 @@ dotnet test tests/Tuilow.Domain.Tests/
 - Senhas: BCrypt (workFactor 12)
 - Tokens JWT: HMAC-SHA256, expiração 15 min
 - Refresh Tokens: rotação automática (revoga token anterior)
-- Webhooks Asaas: validação de assinatura HMAC-SHA256
+- Webhooks Asaas: validação do token `asaas-access-token` configurado no painel da Asaas
 - Vídeos Cloudflare: URLs de playback assinadas com expiração
 
 ---

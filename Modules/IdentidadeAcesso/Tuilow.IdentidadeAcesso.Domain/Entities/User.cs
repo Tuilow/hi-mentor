@@ -85,17 +85,19 @@ public sealed class User : AggregateRoot
     }
 
     // Factory: checkout anônimo de compra de curso (sem senha, sem passar por cadastro) — o
-    // acesso é feito só por Magic Link (ver IssueMagicLink/ConsumeMagicLink). Ativa imediatamente
-    // (o e-mail já foi validado indiretamente pelo gateway de pagamento na cobrança), mesmo
-    // padrão de RegisterFromSocialLogin, só que sem vínculo de login social.
+    // acesso é feito só por Magic Link (ver IssueMagicLink/ConsumeMagicLink). A conta nasce
+    // PendingConfirmation, com e-mail NÃO confirmado: a Asaas não verifica posse do e-mail
+    // informado no checkout (só cria um "customer" com o que for enviado), então marcar como
+    // confirmado aqui permitiria a qualquer visitante criar uma conta em nome de um terceiro só
+    // sabendo o e-mail dele. A confirmação real (Status = Active, EmailConfirmedAt preenchido)
+    // só acontece quando o Magic Link enviado a esse e-mail é de fato consumido — ver
+    // ConsumeMagicLink, que é a prova real de posse do e-mail.
     public static User RegisterFromPurchase(
         string email, string firstName, string lastName, Role? defaultRole = null)
     {
         var user = new User
         {
-            Email = Email.Create(email),
-            Status = UserStatus.Active,
-            EmailConfirmedAt = DateTime.UtcNow
+            Email = Email.Create(email)
         };
 
         user.Profile = UserProfile.Create(user.Id, firstName, lastName);
@@ -128,6 +130,18 @@ public sealed class User : AggregateRoot
             throw new InvalidOperationException("Link de acesso inválido ou expirado.");
 
         link.Consume();
+
+        // Consumir o Magic Link com sucesso é a prova real de posse do e-mail — a pessoa recebeu
+        // o link no e-mail informado no checkout (ou por WhatsApp, encaminhado do mesmo e-mail) e
+        // clicou nele. É só aqui, e não na criação da conta pelo checkout anônimo (ver
+        // RegisterFromPurchase), que o e-mail deve ser considerado confirmado. Não regride uma
+        // conta já confirmada por outro meio (senha, login social).
+        if (Status == UserStatus.PendingConfirmation)
+        {
+            Status = UserStatus.Active;
+            EmailConfirmedAt = DateTime.UtcNow;
+        }
+
         Touch();
     }
 

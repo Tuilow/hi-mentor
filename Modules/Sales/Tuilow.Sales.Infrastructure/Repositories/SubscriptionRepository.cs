@@ -23,13 +23,18 @@ public sealed class SubscriptionRepository(DbContext context) : ISubscriptionRep
     public void Update(SubscriptionEntity entity) => context.Set<SubscriptionEntity>().Update(entity);
     public void Delete(SubscriptionEntity entity) => context.Set<SubscriptionEntity>().Remove(entity);
 
+    // Inclui assinaturas Cancelled cujo período pago (CurrentPeriodEnd) ainda não passou: o
+    // cancelamento não revoga o acesso na hora, só impede a renovação — ver Subscription.IsActive,
+    // que aplica exatamente o mesmo critério em memória depois de carregada. Sem isso aqui, a
+    // consulta nunca devolveria a assinatura cancelada, tornando o campo IsActive irrelevante.
     public async Task<SubscriptionEntity?> GetActiveByUserAsync(Guid userId, CancellationToken ct = default) =>
         await (
             from s in context.Set<SubscriptionEntity>().Include(s => s.Payments)
             join p in context.Set<Plan>() on s.PlanId equals p.Id
             where s.UserId == userId
                 && p.CourseId == null // só plano da plataforma — plano por produto não conta aqui
-                && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Trial)
+                && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Trial
+                    || (s.Status == SubscriptionStatus.Cancelled && s.CurrentPeriodEnd > DateTime.UtcNow))
             orderby s.CurrentPeriodEnd descending
             select s
         ).FirstOrDefaultAsync(ct);
@@ -40,7 +45,8 @@ public sealed class SubscriptionRepository(DbContext context) : ISubscriptionRep
             join p in context.Set<Plan>() on s.PlanId equals p.Id
             where s.UserId == userId
                 && p.CourseId == courseId
-                && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Trial)
+                && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Trial
+                    || (s.Status == SubscriptionStatus.Cancelled && s.CurrentPeriodEnd > DateTime.UtcNow))
             orderby s.CurrentPeriodEnd descending
             select s
         ).FirstOrDefaultAsync(ct);

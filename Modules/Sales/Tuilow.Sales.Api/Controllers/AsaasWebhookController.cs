@@ -29,8 +29,8 @@ public sealed class AsaasWebhookController(
         using var reader = new StreamReader(Request.Body, Encoding.UTF8);
         var rawBody = await reader.ReadToEndAsync(ct);
 
-        var signature = Request.Headers["asaas-access-token"].FirstOrDefault() ?? string.Empty;
-        if (!paymentService.ValidateWebhookSignature(rawBody, signature))
+        var accessToken = Request.Headers["asaas-access-token"].FirstOrDefault() ?? string.Empty;
+        if (!paymentService.ValidateWebhookSignature(accessToken))
             return Unauthorized(new { message = "Assinatura do webhook inválida." });
 
         var payload = JsonSerializer.Deserialize<AsaasWebhookPayload>(rawBody, JsonOpts);

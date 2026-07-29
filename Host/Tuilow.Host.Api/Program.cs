@@ -126,6 +126,19 @@ builder.Services.AddSwaggerGen(opt =>
 var jwtSecret = builder.Configuration["Jwt:Secret"]
     ?? throw new InvalidOperationException("Jwt:Secret não configurado.");
 
+// ─── ASAAS WEBHOOK SECRET (obrigatório fora de Development) ───────────────────
+// Sem esse secret, AsaasPaymentService.ValidateWebhookSignature aceita qualquer POST em
+// /api/v1/webhooks/asaas sem checar o header "asaas-access-token" — aceitável só em
+// Development, para testar o fluxo antes de configurar o webhook de verdade no painel da
+// Asaas. Fora de Development, falha o startup para nunca subir com o webhook de pagamento
+// aberto a qualquer um (quem descobrisse um AsaasPaymentId poderia forjar confirmação de
+// pagamento e liberar acesso/comissão sem pagar).
+if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Asaas:WebhookSecret"]))
+{
+    throw new InvalidOperationException(
+        "Asaas:WebhookSecret não configurado. Obrigatório fora de Development — configure o mesmo token cadastrado no painel da Asaas ao criar o webhook.");
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
     {

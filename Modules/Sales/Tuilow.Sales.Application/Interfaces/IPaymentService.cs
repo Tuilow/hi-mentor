@@ -29,5 +29,10 @@ public interface IPaymentService
     /// </summary>
     Task<AsaasChargeResponse> CreateChargeAsync(AsaasChargeRequest request, CancellationToken ct = default);
 
-    bool ValidateWebhookSignature(string payload, string signature);
+    /// <summary>
+    /// Valida o webhook de pagamento da Asaas. A Asaas não assina o corpo da requisição — ela
+    /// apenas ecoa, no header "asaas-access-token", o mesmo token estático cadastrado no painel
+    /// ao configurar o webhook. Por isso a validação recebe só esse token, não o corpo.
+    /// </summary>
+    bool ValidateWebhookSignature(string accessToken);
 }
