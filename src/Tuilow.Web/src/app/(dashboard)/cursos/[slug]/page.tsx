@@ -15,6 +15,15 @@ const levelLabel: Record<string, string> = {
   Advanced: 'Avançado',
 };
 
+// Mesmos rótulos usados em canal/[handle]/page.tsx e admin/produtos/novo/page.tsx — sufixo de
+// preço pra plano de assinatura ("R$100/mês" etc).
+const billingCycleSuffix: Record<string, string> = {
+  Monthly: '/mês',
+  Quarterly: '/trimestre',
+  Semiannual: '/semestre',
+  Annual: '/ano',
+};
+
 interface Lesson {
   id: string;
   title: string;
@@ -60,7 +69,8 @@ interface EnrollmentProgressDto {
 
 // GET /course-purchases/me — histórico de compras avulsas do aluno (qualquer curso).
 // Usado para saber se já existe uma compra "Pending" deste curso aguardando confirmação
-// de pagamento (webhook do Asaas), e mostrar isso na tela em vez de simplesmente nada.
+// de pagamento (webhook do Asaas), e mostrar isso na tela em vez de simplesmente nada — e,
+// depois de confirmada, para mostrar "o que eu paguei por ESTE curso" (ver confirmedPurchase).
 interface CoursePurchaseDto {
   id: string;
   courseId: string;
@@ -68,6 +78,19 @@ interface CoursePurchaseDto {
   status: string;
   confirmedAt?: string;
   createdAt: string;
+}
+
+// GET /subscriptions/course/{courseId}/me — assinatura ATIVA do aluno para ESTE produto
+// específico (modelo Kiwify: pagamento sempre amarrado ao curso, nunca uma "assinatura da
+// plataforma" genérica). Distinta de GET /subscriptions/me (plano legado de plataforma).
+interface CourseSubscriptionDto {
+  id: string;
+  planName: string;
+  status: string;
+  price: number;
+  billingCycle: string;
+  currentPeriodEnd: string;
+  isActive: boolean;
 }
 
 function formatDuration(seconds?: number): string {
@@ -226,15 +249,28 @@ export default function CourseDetailPage() {
   const subscriptionPlan = coursePlans[0] ?? null;
   const isSubscriptionProduct = !!subscriptionPlan;
 
-  // Compra avulsa (Compra Única) pendente: existe quando o aluno já iniciou uma compra deste
-  // curso mas o pagamento ainda não foi confirmado (aguardando webhook do Asaas). É o que faltava
-  // pra "clico em Comprar e não aparece nada" — sem isso a compra desaparecia no limbo.
+  // Compra avulsa (Compra Única) deste curso — usada tanto para achar uma compra "Pending"
+  // (aguardando confirmação de pagamento) quanto, depois de matriculado, a compra "Confirmed"
+  // pra mostrar "o que eu paguei por ESTE curso" (ver confirmedPurchase logo abaixo). Por isso
+  // busca tanto antes quanto depois da matrícula — antes só desabilitava depois de matriculado,
+  // o que escondia esse histórico assim que o pagamento era confirmado.
   const { data: myPurchases = [] } = useQuery<CoursePurchaseDto[]>({
     queryKey: ['my-course-purchases'],
     queryFn: () => coursePurchasesApi.getMyPurchases().then(r => r.data),
-    enabled: !!course?.id && !course.isFree && !isSubscriptionProduct && !isEnrolled,
+    enabled: !!course?.id && !course.isFree && !isSubscriptionProduct,
   });
   const pendingPurchase = myPurchases.find(p => p.courseId === course?.id && p.status === 'Pending');
+  const confirmedPurchase = myPurchases.find(p => p.courseId === course?.id && p.status === 'Confirmed');
+
+  // "O que eu contratei por ESTE curso" (modelo Kiwify: pagamento sempre amarrado ao curso,
+  // nunca uma central de assinatura da plataforma toda — ver SubscriptionsController.
+  // GetMyCourseSubscription). Só busca quando o produto é por Assinatura e o aluno já está
+  // matriculado; 404 vira null (sem assinatura ativa pra esse curso).
+  const { data: courseSubscription } = useQuery<CourseSubscriptionDto | null>({
+    queryKey: ['my-course-subscription', course?.id],
+    queryFn: () => subscriptionsApi.getMyCourseSubscription(course!.id).then(r => r.data).catch(() => null),
+    enabled: !!course?.id && isSubscriptionProduct && isEnrolled,
+  });
 
   const [simulating, setSimulating] = useState(false);
   // Endpoint de simulação só existe no backend em Development (404 em produção) — este check
@@ -464,6 +500,24 @@ export default function CourseDetailPage() {
               >
                 {isSubscriptionProduct ? 'Assinar plano →' : 'Comprar agora →'}
               </button>
+            )}
+
+            {/* "Planos e Pagamentos" deste curso específico — nunca uma central de assinatura
+                da plataforma (modelo Kiwify: o pagamento é sempre amarrado ao curso). Só aparece
+                pra quem já está matriculado E de fato pagou por ele (Grátis não mostra nada aqui). */}
+            {isEnrolled && isSubscriptionProduct && courseSubscription && (
+              <p className="text-xs text-gray-400 mt-3">
+                💳 Assinatura deste curso: <strong className="text-gray-600">
+                  R$ {courseSubscription.price.toFixed(2).replace('.', ',')}
+                  {billingCycleSuffix[courseSubscription.billingCycle] ?? ''}
+                </strong> · Renova em {new Date(courseSubscription.currentPeriodEnd).toLocaleDateString('pt-BR')}
+              </p>
+            )}
+            {isEnrolled && !isSubscriptionProduct && confirmedPurchase && (
+              <p className="text-xs text-gray-400 mt-3">
+                💳 Comprado por <strong className="text-gray-600">{formatPrice(confirmedPurchase.amount)}</strong> em{' '}
+                {new Date(confirmedPurchase.confirmedAt ?? confirmedPurchase.createdAt).toLocaleDateString('pt-BR')}
+              </p>
             )}
           </div>
         </div>

@@ -3,6 +3,7 @@ using Tuilow.Sales.Application.Commands.CreateCourseSubscriptionPlan;
 using Tuilow.Sales.Application.Commands.CreateSubscription;
 using Tuilow.Sales.Application.Commands.SimulateCourseSubscriptionPayment;
 using Tuilow.Sales.Application.Commands.SubscribeToCourse;
+using Tuilow.Sales.Application.Queries.GetMyCourseSubscription;
 using Tuilow.Sales.Application.Queries.GetUserSubscription;
 using Tuilow.Sales.Domain.Interfaces;
 using Tuilow.SharedKernel.Application.Interfaces;
@@ -110,6 +111,22 @@ public sealed class SubscriptionsController(
             request.CustomerName, request.CustomerEmail,
             request.CpfCnpj, request.Phone), ct);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Assinatura ATIVA do usuário autenticado para UM produto específico (modelo Kiwify: o
+    /// pagamento é sempre amarrado ao curso, nunca a uma "assinatura da plataforma" genérica —
+    /// ver GetMyCourseSubscriptionQuery). Usada na própria tela do curso para mostrar o que o
+    /// aluno contratou/pagou por ELE, distinta de GET /subscriptions/me (plano legado de
+    /// plataforma, CourseId nulo).
+    /// </summary>
+    [HttpGet("course/{courseId:guid}/me")]
+    [Authorize]
+    public async Task<IActionResult> GetMyCourseSubscription(Guid courseId, CancellationToken ct)
+    {
+        var sub = await sender.Send(new GetMyCourseSubscriptionQuery(currentUser.UserId!.Value, courseId), ct);
+        if (sub is null) return NotFound(new { message = "Nenhuma assinatura ativa para este curso." });
+        return Ok(sub);
     }
 
     /// <summary>

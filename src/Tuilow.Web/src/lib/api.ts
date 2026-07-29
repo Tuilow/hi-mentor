@@ -306,6 +306,10 @@ export const subscriptionsApi = {
   // acima (assinatura da plataforma/plano legado, exige login e PlanId direto).
   subscribeToCourse: (courseId: string, data: { customerName: string; customerEmail: string; cpfCnpj?: string; phone?: string }) =>
     api.post(`/subscriptions/course/${courseId}`, data),
+  // Assinatura do usuário logado para UM produto específico (o que ele contratou/paga por
+  // ESSE curso — modelo Kiwify) — mostrado na própria tela do curso, nunca numa central de
+  // assinatura da plataforma. 404 quando não há assinatura ativa para o curso.
+  getMyCourseSubscription: (courseId: string) => api.get(`/subscriptions/course/${courseId}/me`),
   // SANDBOX/DEV apenas — 404 fora de Development no backend. Substitui o webhook do Asaas (que
   // não alcança localhost) para permitir testar o fluxo de assinatura de produto ponta a ponta.
   simulateSubscriptionPayment: (subscriptionId: string) => api.post(`/subscriptions/${subscriptionId}/simulate-payment`),

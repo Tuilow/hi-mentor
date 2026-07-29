@@ -42,6 +42,23 @@ function LoginForm() {
     resolver: zodResolver(schema),
   });
 
+  // Criador loga e cai direto em "Meus Produtos" (era /dashboard genérico pra todo mundo, mas
+  // pra quem já tem produto cadastrado o painel de aluno não é a tela útil no dia a dia). Aluno
+  // sem papel de Criador continua caindo em /dashboard, sem mudança nenhuma. returnUrl (voltar
+  // pra uma página de vendas específica) sempre tem prioridade sobre os dois casos.
+  const goHome = async () => {
+    if (returnUrl) {
+      router.push(returnUrl);
+      return;
+    }
+    try {
+      const { data: profile } = await authApi.me();
+      router.push(profile?.roles?.includes('Creator') ? '/admin/produtos' : '/dashboard');
+    } catch {
+      router.push('/dashboard');
+    }
+  };
+
   const onSubmit = async (data: FormData) => {
     try {
       setLoading(true);
@@ -49,7 +66,7 @@ function LoginForm() {
       localStorage.setItem('access_token', res.data.accessToken);
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Bem-vindo de volta!');
-      router.push(returnUrl || '/dashboard');
+      await goHome();
     } catch (err) {
       toast.error(errorMessage(err, 'E-mail ou senha incorretos.'));
     } finally {
@@ -68,7 +85,7 @@ function LoginForm() {
       localStorage.setItem('access_token', res.data.accessToken);
       localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Bem-vindo!');
-      router.push(returnUrl || '/dashboard');
+      await goHome();
     } catch {
       toast.error('Falha no login com Google. Tente novamente.');
     } finally {

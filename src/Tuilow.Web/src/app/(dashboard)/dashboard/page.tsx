@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { authApi, subscriptionsApi, enrollmentsApi } from '@/lib/api';
+import { authApi, enrollmentsApi } from '@/lib/api';
 import type { MyEnrollment, ContinueWatching } from '@/types';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -24,11 +24,6 @@ export default function DashboardPage() {
   const { data: user } = useQuery({
     queryKey: ['user-profile'],
     queryFn: () => authApi.me().then(r => r.data),
-  });
-
-  const { data: subscription } = useQuery({
-    queryKey: ['my-subscription'],
-    queryFn: () => subscriptionsApi.getMySubscription().then(r => r.data).catch(() => null),
   });
 
   // Mesma query key usada em /cursos (filtro "Matriculados") — um único cache alimenta os dois
@@ -116,29 +111,6 @@ export default function DashboardPage() {
             <span className="btn-primary whitespace-nowrap">Continuar</span>
           </div>
         </Link>
-      )}
-
-      {/* Subscription banner */}
-      {!subscription ? (
-        <div className="card border-blue-100 bg-blue-50/60 mb-8 flex items-center justify-between gap-4">
-          <div>
-            <p className="font-semibold text-gray-800">Você não tem assinatura ativa</p>
-            <p className="text-sm text-gray-500 mt-0.5">Acesse todos os cursos por um preço fixo mensal.</p>
-          </div>
-          <Link href="/assinatura" className="btn-primary whitespace-nowrap flex-shrink-0">
-            Ver Planos
-          </Link>
-        </div>
-      ) : (
-        <div className="card border-emerald-100 bg-emerald-50/60 mb-8 flex items-center gap-3">
-          <span className="text-emerald-500 text-xl">✓</span>
-          <div>
-            <p className="font-semibold text-gray-800">Plano <strong>{subscription.planName}</strong> ativo</p>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Válido até {new Date(subscription.currentPeriodEnd).toLocaleDateString('pt-BR')}
-            </p>
-          </div>
-        </div>
       )}
 
       {/* Become a Creator banner — plataforma aberta: qualquer pessoa pode publicar cursos */}
