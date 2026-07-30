@@ -51,6 +51,12 @@ public sealed class SubscriptionRepository(DbContext context) : ISubscriptionRep
             select s
         ).FirstOrDefaultAsync(ct);
 
+    // B4: usado pelo job periódico que efetiva PastDue → Expired após o prazo de tolerância.
+    public async Task<IEnumerable<SubscriptionEntity>> GetPastDueOlderThanAsync(DateTime threshold, CancellationToken ct = default) =>
+        await context.Set<SubscriptionEntity>()
+            .Where(s => s.Status == SubscriptionStatus.PastDue && s.UpdatedAt < threshold)
+            .ToListAsync(ct);
+
     public async Task<SubscriptionEntity?> GetByAsaasSubscriptionIdAsync(string asaasId, CancellationToken ct = default) =>
         await context.Set<SubscriptionEntity>()
             .Include(s => s.Payments)

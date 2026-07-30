@@ -65,6 +65,14 @@ public sealed class ProcessAsaasWebhookCommandHandler(
                 logger.LogWarning("Pagamento de assinatura falhou: {PaymentId}", payload.Payment.Id);
                 break;
 
+            case "PAYMENT_REFUNDED":
+                // Faltava esse case — SubscriptionPayment.Refund() existia na entidade mas nunca
+                // era chamado (achado M1 da auditoria). Revoga o acesso na hora (ver
+                // Subscription.RefundPayment), diferente do cancelamento voluntário do aluno.
+                subscription.RefundPayment(payload.Payment.Id);
+                logger.LogInformation("Pagamento de assinatura reembolsado: {PaymentId}", payload.Payment.Id);
+                break;
+
             default:
                 logger.LogDebug("Evento Asaas ignorado (assinatura): {Event}", payload.Event);
                 return;

@@ -29,4 +29,10 @@ public interface ISubscriptionRepository : IRepository<SubscriptionEntity>
 
     /// <summary>Força EntityState.Added para o SubscriptionPayment — evita DbUpdateConcurrencyException.</summary>
     Task AddPaymentAsync(SubscriptionPayment payment, CancellationToken ct = default);
+
+    /// <summary>
+    /// Assinaturas em PastDue há mais tempo que o prazo de tolerância (usado pelo job periódico
+    /// que efetiva PastDue → Expired — achado B4 da auditoria).
+    /// </summary>
+    Task<IEnumerable<SubscriptionEntity>> GetPastDueOlderThanAsync(DateTime threshold, CancellationToken ct = default);
 }

@@ -40,4 +40,10 @@ public sealed class CoursePurchaseRepository(DbContext context) : ICoursePurchas
         if (to is not null) query = query.Where(p => p.CreatedAt <= to);
         return await query.ToListAsync(ct);
     }
+
+    // B4: usado pelo job periódico que expira compras Pending abandonadas (checkout nunca concluído).
+    public async Task<IEnumerable<CoursePurchaseEntity>> GetPendingOlderThanAsync(DateTime threshold, CancellationToken ct = default) =>
+        await context.Set<CoursePurchaseEntity>()
+            .Where(p => p.Status == CoursePurchaseStatus.Pending && p.CreatedAt < threshold)
+            .ToListAsync(ct);
 }

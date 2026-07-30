@@ -12,6 +12,12 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.4" />
+    <!-- B4: configuration.GetValue<T>() usado pelo job de expiração para ler os prazos de configuração. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.4" />
+    <!-- M2: retry com backoff + circuit breaker + timeout para o HttpClient da Asaas. -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
+    <!-- B4: BackgroundService do job de expiração (PastDue -> Expired / Pending antigo). -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.4" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tuilow.Sales.Application\Tuilow.Sales.Application.csproj" />

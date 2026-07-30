@@ -111,15 +111,49 @@ public sealed class Subscription : AggregateRoot
         return newPayment;
     }
 
+    /// <summary>
+    /// Marca o pagamento correspondente como reembolsado (mesma capacidade que já existia em
+    /// SubscriptionPayment.Refund(), mas nunca era chamada pelo webhook — ver
+    /// ProcessAsaasWebhookCommandHandler). Diferente de <see cref="Cancel"/> (cancelamento
+    /// voluntário do aluno, mantém acesso até CurrentPeriodEnd): reembolso significa que o valor
+    /// já foi devolvido pela Asaas, então o período pago deixa de valer imediatamente — não faria
+    /// sentido manter acesso liberado a um período que não foi mais pago.
+    /// </summary>
+    public void RefundPayment(string asaasPaymentId)
+    {
+        var payment = _payments.SingleOrDefault(p => p.AsaasPaymentId == asaasPaymentId);
+        if (payment is null) return; // nada a reembolsar — não há registro desse pagamento
+
+        payment.Refund();
+
+        Status = SubscriptionStatus.Cancelled;
+        CancelledAt = DateTime.UtcNow;
+        CancelReason = "Pagamento reembolsado";
+        CurrentPeriodEnd = DateTime.UtcNow; // revoga o acesso na hora — diferente do cancelamento voluntário
+        Touch();
+        AddDomainEvent(new SubscriptionCancelledDomainEvent(Id, UserId, CancelReason));
+    }
+
     public void Cancel(string? reason = null)
     {
-        if (Status == SubscriptionStatus.Cancelled) return;
-
         Status = SubscriptionStatus.Cancelled;
         CancelledAt = DateTime.UtcNow;
         CancelReason = reason;
         Touch();
         AddDomainEvent(new SubscriptionCancelledDomainEvent(Id, UserId, reason));
+    }
+
+    /// <summary>
+    /// Efetiva a expiração de uma assinatura que ficou em PastDue além do prazo de tolerância
+    /// (chamado pelo job periódico <c>SalesExpirationBackgroundService</c> — ver B4 do relatório
+    /// de auditoria). Idempotente: só tem efeito se ainda estiver em PastDue.
+    /// </summary>
+    public void Expire()
+    {
+        if (Status != SubscriptionStatus.PastDue) return;
+
+        Status = SubscriptionStatus.Expired;
+        Touch();
     }
 
     private static DateTime CalculatePeriodEnd(DateTime from, BillingCycle cycle) => cycle switch
