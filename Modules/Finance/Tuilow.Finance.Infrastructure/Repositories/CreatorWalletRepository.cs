@@ -51,4 +51,10 @@ public sealed class CreatorWalletRepository(DbContext context) : ICreatorWalletR
 
         return (rows.Sum(r => r.Gross), rows.Sum(r => r.Fee), rows.Sum(r => r.Net), rows.Count);
     }
+
+    public async Task<bool> HasSaleTransactionForPurchaseAsync(Guid coursePurchaseId, CancellationToken ct = default) =>
+        await context.Set<WalletTransaction>().AnyAsync(t =>
+            t.Type == WalletTransactionType.SaleCredit
+            && t.ReferenceType == "CoursePurchase"
+            && t.ReferenceId == coursePurchaseId, ct);
 }

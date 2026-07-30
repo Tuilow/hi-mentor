@@ -15,17 +15,28 @@ public sealed class Enrollment : AggregateRoot
     public DateTime EnrolledAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
 
+    // Achado M12 da auditoria: sem isso, um chamado de suporte do tipo "paguei e não recebi
+    // acesso" exigia cruzar manualmente Sales (CoursePurchase/Subscription) e Learning (Enrollment)
+    // sem nenhum identificador em comum. Mutuamente exclusivos (uma matrícula vem de compra avulsa
+    // OU de assinatura, nunca as duas) — null nos dois quando criada manualmente (EnrollStudentCommand).
+    public Guid? SourcePurchaseId { get; private set; }
+    public Guid? SourceSubscriptionId { get; private set; }
+
     public IReadOnlyCollection<LessonProgress> LessonsProgress => _lessonProgress.AsReadOnly();
 
     private Enrollment() { }
 
-    public static Enrollment Create(Guid userId, Guid courseId, string courseTitle)
+    public static Enrollment Create(
+        Guid userId, Guid courseId, string courseTitle,
+        Guid? sourcePurchaseId = null, Guid? sourceSubscriptionId = null)
     {
         var enrollment = new Enrollment
         {
             UserId = userId,
             CourseId = courseId,
-            EnrolledAt = DateTime.UtcNow
+            EnrolledAt = DateTime.UtcNow,
+            SourcePurchaseId = sourcePurchaseId,
+            SourceSubscriptionId = sourceSubscriptionId
         };
 
         enrollment.AddDomainEvent(new StudentEnrolledDomainEvent(enrollment.Id, userId, courseId, courseTitle));

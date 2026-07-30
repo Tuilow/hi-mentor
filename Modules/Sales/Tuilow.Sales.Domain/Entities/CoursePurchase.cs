@@ -49,7 +49,7 @@ public sealed class CoursePurchase : AggregateRoot
         ConfirmedAt = DateTime.UtcNow;
         Touch();
 
-        AddDomainEvent(new CoursePurchaseConfirmedDomainEvent(Id, StudentId, CourseId, CreatorId, Amount.Amount));
+        AddDomainEvent(new CoursePurchaseConfirmedDomainEvent(Id, StudentId, CourseId, CreatorId, Amount.Amount, AsaasPaymentId));
     }
 
     public void MarkFailed()

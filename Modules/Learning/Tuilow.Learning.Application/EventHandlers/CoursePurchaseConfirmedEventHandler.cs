@@ -33,6 +33,7 @@ public sealed class CoursePurchaseConfirmedEventHandler(
     IEmailService emailService,
     IWhatsAppService whatsAppService,
     ICreatorChannelRepository creatorChannelRepository,
+    INotificationLogRepository notificationLogRepository,
     IUnitOfWork uow,
     ILogger<CoursePurchaseConfirmedEventHandler> logger
 ) : INotificationHandler<CoursePurchaseConfirmedDomainEvent>
@@ -50,7 +51,11 @@ public sealed class CoursePurchaseConfirmedEventHandler(
 
         if (!await enrollmentRepository.IsEnrolledAsync(notification.StudentId, notification.CourseId, ct))
         {
-            var enrollment = Enrollment.Create(notification.StudentId, notification.CourseId, course.Title);
+            // SourcePurchaseId correlaciona a matrícula com a compra que a originou (achado M12
+            // da auditoria) — permite ao suporte ir direto de Enrollment até CoursePurchase/AsaasPaymentId.
+            var enrollment = Enrollment.Create(
+                notification.StudentId, notification.CourseId, course.Title,
+                sourcePurchaseId: notification.CoursePurchaseId);
             await enrollmentRepository.AddAsync(enrollment, ct);
             await uow.SaveChangesAsync(ct);
         }
@@ -64,16 +69,18 @@ public sealed class CoursePurchaseConfirmedEventHandler(
 
             if (magicLinkToken is not null)
             {
-                await emailService.SendMagicLinkAccessAsync(
-                    contact.Email, contact.FirstName, course.Title, course.Slug.Value, magicLinkToken, ct,
-                    channelHandle: channel?.Handle.Value);
+                await SendEmailAndLogAsync("MagicLinkAccess", contact.Email, notification, () =>
+                    emailService.SendMagicLinkAccessAsync(
+                        contact.Email, contact.FirstName, course.Title, course.Slug.Value, magicLinkToken, ct,
+                        channelHandle: channel?.Handle.Value), ct);
 
                 if (!string.IsNullOrWhiteSpace(contact.Phone))
                 {
                     var redirectPath = channel is not null ? $"/canal/{channel.Handle.Value}" : $"/cursos/{course.Slug.Value}";
                     var magicLinkUrl = $"/acesso?token={magicLinkToken}&redirect={redirectPath}";
                     // Best-effort: hoje é um no-op (sem provedor configurado) — nunca deve
-                    // bloquear a liberação de acesso nem o e-mail, que já foi enviado acima.
+                    // bloquear a liberação de acesso nem o e-mail, que já foi enviado acima. Não
+                    // registra em NotificationLog (o log cobre só os canais realmente em uso).
                     await whatsAppService.SendCourseAccessGrantedAsync(
                         contact.Phone, contact.FirstName, course.Title, magicLinkUrl, ct);
                 }
@@ -82,12 +89,45 @@ public sealed class CoursePurchaseConfirmedEventHandler(
             {
                 // Fallback raríssimo (usuário sumiu entre a checagem de contato e a emissão do
                 // link) — ainda assim avisa por e-mail com o link comum, sem magic link.
-                await emailService.SendCourseAccessGrantedAsync(contact.Email, contact.FirstName, course.Title, course.Slug.Value, ct);
+                await SendEmailAndLogAsync("CourseAccessGranted", contact.Email, notification, () =>
+                    emailService.SendCourseAccessGrantedAsync(contact.Email, contact.FirstName, course.Title, course.Slug.Value, ct), ct);
             }
         }
 
         logger.LogInformation(
             "Acesso liberado automaticamente: compra {PurchaseId}, aluno {StudentId}, curso {CourseId}.",
             notification.CoursePurchaseId, notification.StudentId, notification.CourseId);
+    }
+
+    /// <summary>
+    /// Registra em NotificationLog (achado M12 da auditoria) toda tentativa de e-mail de acesso
+    /// liberado, sucesso ou falha, correlacionada pelo mesmo AsaasPaymentId da compra — sem isso,
+    /// a única evidência de "o e-mail foi enviado?" era uma linha de texto no ILogger, não
+    /// pesquisável. Falha de e-mail é best-effort (não deve derrubar o handler nem impedir os
+    /// outros efeitos colaterais já aplicados) — por isso não relança.
+    /// </summary>
+    private async Task SendEmailAndLogAsync(
+        string template, string recipient, CoursePurchaseConfirmedDomainEvent notification,
+        Func<Task> send, CancellationToken ct)
+    {
+        string? error = null;
+        try
+        {
+            await send();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            logger.LogWarning(ex,
+                "Falha ao enviar e-mail ({Template}) da compra {PurchaseId} para {Recipient}.",
+                template, notification.CoursePurchaseId, recipient);
+        }
+
+        await notificationLogRepository.AddAsync(
+            NotificationLog.Record(
+                "Email", template, recipient, notification.AsaasPaymentId,
+                notification.CoursePurchaseId, error is null, error),
+            ct);
+        await uow.SaveChangesAsync(ct);
     }
 }

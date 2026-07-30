@@ -31,6 +31,7 @@ public sealed class SubscriptionPaymentConfirmedEventHandler(
     IMagicLinkIssuer magicLinkIssuer,
     IEmailService emailService,
     ICreatorChannelRepository creatorChannelRepository,
+    INotificationLogRepository notificationLogRepository,
     IUnitOfWork uow,
     ILogger<SubscriptionPaymentConfirmedEventHandler> logger
 ) : INotificationHandler<PaymentConfirmedDomainEvent>
@@ -54,7 +55,8 @@ public sealed class SubscriptionPaymentConfirmedEventHandler(
             // Plano legado da plataforma (sem produto específico) — acesso já é dinâmico, sem
             // matrícula própria; só notifica o pagamento.
             if (contact is not null)
-                await emailService.SendPaymentConfirmedAsync(contact.Email, contact.FirstName, notification.Amount, ct);
+                await SendEmailAndLogAsync("PaymentConfirmed", contact.Email, notification, () =>
+                    emailService.SendPaymentConfirmedAsync(contact.Email, contact.FirstName, notification.Amount, ct), ct);
             return;
         }
 
@@ -69,7 +71,11 @@ public sealed class SubscriptionPaymentConfirmedEventHandler(
 
         if (!await enrollmentRepository.IsEnrolledAsync(notification.UserId, courseId, ct))
         {
-            var enrollment = Enrollment.Create(notification.UserId, courseId, course.Title);
+            // SourceSubscriptionId correlaciona a matrícula com a assinatura que a originou
+            // (achado M12 da auditoria).
+            var enrollment = Enrollment.Create(
+                notification.UserId, courseId, course.Title,
+                sourceSubscriptionId: notification.SubscriptionId);
             await enrollmentRepository.AddAsync(enrollment, ct);
             await uow.SaveChangesAsync(ct);
         }
@@ -81,20 +87,48 @@ public sealed class SubscriptionPaymentConfirmedEventHandler(
             if (magicLinkToken is not null)
             {
                 var channel = await creatorChannelRepository.GetByCreatorIdAsync(course.InstructorId, ct);
-                await emailService.SendMagicLinkAccessAsync(
-                    contact.Email, contact.FirstName, course.Title, course.Slug.Value, magicLinkToken, ct,
-                    channelHandle: channel?.Handle.Value);
+                await SendEmailAndLogAsync("MagicLinkAccess", contact.Email, notification, () =>
+                    emailService.SendMagicLinkAccessAsync(
+                        contact.Email, contact.FirstName, course.Title, course.Slug.Value, magicLinkToken, ct,
+                        channelHandle: channel?.Handle.Value), ct);
             }
             else
             {
                 // Fallback raríssimo (usuário sumiu entre a checagem de contato e a emissão do
                 // link) — ainda assim avisa por e-mail com o link comum, sem magic link.
-                await emailService.SendCourseAccessGrantedAsync(contact.Email, contact.FirstName, course.Title, course.Slug.Value, ct);
+                await SendEmailAndLogAsync("CourseAccessGranted", contact.Email, notification, () =>
+                    emailService.SendCourseAccessGrantedAsync(contact.Email, contact.FirstName, course.Title, course.Slug.Value, ct), ct);
             }
         }
 
         logger.LogInformation(
             "Acesso liberado automaticamente via assinatura: assinante {UserId}, curso {CourseId}.",
             notification.UserId, courseId);
+    }
+
+    /// <summary>Mesma ideia de CoursePurchaseConfirmedEventHandler.SendEmailAndLogAsync — ver lá para o porquê.</summary>
+    private async Task SendEmailAndLogAsync(
+        string template, string recipient, PaymentConfirmedDomainEvent notification,
+        Func<Task> send, CancellationToken ct)
+    {
+        string? error = null;
+        try
+        {
+            await send();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            logger.LogWarning(ex,
+                "Falha ao enviar e-mail ({Template}) da assinatura {SubscriptionId} para {Recipient}.",
+                template, notification.SubscriptionId, recipient);
+        }
+
+        await notificationLogRepository.AddAsync(
+            NotificationLog.Record(
+                "Email", template, recipient, notification.AsaasPaymentId,
+                notification.SubscriptionId, error is null, error),
+            ct);
+        await uow.SaveChangesAsync(ct);
     }
 }

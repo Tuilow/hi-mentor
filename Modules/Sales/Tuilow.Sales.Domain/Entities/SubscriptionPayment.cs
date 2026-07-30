@@ -37,5 +37,11 @@ public sealed class SubscriptionPayment : Entity
     }
 
     public void Fail() { Status = PaymentStatus.Failed; Touch(); }
-    public void Refund() { Status = PaymentStatus.Refunded; Touch(); }
+    public void Refund()
+    {
+        if (Status == PaymentStatus.Refunded) return;
+
+        Status = PaymentStatus.Refunded;
+        Touch();
+    }
 }

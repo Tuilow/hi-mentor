@@ -30,6 +30,17 @@ public sealed class CoursePurchaseConfirmedEventHandler(
 
     public async Task Handle(CoursePurchaseConfirmedDomainEvent notification, CancellationToken ct)
     {
+        // Idempotente: essencial para o reprocessamento manual (achado C2/M1 da auditoria) não
+        // creditar a carteira do criador duas vezes para a mesma compra — mesmo padrão de
+        // Learning.IsEnrolledAsync (a outra reação a este mesmo evento).
+        if (await walletRepository.HasSaleTransactionForPurchaseAsync(notification.CoursePurchaseId, ct))
+        {
+            logger.LogInformation(
+                "Comissão já aplicada anteriormente para a compra {PurchaseId} — nada a fazer.",
+                notification.CoursePurchaseId);
+            return;
+        }
+
         var feeConfig = await feeConfigRepository.GetActiveAsync(ct);
         var feePercentage = feeConfig?.Percentage ?? DefaultFeePercentage;
 

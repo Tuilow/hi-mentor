@@ -13,6 +13,7 @@ public static class DependencyInjection
     public static IServiceCollection AddLearningInfrastructure(this IServiceCollection services)
     {
         services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
+        services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
         services.AddScoped<ICourseAccessChecker, SalesCourseAccessChecker>();
         // Serviço único de "o usuário tem acesso a este curso?" (SharedKernel — consumido por
         // Learning, Streaming e Channel). Ver IUserCourseAccessService para a regra completa.

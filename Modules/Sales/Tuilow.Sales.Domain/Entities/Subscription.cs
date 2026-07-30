@@ -123,6 +123,7 @@ public sealed class Subscription : AggregateRoot
     {
         var payment = _payments.SingleOrDefault(p => p.AsaasPaymentId == asaasPaymentId);
         if (payment is null) return; // nada a reembolsar — não há registro desse pagamento
+        if (payment.Status == PaymentStatus.Refunded) return;
 
         payment.Refund();
 
@@ -136,6 +137,8 @@ public sealed class Subscription : AggregateRoot
 
     public void Cancel(string? reason = null)
     {
+        if (Status == SubscriptionStatus.Cancelled) return;
+
         Status = SubscriptionStatus.Cancelled;
         CancelledAt = DateTime.UtcNow;
         CancelReason = reason;

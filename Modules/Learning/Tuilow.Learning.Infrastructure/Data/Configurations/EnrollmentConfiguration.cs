@@ -8,7 +8,12 @@ public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollmen
 {
     public void Configure(EntityTypeBuilder<Enrollment> builder)
     {
-        builder.ToTable("enrollments", "learning");
+        builder.ToTable("enrollments", "learning", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_enrollments_single_source",
+                "\"SourcePurchaseId\" IS NULL OR \"SourceSubscriptionId\" IS NULL");
+        });
         builder.HasKey(e => e.Id);
 
         builder.HasIndex(e => new { e.UserId, e.CourseId })
@@ -16,6 +21,8 @@ public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollmen
 
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(50);
         builder.Property(e => e.ProgressPercentage).HasPrecision(5, 2);
+        builder.Property(e => e.SourcePurchaseId);
+        builder.Property(e => e.SourceSubscriptionId);
 
         builder.HasMany(e => e.LessonsProgress)
             .WithOne()

@@ -12,6 +12,8 @@ using CreatorStudioEntities = Tuilow.CreatorStudio.Domain.Entities;
 using ChannelEntities = Tuilow.Channel.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Tuilow.Host.Api.Data;
 
@@ -30,7 +32,9 @@ namespace Tuilow.Host.Api.Data;
 /// </summary>
 public sealed class AppDbContext(
     DbContextOptions<AppDbContext> options,
-    IMediator mediator
+    IMediator mediator,
+    IServiceProvider serviceProvider,
+    ILogger<AppDbContext> logger
 ) : DbContext(options), IUnitOfWork
 {
     // IdentidadeAcesso
@@ -54,6 +58,10 @@ public sealed class AppDbContext(
     public DbSet<LearningEntities.Enrollment> Enrollments => Set<LearningEntities.Enrollment>();
     public DbSet<LearningEntities.LessonProgress> LessonProgress => Set<LearningEntities.LessonProgress>();
     public DbSet<LearningEntities.Certificate> Certificates => Set<LearningEntities.Certificate>();
+
+    // Learning — log mínimo de notificações (achado M12 da auditoria): correlaciona pagamento,
+    // matrícula e tentativa de e-mail/WhatsApp pelo mesmo AsaasPaymentId/CorrelationId.
+    public DbSet<LearningEntities.NotificationLog> NotificationLogs => Set<LearningEntities.NotificationLog>();
 
     // Journey
     public DbSet<JourneyEntities.LearnerProfile> LearnerProfiles => Set<JourneyEntities.LearnerProfile>();
@@ -156,6 +164,46 @@ public sealed class AppDbContext(
             .ToList();
 
         foreach (var domainEvent in events)
+            await PublishDomainEventAsync(domainEvent, ct);
+    }
+
+    private async Task PublishDomainEventAsync(IDomainEvent domainEvent, CancellationToken ct)
+    {
+        var handlerType = typeof(INotificationHandler<>).MakeGenericType(domainEvent.GetType());
+        var handlers = serviceProvider.GetServices(handlerType).ToList();
+
+        if (handlers.Count == 0)
+        {
             await mediator.Publish(domainEvent, ct);
+            return;
+        }
+
+        var handleMethod = handlerType.GetMethod("Handle")
+            ?? throw new InvalidOperationException($"Handler {handlerType.Name} sem metodo Handle.");
+
+        foreach (var handler in handlers)
+        {
+            try
+            {
+                if (handler is null) continue;
+
+                var task = handleMethod.Invoke(handler, [domainEvent, ct]) as Task
+                    ?? throw new InvalidOperationException(
+                        $"Handler {handler.GetType().Name} retornou resultado invalido.");
+
+                await task;
+            }
+            catch (Exception ex)
+            {
+                // Achado C2: o estado que originou o evento já foi commitado. Cada handler roda
+                // isoladamente para que uma falha em Learning não impeça Finance, ou vice-versa.
+                logger.LogCritical(ex,
+                    "Falha ao processar domain event {EventType} no handler {HandlerType} " +
+                    "(EventId {EventId}, ocorrido em {OccurredOn}) — efeito colateral pode não ter sido aplicado " +
+                    "(matrícula/e-mail/comissão). Payload: {DomainEvent}",
+                    domainEvent.GetType().Name, handler?.GetType().Name ?? handlerType.Name,
+                    domainEvent.EventId, domainEvent.OccurredOn, domainEvent);
+            }
+        }
     }
 }
