@@ -118,14 +118,20 @@ public sealed class EmailService(
         await SendAsync(to, $"Acesso liberado: {courseTitle} — Tuilow", body, ct);
     }
 
-    public async Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateUrl, CancellationToken ct = default)
+    public async Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateCode, CancellationToken ct = default)
     {
+        // Achado A4 da avaliação: aponta para a página pública de verificação (/certificado/{code}
+        // no frontend, GET /api/v1/certificates/verify/{code} no backend) — hoje NÃO existe um PDF
+        // gerado automaticamente, então o botão leva à confirmação de autenticidade (nome do aluno,
+        // curso, data de emissão), não a um download. Ver relatório desta rodada.
+        var certificateUrl = $"{_frontendUrl}/certificado/{certificateCode}";
         var body = $"""
             <h2>Parabéns, {firstName}! 🏆</h2>
-            <p>Você concluiu o curso <strong>{courseTitle}</strong>!</p>
+            <p>Você concluiu o curso <strong>{courseTitle}</strong>! Seu certificado já está disponível para consulta.</p>
             <a href="{certificateUrl}" style="background:#1D4ED8;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">
-                Baixar Certificado
+                Ver Certificado
             </a>
+            <p style="color:#6B7280;font-size:13px;">Código de verificação: {certificateCode}</p>
             """;
         await SendAsync(to, $"Certificado de Conclusão — {courseTitle}", body, ct);
     }

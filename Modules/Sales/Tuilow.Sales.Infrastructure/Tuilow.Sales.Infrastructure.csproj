@@ -24,5 +24,9 @@
     <!-- Acoplamento legítimo: IUserProvisioningService consulta/cria contas no módulo
          IdentidadeAcesso para o checkout anônimo (compra sem login prévio). -->
     <ProjectReference Include="..\..\IdentidadeAcesso\Tuilow.IdentidadeAcesso.Domain\Tuilow.IdentidadeAcesso.Domain.csproj" />
+    <!-- Acoplamento legítimo (achado A5 da avaliação): FinanceWalletCreditChecker consulta o
+         módulo Finance para o job de reconciliação (venda Confirmed sem WalletTransaction
+         correspondente) — mesma direção de acoplamento já usada acima para IdentidadeAcesso. -->
+    <ProjectReference Include="..\..\Finance\Tuilow.Finance.Domain\Tuilow.Finance.Domain.csproj" />
   </ItemGroup>
 </Project>

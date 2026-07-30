@@ -136,4 +136,24 @@ public sealed class CourseRepository(DbContext context) : ICourseRepository
 
         return (items, total);
     }
+
+    /// <summary>
+    /// Achado M8: junção leve Attachment -> Lesson -> Module -> Course por FileUrl, sem carregar
+    /// o agregado inteiro (evita os múltiplos Include de GetByIdAsync só para checar acesso a
+    /// um anexo). Cada FileUrl é gerada com um Guid novo por MaterialsUploadController.Upload,
+    /// então o filtro por igualdade é seletivo o bastante mesmo sem índice dedicado.
+    /// </summary>
+    public async Task<MaterialAccessInfo?> GetMaterialAccessInfoAsync(string fileUrl, CancellationToken ct = default)
+    {
+        var result = await (
+            from attachment in context.Set<LessonAttachment>()
+            where attachment.FileUrl == fileUrl
+            join lesson in context.Set<Lesson>() on attachment.LessonId equals lesson.Id
+            join module in context.Set<Module>() on lesson.ModuleId equals module.Id
+            join course in context.Set<Course>() on module.CourseId equals course.Id
+            select new { course.Id, course.InstructorId, lesson.IsPreview }
+        ).FirstOrDefaultAsync(ct);
+
+        return result is null ? null : new MaterialAccessInfo(result.Id, result.InstructorId, result.IsPreview);
+    }
 }

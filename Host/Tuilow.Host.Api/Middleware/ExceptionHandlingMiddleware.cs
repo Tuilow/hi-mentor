@@ -32,6 +32,15 @@ public sealed class ExceptionHandlingMiddleware(
             UnauthorizedException ue => (401, ue.Message, (Dictionary<string, object>?)null),
             ForbiddenException fe => (403, fe.Message, (Dictionary<string, object>?)null),
             BusinessException be => (422, be.Message, (Dictionary<string, object>?)null),
+            // Achado M5 da avaliação: diferente do InvalidOperationException genérico abaixo
+            // (usado também por validações de domínio que DEVEM chegar ao usuário, ex.:
+            // Course.Publish), ExternalServiceException é sempre uma falha de integração
+            // externa (Asaas, Cloudflare Stream) — a Message pode conter texto cru do
+            // provedor terceiro, então nunca repassamos ela ao cliente. O log em InvokeAsync
+            // já registrou a Message completa para investigação interna.
+            ExternalServiceException => (502,
+                "Não foi possível completar a operação com um serviço externo no momento. Tente novamente em instantes.",
+                (Dictionary<string, object>?)null),
             InvalidOperationException ioe => (422, ioe.Message, (Dictionary<string, object>?)null),
             _ => (500, "Ocorreu um erro interno. Tente novamente mais tarde.", (Dictionary<string, object>?)null)
         };

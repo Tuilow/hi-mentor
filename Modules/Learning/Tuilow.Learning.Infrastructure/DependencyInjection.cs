@@ -14,6 +14,10 @@ public static class DependencyInjection
     {
         services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
         services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
+        // Achado A4 da avaliação: Certificate existia no domínio mas nunca era instanciado — ver
+        // CourseCompletedEventHandler (Learning.Application/EventHandlers), que agora emite o
+        // certificado reagindo à conclusão do curso.
+        services.AddScoped<ICertificateRepository, CertificateRepository>();
         services.AddScoped<ICourseAccessChecker, SalesCourseAccessChecker>();
         // Serviço único de "o usuário tem acesso a este curso?" (SharedKernel — consumido por
         // Learning, Streaming e Channel). Ver IUserCourseAccessService para a regra completa.

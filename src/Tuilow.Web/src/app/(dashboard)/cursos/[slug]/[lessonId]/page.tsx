@@ -163,8 +163,57 @@ export default function LessonPlayerPage() {
     if (!enrollmentProgress?.enrollmentId || !totalSeconds) return;
     enrollmentsApi.trackProgress(enrollmentProgress.enrollmentId, {
       lessonId, watchedSeconds: Math.floor(watchedSeconds), totalSeconds: Math.floor(totalSeconds),
+      // Achado M6 da avaliação: instante em que o CLIENTE leu o currentTime (não quando a
+      // requisição chega no servidor) — deixa o backend distinguir "evento antigo chegando
+      // atrasado" de "evento realmente mais novo", em vez de só aplicar quem chegar por último.
+      clientCapturedAt: new Date().toISOString(),
     }).catch(() => { /* não trava o player por causa disso — tenta de novo no próximo intervalo */ });
   };
+
+  // Achado B10 da avaliação: até aqui só salvava a cada 10s e em pause/ended — fechar a aba sem
+  // pausar (ex.: Ctrl+W, fechar o navegador) podia perder até ~10s de progresso. visibilitychange
+  // dispara de forma confiável em troca de aba/minimizar/fechar (inclusive mobile); pagehide cobre
+  // navegação/fechamento em navegadores que não disparam visibilitychange a tempo. keepalive
+  // mantém a requisição viva mesmo com a página sendo descartada — sem ele, o navegador cancelaria
+  // um fetch/XHR comum no meio da saída da página.
+  useEffect(() => {
+    const flushOnExit = () => {
+      const video = videoRef.current;
+      if (!video || !video.duration || !enrollmentProgress?.enrollmentId) return;
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+      try {
+        fetch(`${apiUrl}/api/v1/enrollments/${enrollmentProgress.enrollmentId}/progress`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            lessonId,
+            watchedSeconds: Math.floor(video.currentTime),
+            totalSeconds: Math.floor(video.duration),
+            clientCapturedAt: new Date().toISOString(),
+          }),
+          keepalive: true,
+        }).catch(() => { /* best-effort — não pode travar o fechamento da aba */ });
+      } catch {
+        /* keepalive/fetch podem não existir em navegadores muito antigos — ignora */
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushOnExit();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', flushOnExit);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', flushOnExit);
+    };
+  }, [enrollmentProgress?.enrollmentId, lessonId]);
 
   // Ao carregar os metadados do vídeo, pula direto pra onde o aluno parou da última vez
   // (só uma vez por aula — depois disso o aluno pode navegar livremente sem ser "puxado de volta").

@@ -23,6 +23,7 @@ using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Tuilow.CreatorStudio.Api.Controllers;
 
@@ -89,9 +90,16 @@ public sealed class CreatorStudioController(ISender sender, ICurrentUserService 
         return Ok(result);
     }
 
-    /// <summary>Captura um lead da página de vendas pública — endpoint anônimo (sem exigir papel de Creator).</summary>
+    /// <summary>
+    /// Captura um lead da página de vendas pública — endpoint anônimo (sem exigir papel de
+    /// Creator). Achado M9 da avaliação: sem limite de taxa, um script conseguia inundar o
+    /// banco de leads falsos. EnableRateLimiting("leads") aplica a política registrada em
+    /// Program.cs (5 requisições/10min por IP) — captcha explicitamente NÃO implementado,
+    /// fora do escopo deste achado.
+    /// </summary>
     [HttpPost("leads")]
     [AllowAnonymous]
+    [EnableRateLimiting("leads")]
     public async Task<IActionResult> CaptureLead([FromBody] CaptureLeadCommand command, CancellationToken ct)
     {
         var leadId = await sender.Send(command, ct);

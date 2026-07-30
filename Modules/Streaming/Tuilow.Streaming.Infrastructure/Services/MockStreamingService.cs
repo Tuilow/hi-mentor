@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Tuilow.Streaming.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -10,7 +12,7 @@ namespace Tuilow.Streaming.Infrastructure.Services;
 ///   1. GetDirectUploadUrlAsync  → uid falso + uploadUrl → /api/v1/mock/tus/{uid}
 ///   2. MockTusController salva o vídeo em disco em mock-videos/{uid}
 ///   3. MockTusController marca o vídeo como pronto no banco
-///   4. GetSignedPlaybackUrlAsync → /api/v1/mock/videos/{uid}  (serve o arquivo local)
+///   4. GetSignedPlaybackUrlAsync → /api/v1/mock/videos/{uid}?exp=...&sig=...  (serve o arquivo local)
 /// </summary>
 public sealed class MockStreamingService(
     IHttpContextAccessor httpContextAccessor,
@@ -37,6 +39,32 @@ public sealed class MockStreamingService(
         }
     }
 
+    /// <summary>
+    /// Achado C3 da avaliação: MockStreamingService é quem está DE FATO ativo hoje
+    /// (Cloudflare:MockMode=true) — corrigir só o CloudflareStreamService (que nem roda em
+    /// dev) deixaria o achado real sem efeito nenhum na prática. Reaproveita Jwt:Secret (já
+    /// obrigatório no startup, nunca vazio) como chave HMAC, com um prefixo de propósito
+    /// ("mock-stream") pra não reutilizar o mesmo par (chave, mensagem) do JWT de autenticação
+    /// da aplicação — mesmo secret, domínios de assinatura diferentes. Público e estático para
+    /// que MockTusController.GetVideo (Streaming.Api) recompute exatamente o mesmo HMAC na hora
+    /// de validar — duas implementações independentes do mesmo cálculo divergiriam
+    /// silenciosamente no primeiro ajuste feito só de um lado.
+    /// </summary>
+    public static string ComputeSignature(string uid, long expiresAt, IConfiguration configuration)
+    {
+        var secret = configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret não configurado.");
+
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes($"mock-stream:{uid}:{expiresAt}"));
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static (string Signature, long ExpiresAt) SignMockVideo(string uid, IConfiguration configuration, int expirationMinutes)
+    {
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(expirationMinutes).ToUnixTimeSeconds();
+        return (ComputeSignature(uid, expiresAt, configuration), expiresAt);
+    }
+
     public Task<DirectUploadResult> GetDirectUploadUrlAsync(CancellationToken ct = default)
     {
         var fakeUid   = Guid.NewGuid().ToString("N");
@@ -44,13 +72,19 @@ public sealed class MockStreamingService(
         return Task.FromResult(new DirectUploadResult(fakeUid, uploadUrl));
     }
 
+    /// <summary>
+    /// Achado C3 da avaliação: antes devolvia a URL pública do arquivo em disco, sem token nem
+    /// expiração — qualquer um com o link assistia/baixava para sempre. Agora anexa um token
+    /// HMAC + timestamp de expiração; MockTusController.GetVideo valida os dois antes de servir
+    /// o arquivo (ver SignMockVideo acima).
+    /// </summary>
     public Task<string> GetSignedPlaybackUrlAsync(
         string cloudflareVideoId,
         int expirationMinutes = 60,
         CancellationToken ct = default)
     {
-        // Retorna a URL do arquivo salvo em disco pelo MockTusController
-        return Task.FromResult($"{ApiBaseUrl}/api/v1/mock/videos/{cloudflareVideoId}");
+        var (signature, expiresAt) = SignMockVideo(cloudflareVideoId, configuration, expirationMinutes);
+        return Task.FromResult($"{ApiBaseUrl}/api/v1/mock/videos/{cloudflareVideoId}?exp={expiresAt}&sig={signature}");
     }
 
     public Task DeleteVideoAsync(string cloudflareVideoId, CancellationToken ct = default)

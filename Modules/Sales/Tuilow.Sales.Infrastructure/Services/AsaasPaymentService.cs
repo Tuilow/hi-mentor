@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Tuilow.SharedKernel.Application.Exceptions;
 using Tuilow.Sales.Application.Interfaces;
 using Tuilow.Sales.Domain.Enums;
 using Microsoft.Extensions.Configuration;
@@ -38,7 +39,11 @@ public sealed class AsaasPaymentService(
         }
         catch { /* ignora falha no parse */ }
 
-        throw new InvalidOperationException(
+        // Achado M5 da avaliação: era InvalidOperationException — o middleware global tratava
+        // isso como 422 e devolvia a Message (incluindo texto cru vindo da Asaas) direto ao
+        // cliente. ExternalServiceException é sanitizada pelo middleware; a Message completa
+        // (com o corpo de erro da Asaas) já foi logada acima para investigação interna.
+        throw new ExternalServiceException(
             $"Asaas {operation}: {errorMessage ?? $"HTTP {(int)response.StatusCode}"}");
     }
 

@@ -16,4 +16,13 @@ public interface ICoursePurchaseRepository : IRepository<CoursePurchase>
     /// achado B4 da auditoria).
     /// </summary>
     Task<IEnumerable<CoursePurchase>> GetPendingOlderThanAsync(DateTime threshold, CancellationToken ct = default);
+
+    /// <summary>
+    /// Compras Confirmed dentro da janela [lookbackFloor, graceThreshold] — usado pelo job de
+    /// reconciliação (achado A5 da auditoria). graceThreshold dá tempo do fluxo normal (domain
+    /// event → Finance) rodar antes de alertar por engano; lookbackFloor evita reescanear o
+    /// histórico inteiro a cada execução.
+    /// </summary>
+    Task<IEnumerable<CoursePurchase>> GetConfirmedForReconciliationAsync(
+        DateTime lookbackFloor, DateTime graceThreshold, CancellationToken ct = default);
 }

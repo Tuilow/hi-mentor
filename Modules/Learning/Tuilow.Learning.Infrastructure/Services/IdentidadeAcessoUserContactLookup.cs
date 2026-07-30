@@ -9,6 +9,8 @@ public sealed class IdentidadeAcessoUserContactLookup(IUserRepository userReposi
     public async Task<UserContact?> GetContactAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await userRepository.GetByIdAsync(userId, ct);
-        return user is null ? null : new UserContact(user.Email.Value, user.Profile.FirstName, user.Profile.Phone);
+        return user is null
+            ? null
+            : new UserContact(user.Email.Value, user.Profile.FirstName, user.Profile.Phone, user.Profile.LastName);
     }
 }

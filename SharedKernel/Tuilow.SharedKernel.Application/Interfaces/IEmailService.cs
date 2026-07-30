@@ -15,7 +15,15 @@ public interface IEmailService
     Task SendWelcomeAsync(Guid userId, string to, string firstName, string confirmationToken, CancellationToken ct = default);
     Task SendPasswordResetAsync(string to, string firstName, string resetToken, CancellationToken ct = default);
     Task SendPaymentConfirmedAsync(string to, string firstName, decimal amount, CancellationToken ct = default);
-    Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateUrl, CancellationToken ct = default);
+
+    /// <summary>
+    /// Achado A4 da avaliação: Certificate existia no domínio mas nunca era emitido nem enviado —
+    /// ver CourseCompletedEventHandler (Learning.Application/EventHandlers), que agora chama isto
+    /// ao emitir um certificado real. certificateCode (não mais uma URL pronta) — a implementação
+    /// monta o link de verificação pública a partir dele, mesmo padrão de courseSlug em
+    /// SendCourseAccessGrantedAsync/SendMagicLinkAccessAsync abaixo.
+    /// </summary>
+    Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateCode, CancellationToken ct = default);
 
     /// <summary>
     /// Disparado quando o acesso a um curso é liberado (compra avulsa confirmada ou assinatura

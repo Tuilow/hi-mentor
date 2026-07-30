@@ -279,6 +279,10 @@ function PostRecordingActions({ blob, recordedUrl, scriptId }: { blob: Blob; rec
           chunkSize: 50 * 1024 * 1024,
           retryDelays: [0, 3000, 5000, 10000],
           metadata: { filename: file.name, filetype: file.type },
+          // Achado M10 da avaliação: o mock de upload de vídeo (MockTusController) passou a
+          // exigir [Authorize(Roles="Creator,Admin")] nos métodos de escrita (Options/Head/
+          // Patch) — sem enviar o token aqui, o upload passaria a falhar com 401.
+          headers: { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` },
           onError: reject,
           onSuccess: () => resolve(),
         });

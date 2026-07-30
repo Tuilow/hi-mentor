@@ -43,7 +43,12 @@ export default function DashboardPage() {
   const avgProgress = myEnrollments.length > 0
     ? Math.round(myEnrollments.reduce((acc, e) => acc + e.progressPercentage, 0) / myEnrollments.length)
     : 0;
-  const certificatesCount = myEnrollments.filter(e => e.status === 'Completed').length;
+  // Achado M7 da avaliação: chamava-se "certificados conquistados", mas nenhum certificado é
+  // emitido de fato (ver achado A4) — é só a contagem de matrículas com status Completed. Manter
+  // o rótulo antigo prometia um documento que o aluno não consegue baixar. Renomeado para
+  // "cursos concluídos" (a métrica em si está correta, só o nome estava errado) até a emissão
+  // real de certificados existir.
+  const completedCoursesCount = myEnrollments.filter(e => e.status === 'Completed').length;
 
   const isCreator = user?.roles?.includes('Creator') || user?.roles?.includes('Admin');
 
@@ -53,6 +58,8 @@ export default function DashboardPage() {
       // O backend já devolve um access token novo (com o claim de role "Creator") e regrava o
       // cookie HttpOnly de refresh token — evita uma chamada extra a /auth/refresh-token logo em
       // seguida, que competia pelo refresh token de uso único e causava um erro intermitente aqui.
+      // Nota: refresh token não é mais gravado aqui — ele só existe no cookie HttpOnly (achado
+      // C1), nunca no corpo da resposta nem em localStorage.
       const { data } = await authApi.becomeCreator();
       localStorage.setItem('access_token', data.accessToken);
 
@@ -137,7 +144,7 @@ export default function DashboardPage() {
           { label: 'Cursos',       value: String(myEnrollments.length), sub: 'matriculados' },
           { label: 'Aulas',        value: String(totalCompletedLessons), sub: 'concluídas' },
           { label: 'Progresso',    value: `${avgProgress}%`, sub: 'médio' },
-          { label: 'Certificados', value: String(certificatesCount), sub: 'conquistados' },
+          { label: 'Concluídos', value: String(completedCoursesCount), sub: 'cursos concluídos' },
         ].map(s => (
           <div key={s.label} className="card border-gray-200 text-center">
             <p className="text-2xl font-bold gradient-text">{s.value}</p>

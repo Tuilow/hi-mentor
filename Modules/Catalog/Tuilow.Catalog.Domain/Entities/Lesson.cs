@@ -60,4 +60,12 @@ public sealed class Lesson : Entity
         Touch();
         return exercise;
     }
+
+    /// <summary>Achado B6 da avaliação: mesmo método já existente em Module, agora espelhado
+    /// aqui — antes não havia como reordenar aulas dentro de um módulo, só entre módulos.</summary>
+    public void Reorder(int newOrder)
+    {
+        Order = newOrder;
+        Touch();
+    }
 }

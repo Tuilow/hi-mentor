@@ -33,7 +33,7 @@ public sealed class EnrollmentsController(ISender sender, ICurrentUserService cu
     {
         await sender.Send(new CompleteLessonCommand(
             currentUser.UserId!.Value, enrollmentId,
-            request.LessonId, request.WatchedSeconds, request.TotalSeconds), ct);
+            request.LessonId, request.WatchedSeconds, request.TotalSeconds, request.ClientCapturedAt), ct);
         return Ok();
     }
 
@@ -73,4 +73,7 @@ public sealed class EnrollmentsController(ISender sender, ICurrentUserService cu
 }
 
 public sealed record EnrollRequest(Guid CourseId);
-public sealed record TrackProgressRequest(Guid LessonId, int WatchedSeconds, int TotalSeconds);
+
+/// <summary>ClientCapturedAt (achado M6) — ver doc de CompleteLessonCommand.</summary>
+public sealed record TrackProgressRequest(
+    Guid LessonId, int WatchedSeconds, int TotalSeconds, DateTime? ClientCapturedAt = null);

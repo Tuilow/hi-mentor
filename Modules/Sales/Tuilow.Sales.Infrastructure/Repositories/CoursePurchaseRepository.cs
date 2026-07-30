@@ -46,4 +46,14 @@ public sealed class CoursePurchaseRepository(DbContext context) : ICoursePurchas
         await context.Set<CoursePurchaseEntity>()
             .Where(p => p.Status == CoursePurchaseStatus.Pending && p.CreatedAt < threshold)
             .ToListAsync(ct);
+
+    // A5: usado pelo job de reconciliação (Confirmed sem crédito correspondente na carteira do criador).
+    public async Task<IEnumerable<CoursePurchaseEntity>> GetConfirmedForReconciliationAsync(
+        DateTime lookbackFloor, DateTime graceThreshold, CancellationToken ct = default) =>
+        await context.Set<CoursePurchaseEntity>()
+            .Where(p => p.Status == CoursePurchaseStatus.Confirmed
+                && p.ConfirmedAt != null
+                && p.ConfirmedAt >= lookbackFloor
+                && p.ConfirmedAt <= graceThreshold)
+            .ToListAsync(ct);
 }

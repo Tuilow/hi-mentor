@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Tuilow.SharedKernel.Infrastructure;
 using Tuilow.IdentidadeAcesso.Api;
 using Tuilow.Catalog.Api;
@@ -19,6 +20,7 @@ using Tuilow.Host.Api.Data;
 using Tuilow.Host.Api.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -61,7 +63,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default"),
         npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public"));
 
-    
+
 });
 
 builder.Services.AddScoped<Tuilow.SharedKernel.Application.Interfaces.IUnitOfWork>(
@@ -139,6 +141,17 @@ if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Co
         "Asaas:WebhookSecret não configurado. Obrigatório fora de Development — configure o mesmo token cadastrado no painel da Asaas ao criar o webhook.");
 }
 
+// ─── CLOUDFLARE STREAM WEBHOOK SECRET (obrigatório fora de Development) ───────
+// Achado A6 da avaliação: mesmo raciocínio do guard da Asaas acima — sem este secret,
+// CloudflareStreamWebhookController aceitava qualquer POST sem checar o header
+// "Webhook-Signature", permitindo forjar eventos "stream.video.finished" com um uid
+// conhecido/adivinhado.
+if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Cloudflare:StreamWebhookSecret"]))
+{
+    throw new InvalidOperationException(
+        "Cloudflare:StreamWebhookSecret não configurado. Obrigatório fora de Development — configure o mesmo secret cadastrado no painel da Cloudflare ao criar o webhook do Stream.");
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
     {
@@ -173,6 +186,40 @@ builder.Services.AddCors(opt =>
             // da resposta e falha com "failed to resume upload".
             .WithExposedHeaders("Upload-Offset", "Upload-Length", "Upload-Defer-Length",
                 "Tus-Resumable", "Tus-Version", "Tus-Max-Size", "Location"));
+});
+
+// ─── RATE LIMITING ────────────────────────────────────────────────────────────
+// Achado M9 da avaliação: POST /api/v1/creator-studio/leads é público (AllowAnonymous, sem
+// captcha) e não tinha nenhum limite de taxa — um script simples conseguia inundar o banco de
+// leads falsos ou disparar e-mail/WhatsApp de confirmação em massa. Particiona por IP do
+// requisitante (RemoteIpAddress) via API nativa do ASP.NET Core (Microsoft.AspNetCore.App,
+// sem pacote NuGet extra). Captcha explicitamente NÃO implementado aqui — exigiria escolher e
+// integrar um provedor externo (ex.: hCaptcha/Turnstile), fora do escopo deste achado pontual.
+builder.Services.AddRateLimiter(opt =>
+{
+    opt.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    opt.AddPolicy("leads", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(10),
+            QueueLimit = 0
+        }));
+
+    // Achado B8 da avaliação: nenhum endpoint tinha limite de taxa, incluindo login/registro/
+    // esqueci-minha-senha — facilitava força bruta de senha e enumeração de e-mails cadastrados.
+    // Mais permissivo que "leads" (usuário legítimo erra a senha algumas vezes sem problema),
+    // mas suficiente para tornar um ataque de força bruta impraticável em volume.
+    opt.AddPolicy("auth", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(5),
+            QueueLimit = 0
+        }));
 });
 
 // ─── HEALTH CHECKS ────────────────────────────────────────────────────────────
@@ -211,6 +258,7 @@ app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHealthChecks("/health");

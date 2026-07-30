@@ -1,7 +1,10 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type { RegisterRequest, LoginRequest } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+// Exportado (achado B10 da avaliação) — a página da aula usa isto para montar a URL do fetch
+// "keepalive" disparado em visibilitychange/pagehide, fora do axios (ver
+// (dashboard)/cursos/[slug]/[lessonId]/page.tsx), sem duplicar o fallback de localhost aqui.
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
@@ -207,6 +210,14 @@ export const coursesApi = {
     api.post(`/courses/${courseId}/modules/${moduleId}/lessons`, data),
   addAttachment: (courseId: string, moduleId: string, lessonId: string, data: unknown) =>
     api.post(`/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/attachments`, data),
+  // Achado B6 da avaliação: reordenar módulos/aulas por arrastar-e-soltar. Wrappers finos —
+  // exigem a lista COMPLETA de IDs (do módulo, ou de aulas dentro de um módulo) na nova ordem
+  // desejada. Ainda não há UI de drag-and-drop consumindo isto no assistente; o backend já
+  // suporta para quando essa UI entrar no roadmap.
+  reorderModules: (courseId: string, orderedModuleIds: string[]) =>
+    api.put(`/courses/${courseId}/modules/reorder`, { orderedModuleIds }),
+  reorderLessons: (courseId: string, moduleId: string, orderedLessonIds: string[]) =>
+    api.put(`/courses/${courseId}/modules/${moduleId}/lessons/reorder`, { orderedLessonIds }),
 };
 
 export interface CategoryOption {
@@ -351,6 +362,13 @@ export const channelApi = {
   }) => api.put('/channel/me', data),
   // Público — não exige login. viewerUserId é inferido no backend via token opcional.
   getByHandle: (handle: string) => api.get(`/channel/${handle}`),
+};
+
+// Achado A4 da avaliação: verificação pública de autenticidade de certificado — página
+// /certificado/[code] chama isto para confirmar que um código realmente foi emitido, sem exigir
+// login (é para ser conferível por qualquer pessoa, ex.: um recrutador).
+export const certificatesApi = {
+  verify: (code: string) => api.get(`/certificates/verify/${code}`),
 };
 
 // "Meus Perfis" (learnerProfilesApi) removido temporariamente da experiência do usuário — era

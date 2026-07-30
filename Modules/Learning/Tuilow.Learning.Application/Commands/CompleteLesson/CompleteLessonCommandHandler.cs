@@ -26,7 +26,7 @@ public sealed class CompleteLessonCommandHandler(
         var totalLessons = course.Modules.SelectMany(m => m.Lessons).Count();
 
         var newProgress = enrollment.TrackLessonProgress(
-            request.LessonId, request.WatchedSeconds, request.TotalSeconds, totalLessons);
+            request.LessonId, request.WatchedSeconds, request.TotalSeconds, totalLessons, request.ClientCapturedAt);
 
         // Registra explicitamente como Added quando é um progresso novo — evita
         // DbUpdateConcurrencyException (mesmo padrão usado em Catalog.AddModule/AddLesson).

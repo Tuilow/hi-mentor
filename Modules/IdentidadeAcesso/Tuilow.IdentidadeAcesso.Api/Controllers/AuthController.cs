@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 
 namespace Tuilow.IdentidadeAcesso.Api.Controllers;
@@ -85,8 +86,11 @@ public sealed class AuthController(
     /// Registra novo usuário com e-mail e senha. Não faz login automático (Sprint Item 4) — a
     /// conta nasce pendente de confirmação; um código de 6 dígitos é enviado por e-mail e deve
     /// ser confirmado em /auth/confirm-email antes que /auth/login funcione para esta conta.
+    /// Achado B8 da avaliação: rate limit por IP — sem isso, um script conseguia criar contas
+    /// em massa (spam de e-mail de confirmação para terceiros, sobrecarga do provedor de e-mail).
     /// </summary>
     [HttpPost("register")]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -96,8 +100,12 @@ public sealed class AuthController(
         return Ok(result);
     }
 
-    /// <summary>Autentica usuário com e-mail e senha.</summary>
+    /// <summary>
+    /// Autentica usuário com e-mail e senha. Achado B8 da avaliação: rate limit por IP — sem
+    /// isso, nada impedia uma tentativa de força bruta de senha contra uma conta conhecida.
+    /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginUserCommand command, CancellationToken ct)
@@ -174,8 +182,13 @@ public sealed class AuthController(
         return Ok(new { message = "E-mail confirmado com sucesso." });
     }
 
-    /// <summary>Solicita redefinição de senha.</summary>
+    /// <summary>
+    /// Solicita redefinição de senha. Achado B8 da avaliação: rate limit por IP — sem isso,
+    /// dava pra usar este endpoint para enumerar e-mails cadastrados em massa (timing/volume)
+    /// ou para bombardear a caixa de entrada de terceiros com e-mails de redefinição.
+    /// </summary>
     [HttpPost("forgot-password")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordCommand command, CancellationToken ct)
     {
         await sender.Send(command, ct);

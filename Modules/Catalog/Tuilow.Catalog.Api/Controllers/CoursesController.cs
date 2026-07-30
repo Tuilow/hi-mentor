@@ -7,6 +7,8 @@ using Tuilow.Catalog.Application.Commands.DeleteCourse;
 using Tuilow.Catalog.Application.Commands.DuplicateCourse;
 using Tuilow.Catalog.Application.Commands.PublishCourse;
 using Tuilow.Catalog.Application.Commands.RecordCourseView;
+using Tuilow.Catalog.Application.Commands.ReorderLessons;
+using Tuilow.Catalog.Application.Commands.ReorderModules;
 using Tuilow.Catalog.Application.Commands.SetCoursePrice;
 using Tuilow.Catalog.Application.Commands.SetCourseSalesPage;
 using Tuilow.Catalog.Application.Commands.UpdateCourseBasicInfo;
@@ -72,6 +74,19 @@ public sealed class CoursesController(ISender sender, ICurrentUserService curren
         return Ok(new { id = moduleId });
     }
 
+    /// <summary>
+    /// Achado B6 da avaliação: reordena os módulos do curso (arrastar-e-soltar no front chama
+    /// este endpoint ao soltar o item — a UI de drag-and-drop em si fica fora do escopo deste
+    /// achado). Exige a lista completa de IDs de módulo na nova ordem desejada.
+    /// </summary>
+    [HttpPut("{courseId:guid}/modules/reorder")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> ReorderModules(Guid courseId, [FromBody] ReorderModulesRequest request, CancellationToken ct)
+    {
+        await sender.Send(new ReorderModulesCommand(courseId, currentUser.UserId!.Value, request.OrderedModuleIds), ct);
+        return Ok(new { message = "Módulos reordenados com sucesso." });
+    }
+
     /// <summary>Adiciona aula ao módulo.</summary>
     [HttpPost("{courseId:guid}/modules/{moduleId:guid}/lessons")]
     [Authorize(Roles = "Creator,Admin")]
@@ -81,6 +96,20 @@ public sealed class CoursesController(ISender sender, ICurrentUserService curren
         var lessonId = await sender.Send(
             command with { CourseId = courseId, ModuleId = moduleId, InstructorId = currentUser.UserId!.Value }, ct);
         return Ok(new { id = lessonId });
+    }
+
+    /// <summary>
+    /// Achado B6 da avaliação: reordena as aulas dentro de um módulo. Mesma lógica de
+    /// ReorderModules, um nível abaixo — ver comentário lá.
+    /// </summary>
+    [HttpPut("{courseId:guid}/modules/{moduleId:guid}/lessons/reorder")]
+    [Authorize(Roles = "Creator,Admin")]
+    public async Task<IActionResult> ReorderLessons(Guid courseId, Guid moduleId,
+        [FromBody] ReorderLessonsRequest request, CancellationToken ct)
+    {
+        await sender.Send(
+            new ReorderLessonsCommand(courseId, moduleId, currentUser.UserId!.Value, request.OrderedLessonIds), ct);
+        return Ok(new { message = "Aulas reordenadas com sucesso." });
     }
 
     /// <summary>Anexa um material (PDF/DOCX/PPTX/ZIP/imagem/planilha) à aula (passo 4 do assistente).</summary>
@@ -182,3 +211,9 @@ public sealed class CoursesController(ISender sender, ICurrentUserService curren
         return Ok(result);
     }
 }
+
+/// <summary>Achado B6: lista completa dos IDs de módulo do curso, na nova ordem desejada.</summary>
+public sealed record ReorderModulesRequest(IReadOnlyList<Guid> OrderedModuleIds);
+
+/// <summary>Achado B6: lista completa dos IDs de aula do módulo, na nova ordem desejada.</summary>
+public sealed record ReorderLessonsRequest(IReadOnlyList<Guid> OrderedLessonIds);

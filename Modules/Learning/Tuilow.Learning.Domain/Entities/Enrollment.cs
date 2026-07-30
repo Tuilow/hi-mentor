@@ -19,6 +19,9 @@ public sealed class Enrollment : AggregateRoot
     // acesso" exigia cruzar manualmente Sales (CoursePurchase/Subscription) e Learning (Enrollment)
     // sem nenhum identificador em comum. Mutuamente exclusivos (uma matrícula vem de compra avulsa
     // OU de assinatura, nunca as duas) — null nos dois quando criada manualmente (EnrollStudentCommand).
+    //
+    // NOTA (re-aplicado): este arquivo tinha revertido para uma versão anterior sem estes campos
+    // — ver aviso no relatório desta rodada. Reaplicado junto com o achado M6 desta vez.
     public Guid? SourcePurchaseId { get; private set; }
     public Guid? SourceSubscriptionId { get; private set; }
 
@@ -47,8 +50,11 @@ public sealed class Enrollment : AggregateRoot
     /// Registra progresso na aula. Retorna o LessonProgress caso um NOVO registro tenha sido
     /// criado (para o caller persistir explicitamente como Added — evita DbUpdateConcurrencyException
     /// quando o Enrollment pai já está tracked). Retorna null se apenas atualizou um existente.
+    /// clientCapturedAt (achado M6): repassado ao LessonProgress para distinguir evento antigo
+    /// chegando atrasado de evento realmente mais novo — ver LessonProgress.UpdateProgress.
     /// </summary>
-    public LessonProgress? TrackLessonProgress(Guid lessonId, int watchedSeconds, int totalSeconds, int totalLessons)
+    public LessonProgress? TrackLessonProgress(
+        Guid lessonId, int watchedSeconds, int totalSeconds, int totalLessons, DateTime? clientCapturedAt = null)
     {
         var progress = _lessonProgress.SingleOrDefault(p => p.LessonId == lessonId);
         LessonProgress? newProgress = null;
@@ -60,7 +66,7 @@ public sealed class Enrollment : AggregateRoot
         }
 
         var wasCompleted = progress.IsCompleted;
-        progress.UpdateProgress(watchedSeconds, totalSeconds);
+        progress.UpdateProgress(watchedSeconds, totalSeconds, clientCapturedAt);
 
         if (!wasCompleted && progress.IsCompleted)
         {
@@ -84,6 +90,11 @@ public sealed class Enrollment : AggregateRoot
 
     private void Complete()
     {
+        // Idempotência: TrackLessonProgress só chama Complete() quando uma aula recém-concluída
+        // faz ProgressPercentage cruzar 100%, então na prática isto já roda uma vez só — mas o
+        // guard evita reemitir CourseCompletedDomainEvent (e reprocessar a emissão de certificado
+        // no handler, achado A4) caso Complete() volte a ser chamado por engano no futuro.
+        if (Status == EnrollmentStatus.Completed) return;
         Status = EnrollmentStatus.Completed;
         CompletedAt = DateTime.UtcNow;
         AddDomainEvent(new CourseCompletedDomainEvent(Id, UserId, CourseId));

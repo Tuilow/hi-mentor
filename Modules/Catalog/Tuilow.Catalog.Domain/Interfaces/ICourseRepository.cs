@@ -51,7 +51,19 @@ public interface ICourseRepository : IRepository<Course>
     /// sem isso as linhas antigas ficariam órfãs no banco em vez de serem excluídas).
     /// </summary>
     void RemoveFaqItem(CourseFaqItem faqItem);
+
+    /// <summary>
+    /// Achado M8 da avaliação: resolve, a partir da FileUrl de um material de aula, a que curso
+    /// ele pertence e se essa aula é preview — sem precisar carregar o agregado Course inteiro
+    /// (Modules/Lessons/Attachments/Exercises) só para checar acesso a um único anexo. Usado por
+    /// MaterialsUploadController.GetMaterial para decidir se o requisitante pode baixar o
+    /// arquivo (dono do curso, aula marcada como preview, ou matrícula/compra válida).
+    /// </summary>
+    Task<MaterialAccessInfo?> GetMaterialAccessInfoAsync(string fileUrl, CancellationToken ct = default);
 }
 
 /// <summary>Par (Categoria, Subcategoria) realmente usado por algum curso — ver GetDistinctCategoriesAsync.</summary>
 public sealed record CourseCategoryUsage(string Category, string? Subcategory);
+
+/// <summary>Dados mínimos para decidir acesso a um material de aula — ver GetMaterialAccessInfoAsync.</summary>
+public sealed record MaterialAccessInfo(Guid CourseId, Guid InstructorId, bool IsPreview);

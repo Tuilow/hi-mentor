@@ -15,6 +15,9 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
         services.AddScoped<ICoursePurchaseRepository, CoursePurchaseRepository>();
         services.AddScoped<IUserProvisioningService, IdentidadeAcessoUserProvisioningService>();
+        // A5: usado pelo job de reconciliação abaixo para saber se uma compra Confirmed já tem
+        // WalletTransaction correspondente no módulo Finance.
+        services.AddScoped<IWalletCreditChecker, FinanceWalletCreditChecker>();
 
         services.AddHttpClient<IPaymentService, AsaasPaymentService>(client =>
             {
@@ -34,6 +37,11 @@ public static class DependencyInjection
         // B4: job periódico que efetiva PastDue -> Expired (assinatura) e expira compras Pending
         // abandonadas — nenhum dos dois acontecia sozinho antes.
         services.AddHostedService<SalesExpirationBackgroundService>();
+
+        // A5: job periódico de reconciliação Sales × Finance (venda Confirmed sem crédito na
+        // carteira do criador) — detecta e loga como crítico, não reprocessa sozinho (ver
+        // comentário em FinanceReconciliationBackgroundService sobre o motivo).
+        services.AddHostedService<FinanceReconciliationBackgroundService>();
 
         return services;
     }
