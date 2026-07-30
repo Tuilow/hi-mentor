@@ -29,7 +29,6 @@ function MagicLinkConsumer() {
     authApi.consumeMagicLink(token)
       .then(res => {
         localStorage.setItem('access_token', res.data.accessToken);
-        localStorage.setItem('refresh_token', res.data.refreshToken);
         router.push(redirect || '/dashboard');
       })
       .catch(() => setStatus('error'));

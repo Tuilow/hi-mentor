@@ -50,12 +50,11 @@ export default function DashboardPage() {
   const handleBecomeCreator = async () => {
     setBecomingCreator(true);
     try {
-      // O backend já devolve tokens novos (access token com o claim de role "Creator" e o
-      // refresh token ativo) — evita uma chamada extra a /auth/refresh-token logo em seguida,
-      // que competia pelo refresh token de uso único e causava um erro intermitente aqui.
+      // O backend já devolve um access token novo (com o claim de role "Creator") e regrava o
+      // cookie HttpOnly de refresh token — evita uma chamada extra a /auth/refresh-token logo em
+      // seguida, que competia pelo refresh token de uso único e causava um erro intermitente aqui.
       const { data } = await authApi.becomeCreator();
       localStorage.setItem('access_token', data.accessToken);
-      localStorage.setItem('refresh_token', data.refreshToken);
 
       // Invalida o cache em vez de recarregar a página inteira: sidebar e conteúdo atualizam
       // na hora com os novos recursos de criador (sem repetir toda a dança de autenticação de

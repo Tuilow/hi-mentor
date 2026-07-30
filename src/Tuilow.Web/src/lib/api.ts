@@ -7,6 +7,11 @@ export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
   timeout: 15000,
+  // Migração para cookie HttpOnly (achado C1 da avaliação www/app): o refresh token não é mais
+  // lido/gravado em localStorage — ele viaja como cookie "refresh_token" e o navegador só o
+  // envia se withCredentials estiver ligado (equivale a credentials: 'include' do fetch). Sem
+  // isso o cookie HttpOnly setado pelo backend nunca voltaria nas próximas chamadas.
+  withCredentials: true,
 });
 
 // ─── Indicador global de carregamento ─────────────────────────────
@@ -108,22 +113,24 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) throw new Error('No refresh token');
-
-        const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh-token`, {
-          refreshToken,
-        });
+        // O refresh token não existe mais no localStorage — ele vive só no cookie HttpOnly
+        // "refresh_token" (setado pelo backend em /auth/login etc.), enviado automaticamente
+        // pelo navegador porque withCredentials está ligado. Nada para ler/montar aqui além do
+        // credentials: se o cookie não existir/estiver expirado, o backend responde 401 e cai
+        // no catch abaixo normalmente.
+        const { data } = await axios.post(
+          `${API_URL}/api/v1/auth/refresh-token`,
+          {},
+          { withCredentials: true }
+        );
 
         localStorage.setItem('access_token', data.accessToken);
-        localStorage.setItem('refresh_token', data.refreshToken);
         processQueue(null, data.accessToken);
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(original);
       } catch (refreshError) {
         processQueue(refreshError as AxiosError, null);
         localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
         if (typeof window !== 'undefined') window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {
@@ -161,7 +168,12 @@ export const authApi = {
   becomeCreator: () => api.post('/auth/become-creator'),
   // Magic Link — troca o token recebido por e-mail/WhatsApp por um login completo, sem senha.
   consumeMagicLink: (token: string) => api.post('/auth/magic-link/consume', { token }),
-  refreshToken: (refreshToken: string) => api.post('/auth/refresh-token', { refreshToken }),
+  // Cookie-driven (achado C1) — o refresh token não é mais passado por parâmetro, ele viaja no
+  // cookie HttpOnly "refresh_token" (ver withCredentials acima). Mantido aqui por simetria com
+  // o restante do módulo; o interceptor 401 acima chama o endpoint diretamente via axios.
+  refreshToken: () => api.post('/auth/refresh-token', {}),
+  // Revoga o refresh token no servidor e limpa o cookie HttpOnly — ver (dashboard)/layout.tsx.
+  logout: () => api.post('/auth/logout'),
 };
 
 export interface ListCoursesParams {

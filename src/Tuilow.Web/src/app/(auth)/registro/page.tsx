@@ -73,7 +73,6 @@ function RegisterForm() {
       setGoogleLoading(true);
       const res = await authApi.googleLogin(credentialResponse.credential);
       localStorage.setItem('access_token', res.data.accessToken);
-      localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Conta criada com Google!');
       router.push(returnUrl || '/dashboard');
     } catch (err) {

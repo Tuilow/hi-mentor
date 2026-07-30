@@ -1,7 +1,9 @@
+// Achado C1 da avaliação www/app: o refresh token não é mais devolvido no corpo JSON — ele
+// vive só no cookie HttpOnly "refresh_token" setado pelo backend (ver AuthController.SetRefreshTokenCookie).
+// Devolvê-lo aqui de novo reabriria a exposição a XSS que essa migração fecha.
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
+  accessTokenExpires: string;
 }
 
 // Corpo de POST /auth/register — reflete o formulário em app/(auth)/registro/page.tsx

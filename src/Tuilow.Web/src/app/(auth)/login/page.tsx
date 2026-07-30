@@ -63,8 +63,9 @@ function LoginForm() {
     try {
       setLoading(true);
       const res = await authApi.login(data);
+      // Achado C1: o refresh token não volta mais no corpo (vive só no cookie HttpOnly setado
+      // pelo backend nesta mesma resposta) — access_token continua em localStorage por enquanto.
       localStorage.setItem('access_token', res.data.accessToken);
-      localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Bem-vindo de volta!');
       await goHome();
     } catch (err) {
@@ -83,7 +84,6 @@ function LoginForm() {
       setGoogleLoading(true);
       const res = await authApi.googleLogin(credentialResponse.credential);
       localStorage.setItem('access_token', res.data.accessToken);
-      localStorage.setItem('refresh_token', res.data.refreshToken);
       toast.success('Bem-vindo!');
       await goHome();
     } catch {

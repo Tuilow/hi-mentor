@@ -60,10 +60,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (isError) router.push('/login');
   }, [isError, router]);
 
-  const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    router.push('/login');
+  // Achado C1 da avaliação www/app: antes só limpava o localStorage — o refresh token continuava
+  // válido no servidor até expirar sozinho (30 dias). Agora chama /auth/logout para revogá-lo de
+  // verdade e limpar o cookie HttpOnly; se a chamada falhar (ex.: rede fora), ainda assim limpa o
+  // estado local e redireciona — não deixar o usuário preso na tela é mais importante do que
+  // garantir a revogação no servidor neste caminho de erro.
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // Sessão local será limpa de qualquer forma — ver comentário acima.
+    } finally {
+      localStorage.removeItem('access_token');
+      router.push('/login');
+    }
   };
 
   const initials = user

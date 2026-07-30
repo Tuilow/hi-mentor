@@ -4,24 +4,83 @@ using Tuilow.IdentidadeAcesso.Application.Commands.ConsumeMagicLink;
 using Tuilow.IdentidadeAcesso.Application.Commands.ForgotPassword;
 using Tuilow.IdentidadeAcesso.Application.Commands.GoogleLogin;
 using Tuilow.IdentidadeAcesso.Application.Commands.LoginUser;
+using Tuilow.IdentidadeAcesso.Application.Commands.Logout;
 using Tuilow.IdentidadeAcesso.Application.Commands.RefreshToken;
 using Tuilow.IdentidadeAcesso.Application.Commands.RegisterUser;
 using Tuilow.IdentidadeAcesso.Application.Commands.ResetPassword;
 using Tuilow.IdentidadeAcesso.Application.Commands.UpdateProfile;
+using Tuilow.IdentidadeAcesso.Application.Common;
 using Tuilow.IdentidadeAcesso.Application.Queries.GetUserProfile;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace Tuilow.IdentidadeAcesso.Api.Controllers;
 
+/// <summary>
+/// Achado C1 do PROMPT de arquitetura www/app: o refresh token vivia em localStorage
+/// (acessível a qualquer script — risco de XSS) e não havia nenhuma forma de invalidá-lo no
+/// servidor no logout. Agora todo endpoint que emite AuthTokens também grava o refresh token
+/// como cookie HttpOnly (ver SetRefreshTokenCookie) e a resposta JSON devolve só o access token
+/// — o refresh token nunca mais chega a código JavaScript. O cookie é HttpOnly + (fora de
+/// Development) Secure, com Domain configurável via "Cookies:Domain" (vazio em dev = cookie
+/// preso ao host exato; em produção, ".tuilow.com.br" faz o cookie valer tanto em
+/// www.tuilow.com.br quanto em app.tuilow.com.br, viabilizando o subdomínio dedicado sem
+/// deslogar o aluno ao trocar de host).
+/// </summary>
 [ApiController]
 [Route("api/v1/auth")]
 [Produces("application/json")]
-public sealed class AuthController(ISender sender, ICurrentUserService currentUser) : ControllerBase
+public sealed class AuthController(
+    ISender sender, ICurrentUserService currentUser,
+    IConfiguration configuration, IWebHostEnvironment environment
+) : ControllerBase
 {
+    private const string RefreshTokenCookieName = "refresh_token";
+
+    private void SetRefreshTokenCookie(AuthTokens tokens)
+    {
+        Response.Cookies.Append(RefreshTokenCookieName, tokens.RefreshToken, BuildCookieOptions(tokens.RefreshTokenExpires));
+    }
+
+    private void ClearRefreshTokenCookie()
+    {
+        Response.Cookies.Delete(RefreshTokenCookieName, BuildCookieOptions(DateTimeOffset.UnixEpoch));
+    }
+
+    private CookieOptions BuildCookieOptions(DateTimeOffset expires)
+    {
+        var domain = configuration["Cookies:Domain"];
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            // Secure exige HTTPS — em Development (http://localhost) o cookie seria descartado
+            // pelo navegador se marcado Secure.
+            Secure = !environment.IsDevelopment(),
+            // Lax (não None): www.tuilow.com.br e app.tuilow.com.br são subdomínios do MESMO
+            // site registrável, então são "same-site" entre si — None só seria necessário para
+            // domínios de fato diferentes.
+            SameSite = SameSiteMode.Lax,
+            Domain = string.IsNullOrWhiteSpace(domain) ? null : domain,
+            Expires = expires,
+            Path = "/"
+        };
+    }
+
+    /// <summary>
+    /// A resposta ao cliente nunca mais inclui o refresh token (ele só existe no cookie
+    /// HttpOnly, ver SetRefreshTokenCookie) — expor os dois ao mesmo tempo (cookie + corpo JSON)
+    /// devolveria o mesmo risco de XSS que essa migração resolve.
+    /// </summary>
+    private static object ToClientResponse(AuthTokens tokens) => new
+    {
+        accessToken = tokens.AccessToken,
+        accessTokenExpires = tokens.AccessTokenExpires
+    };
     /// <summary>
     /// Registra novo usuário com e-mail e senha. Não faz login automático (Sprint Item 4) — a
     /// conta nasce pendente de confirmação; um código de 6 dígitos é enviado por e-mail e deve
@@ -45,7 +104,8 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
     {
         var tokens = await sender.Send(
             command with { IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() }, ct);
-        return Ok(tokens);
+        SetRefreshTokenCookie(tokens);
+        return Ok(ToClientResponse(tokens));
     }
 
     /// <summary>
@@ -60,16 +120,27 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
     {
         var tokens = await sender.Send(
             new ConsumeMagicLinkCommand(request.Token, HttpContext.Connection.RemoteIpAddress?.ToString()), ct);
-        return Ok(tokens);
+        SetRefreshTokenCookie(tokens);
+        return Ok(ToClientResponse(tokens));
     }
 
-    /// <summary>Renova o access token usando o refresh token.</summary>
+    /// <summary>
+    /// Renova o access token usando o refresh token. Achado C1: o refresh token agora chega
+    /// preferencialmente pelo cookie HttpOnly "refresh_token" (fluxo cross-subdomínio
+    /// www/app) — o campo no corpo (RefreshTokenRequestBody) fica só como fallback de
+    /// compatibilidade para clientes que ainda não migraram (ex.: apps mobile futuros).
+    /// </summary>
     [HttpPost("refresh-token")]
-    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenCommand command, CancellationToken ct)
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestBody? body, CancellationToken ct)
     {
+        var refreshToken = Request.Cookies[RefreshTokenCookieName] ?? body?.RefreshToken;
+        if (string.IsNullOrEmpty(refreshToken))
+            return Unauthorized(new { message = "Refresh token ausente." });
+
         var tokens = await sender.Send(
-            command with { IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() }, ct);
-        return Ok(tokens);
+            new RefreshTokenCommand(refreshToken, HttpContext.Connection.RemoteIpAddress?.ToString()), ct);
+        SetRefreshTokenCookie(tokens);
+        return Ok(ToClientResponse(tokens));
     }
 
     /// <summary>Login com Google OAuth.</summary>
@@ -77,7 +148,22 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
     public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginCommand command, CancellationToken ct)
     {
         var tokens = await sender.Send(command, ct);
-        return Ok(tokens);
+        SetRefreshTokenCookie(tokens);
+        return Ok(ToClientResponse(tokens));
+    }
+
+    /// <summary>
+    /// Encerra a sessão: revoga o refresh token no servidor (achado C1 — hoje não havia como
+    /// invalidar um refresh token vazado/roubado antes dele expirar sozinho) e limpa o cookie
+    /// HttpOnly. Idempotente — chamar sem cookie/já deslogado apenas limpa e retorna 200.
+    /// </summary>
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(CancellationToken ct)
+    {
+        var refreshToken = Request.Cookies[RefreshTokenCookieName];
+        await sender.Send(new LogoutCommand(refreshToken), ct);
+        ClearRefreshTokenCookie();
+        return Ok(new { message = "Sessão encerrada." });
     }
 
     /// <summary>Confirma e-mail do usuário com o código de 6 dígitos enviado no cadastro.</summary>
@@ -142,7 +228,8 @@ public sealed class AuthController(ISender sender, ICurrentUserService currentUs
     public async Task<IActionResult> BecomeCreator(CancellationToken ct)
     {
         var tokens = await sender.Send(new BecomeCreatorCommand(currentUser.UserId!.Value), ct);
-        return Ok(tokens);
+        SetRefreshTokenCookie(tokens);
+        return Ok(ToClientResponse(tokens));
     }
 }
 
@@ -150,3 +237,6 @@ public sealed record UpdateProfileRequest(
     string FirstName, string LastName, string? Phone, DateOnly? BirthDate, string? Bio, string? AvatarUrl);
 
 public sealed record ConsumeMagicLinkRequest(string Token);
+
+/// <summary>Fallback de compatibilidade para /auth/refresh-token — ver comentário no controller.</summary>
+public sealed record RefreshTokenRequestBody(string? RefreshToken);
