@@ -308,6 +308,14 @@ export const courseSubscriptionPlansApi = {
 
 export const enrollmentsApi = {
   enroll: (courseId: string) => api.post('/enrollments', { courseId }),
+  // Achado B2 da avaliação de UX: matrícula em curso grátis sem exigir /registro completo (nome,
+  // sobrenome, e-mail, senha, confirmar senha) antes — mesmo nível de fricção do checkout anônimo
+  // de curso pago (ver coursePurchasesApi.purchase abaixo), só nome/e-mail. Não exige login
+  // (endpoint [AllowAnonymous] no backend); quando já há um access_token salvo, o interceptor de
+  // request já anexa o Authorization normalmente e o backend usa o usuário da sessão em vez do
+  // e-mail do formulário.
+  enrollFreeAnonymous: (courseId: string, data: { customerName: string; customerEmail: string }) =>
+    api.post('/enrollments/free', { courseId, ...data }),
   trackProgress: (enrollmentId: string, data: unknown) =>
     api.post(`/enrollments/${enrollmentId}/progress`, data),
   getProgress: (courseId: string) => api.get(`/enrollments/courses/${courseId}`),

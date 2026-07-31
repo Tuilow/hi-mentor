@@ -1,28 +1,67 @@
 # 🎓 Tuilow — Plataforma de Cursos Online
 
 Uma plataforma moderna onde pessoas, profissionais, especialistas e empresas podem criar, publicar, vender e
-gerenciar cursos online. Sistema completo construído com **Clean Architecture, DDD, CQRS, ASP.NET Core 9 e Next.js 15**.
+gerenciar cursos online. Backend em **monolito modular (.NET 9)** com DDD, CQRS e Domain Events; frontend em
+**Next.js 15**.
 
 ---
 
 ## 🏗️ Arquitetura
 
+O backend é um **monolito modular**: cada módulo de negócio tem suas próprias camadas Domain/Application/
+Infrastructure/Api, mas todos são hospedados por um único processo ASP.NET Core (`Host/Tuilow.Host.Api`) — sem
+a complexidade operacional de microsserviços, mas com o desacoplamento de módulos independentes. A regra entre
+módulos é referenciar só a camada `Domain` uns dos outros (nunca `Application`); comunicação que não é uma
+simples leitura de dado passa por Domain Events (MediatR), despachados pelo `AppDbContext` depois que a
+transação já foi salva.
+
 ```
 Tuilow/
+├── Host/
+│   └── Tuilow.Host.Api/            # Processo único: Program.cs compõe os módulos, AppDbContext, migrations
+├── SharedKernel/
+│   ├── Tuilow.SharedKernel.Domain/         # AggregateRoot, IDomainEvent, VOs compartilhados
+│   ├── Tuilow.SharedKernel.Application/    # ICurrentUserService, IUnitOfWork, IRepository
+│   └── Tuilow.SharedKernel.Infrastructure/
+├── Modules/
+│   ├── IdentidadeAcesso/    # Usuários, autenticação, roles, Magic Link
+│   ├── Catalog/             # Cursos, módulos, aulas, categorias
+│   ├── Learning/            # Matrículas, progresso, certificados
+│   ├── Sales/               # Checkout (Asaas), assinaturas, compra avulsa
+│   ├── Streaming/           # Vídeos no Cloudflare Stream (+ YouTube/Vimeo/Drive embutidos)
+│   ├── Finance/             # Carteira do criador, comissão da plataforma
+│   ├── Payout/              # Saques do criador
+│   ├── CreatorStudio/       # Jornada guiada de criação de produto (orquestra os módulos acima)
+│   ├── Channel/             # Canal do Criador — vitrine pública em /canal/{handle}
+│   ├── Journey/             # "Meus Perfis" — código intacto, desligado do pipeline (ver Program.cs)
+│   └── Growth/              # Reservado — ainda stub, sem domínio implementado
+│       └── {Domain,Application,Infrastructure,Api}/   # cada módulo segue essa mesma estrutura interna
 ├── src/
-│   ├── Tuilow.Domain/          # Entidades, VOs, Eventos de Domínio
-│   ├── Tuilow.Application/     # CQRS (Commands/Queries), Behaviors, Interfaces
-│   ├── Tuilow.Infrastructure/  # EF Core, JWT, Asaas, Cloudflare, Repositórios
-│   └── Tuilow.API/             # Controllers REST, Middleware, Program.cs
-│   └── Tuilow.Web/             # Frontend Next.js 15 + React 19 + Tailwind
+│   └── Tuilow.Web/          # Frontend Next.js 15 + React 19 + Tailwind
 ├── tests/
-│   └── Tuilow.Domain.Tests/    # Testes unitários xUnit + FluentAssertions
+│   └── Tuilow.Application.Tests/   # Projeto reservado para testes automatizados (ver nota abaixo)
 ├── scripts/
 │   └── init-db.sql                # Criação dos schemas PostgreSQL
 ├── docker-compose.yml
 ├── .env.example
 └── .gitignore
 ```
+
+Cada módulo em `Modules/` segue a mesma estrutura interna: `Tuilow.<Módulo>.Domain`, `.Application`,
+`.Infrastructure` e `.Api` — quatro `.csproj` próprios, referenciados pelo Host.
+
+**Status de cada módulo** (ver `Program.cs` para a lista viva):
+
+| Módulo | Status |
+|---|---|
+| IdentidadeAcesso, Catalog, Learning, Sales, Streaming, Finance, Payout, CreatorStudio, Channel | Ativos, registrados no Host |
+| Journey | Código completo (entidades, tabelas), **desligado deliberadamente** do pipeline — `AddJourneyModule()` comentado em `Program.cs` |
+| Growth | Reservado — ainda sem domínio implementado, não registrado no Host |
+
+> Nota sobre `tests/`: não há atualmente um projeto de testes automatizados ativo referenciado em
+> `Tuilow.sln`. `Tuilow.Application.Tests` existe como pasta reservada. Um diretório legado do nome anterior
+> à marca (`DogMaster.Domain.Tests`, sem `.csproj` nem código-fonte — só artefatos de build antigos) foi
+> movido para `tests/_to_delete/` para remoção manual.
 
 ## 🚀 Início Rápido
 
@@ -50,10 +89,10 @@ Isso sobe: **API (porta 5000)**, **Frontend (porta 3000)**, **PostgreSQL (5432)*
 
 **Backend:**
 ```bash
-cd src/Tuilow.API
+cd Host/Tuilow.Host.Api
 dotnet run
-# API disponível em https://localhost:7000
-# Swagger: https://localhost:7000/swagger
+# API disponível em http://localhost:5000 (ou a porta configurada no launchSettings/appsettings)
+# Swagger: http://localhost:5000/swagger
 ```
 
 **Frontend:**
@@ -67,17 +106,18 @@ npm run dev
 
 ### 4. Migrations EF Core
 
-```bash
-cd src/Tuilow.Infrastructure
-dotnet ef migrations add InitialCreate --startup-project ../Tuilow.API
-dotnet ef database update --startup-project ../Tuilow.API
-```
-
-### 5. Rodar testes
+O `AppDbContext` e as migrations vivem no próprio Host (ele referencia o `Domain`/`Infrastructure` de cada
+módulo via `ApplyConfigurationsFromAssembly`), então não é preciso indicar um `--startup-project` separado:
 
 ```bash
-dotnet test tests/Tuilow.Domain.Tests/
+cd Host/Tuilow.Host.Api
+dotnet ef migrations add NomeDaMigration
+dotnet ef database update
 ```
+
+### 5. Testes
+
+Não há hoje uma suíte de testes automatizados ativa no `Tuilow.sln` (ver nota na seção Arquitetura acima).
 
 ---
 
@@ -85,30 +125,32 @@ dotnet test tests/Tuilow.Domain.Tests/
 
 | Camada        | Tecnologia                                          |
 |---------------|-----------------------------------------------------|
-| Backend       | ASP.NET Core 9, C# 13, EF Core 9, PostgreSQL 16    |
-| Padrões       | Clean Architecture, DDD, CQRS, SOLID, Domain Events|
-| Mediação      | MediatR 12, FluentValidation 11, AutoMapper 14      |
-| Autenticação  | JWT (15min) + Refresh Token (30d) + Google OAuth    |
+| Backend       | ASP.NET Core 9, C# 13, EF Core 9, PostgreSQL 16     |
+| Padrões       | Monolito Modular, DDD, CQRS, SOLID, Domain Events   |
+| Mediação      | MediatR 12, FluentValidation 11                     |
+| Autenticação  | JWT (15min) + Refresh Token (30d) + Google OAuth + Magic Link |
 | Pagamentos    | Asaas (PIX, Cartão, Boleto) com webhooks            |
-| Streaming     | Cloudflare Stream (upload direto + playback assinado)|
-| Storage       | Cloudflare R2 (S3-compatible)                       |
-| Frontend      | Next.js 15, React 19, TypeScript, Tailwind CSS 3   |
-| State         | TanStack Query v5, Zustand 5                        |
+| Streaming     | Cloudflare Stream (upload direto + playback assinado) + embed YouTube/Vimeo/Drive |
+| Frontend      | Next.js 15, React 19, TypeScript, Tailwind CSS      |
+| State         | TanStack Query v5                                    |
 | Containers    | Docker, Docker Compose                              |
-| Testes        | xUnit, FluentAssertions, Bogus                      |
 | Documentação  | Swagger/OpenAPI                                     |
 
 ---
 
-## 🔑 Bounded Contexts (DDD)
+## 🔑 Módulos (Bounded Contexts)
 
-- **Identity** — Usuários, autenticação, perfis sociais, refresh tokens
-- **Catalog** — Cursos, módulos, aulas, exercícios, anexos
+- **IdentidadeAcesso** — Usuários, autenticação (senha, Google, Magic Link), roles/permissões
+- **Catalog** — Cursos, módulos, aulas, categorias, página de vendas pública (`/c/{slug}`)
 - **Learning** — Matrículas, progresso de aulas, certificados
-- **Subscription** — Planos, assinaturas Asaas, histórico de pagamentos
-- **Profiles** — Perfis de aprendizado dos alunos (categoria, idade, metas)
-- **Streaming** — Vídeos no Cloudflare Stream
-- **Notifications** — Emails transacionais (MailKit)
+- **Sales** — Checkout avulso e por assinatura (Asaas), planos
+- **Streaming** — Vídeos no Cloudflare Stream, importação de YouTube/Vimeo/Drive
+- **Finance** — Carteira do criador, cálculo de comissão da plataforma
+- **Payout** — Solicitação e histórico de saques do criador
+- **CreatorStudio** — Jornada guiada de criação de produto (orquestra Catalog/Sales/Learning/Finance), geração de copy por IA, dashboard do produto
+- **Channel** — Canal do Criador: vitrine pública em `/canal/{handle}` com os cursos publicados
+- **Journey** — "Meus Perfis"; módulo completo, desligado do pipeline por decisão de produto
+- **Growth** — Reservado para funcionalidades futuras de aquisição/retenção; ainda sem domínio implementado
 
 ---
 
@@ -117,6 +159,7 @@ dotnet test tests/Tuilow.Domain.Tests/
 - Senhas: BCrypt (workFactor 12)
 - Tokens JWT: HMAC-SHA256, expiração 15 min
 - Refresh Tokens: rotação automática (revoga token anterior)
+- Magic Link: acesso sem senha para contas criadas via checkout anônimo
 - Webhooks Asaas: validação do token `asaas-access-token` configurado no painel da Asaas
 - Vídeos Cloudflare: URLs de playback assinadas com expiração
 
@@ -125,20 +168,22 @@ dotnet test tests/Tuilow.Domain.Tests/
 ## 📡 Endpoints Principais
 
 | Método | Rota                                  | Descrição                    |
-|--------|---------------------------------------|------------------------------|
-| POST   | /api/v1/auth/register                 | Cadastro de usuário          |
-| POST   | /api/v1/auth/login                    | Login com e-mail e senha     |
-| POST   | /api/v1/auth/google                   | Login com Google             |
-| POST   | /api/v1/auth/refresh-token            | Renovar access token         |
-| GET    | /api/v1/auth/me                       | Perfil do usuário logado     |
-| GET    | /api/v1/courses                       | Listar cursos publicados     |
-| GET    | /api/v1/courses/{slug}                | Detalhes do curso            |
-| POST   | /api/v1/enrollments                   | Matricular em curso          |
-| POST   | /api/v1/enrollments/{id}/progress     | Registrar progresso          |
-| GET    | /api/v1/subscriptions/plans           | Listar planos disponíveis    |
-| POST   | /api/v1/subscriptions                 | Assinar plano                |
-| GET    | /api/v1/learner-profiles              | Listar meus perfis de aprendizado |
-| POST   | /api/v1/learner-profiles              | Cadastrar perfil de aprendizado   |
-| POST   | /api/v1/webhooks/asaas                | Webhook de pagamentos Asaas  |
+|--------|---------------------------------------|-------------------------------|
+| POST   | /api/v1/auth/register                 | Cadastro de usuário           |
+| POST   | /api/v1/auth/login                    | Login com e-mail e senha      |
+| POST   | /api/v1/auth/google                   | Login com Google              |
+| POST   | /api/v1/auth/refresh-token            | Renovar access token          |
+| GET    | /api/v1/auth/me                       | Perfil do usuário logado      |
+| GET    | /api/v1/courses                       | Listar cursos publicados      |
+| GET    | /api/v1/courses/{slug}                | Detalhes do curso (público — alimenta `/c/{slug}`) |
+| GET    | /api/v1/courses/by-instructor/{instructorId} | Outros cursos do mesmo criador (público, cross-sell) |
+| POST   | /api/v1/enrollments                   | Matricular em curso           |
+| POST   | /api/v1/enrollments/free              | Matrícula em curso grátis, sem login (Magic Link) |
+| POST   | /api/v1/enrollments/{id}/progress     | Registrar progresso           |
+| GET    | /api/v1/course-subscription-plans     | Listar planos de assinatura por curso |
+| POST   | /api/v1/subscriptions                 | Assinar plano                 |
+| GET    | /api/v1/channel/{handle}              | Canal público do criador (`/canal/{handle}`) |
+| PUT    | /api/v1/channel/me                    | Criar/editar o próprio canal (criador autenticado) |
+| POST   | /api/v1/webhooks/asaas                | Webhook de pagamentos Asaas   |
 
 Documentação interativa completa: **http://localhost:5000/swagger**

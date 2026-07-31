@@ -16,10 +16,14 @@
     <ProjectReference Include="..\..\..\SharedKernel\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />
     <!-- Acoplamento legítimo: o painel do dono da plataforma (GetPlatformStatsQuery) precisa
          contar cursos publicados e vídeos, e a exclusão de conta em cascata (DeleteUserCommand)
-         precisa enumerar e apagar os cursos/vídeos do criador excluído — mesma relação de negócio
-         já usada por Streaming.Application ao referenciar Catalog.Domain no DeleteVideoCommandHandler. -->
+         precisa enumerar e arquivar os cursos do criador excluído — mesma relação de negócio já
+         usada por Streaming.Application ao referenciar Catalog.Domain no DeleteVideoCommandHandler.
+         Achado M11 da auditoria (CORRIGIDO): a ProjectReference para Streaming.Application (usada
+         só para IStreamingService, dentro de DeleteUserCommandHandler) foi removida — a exclusão
+         em cascata de vídeos virou um domain event consumido pelo próprio módulo Streaming (ver
+         UserDeletedDomainEvent / UserDeletedEventHandler). Streaming.Domain continua referenciado:
+         só GetPlatformStatsQueryHandler ainda usa IVideoRepository, pra contar vídeos no painel. -->
     <ProjectReference Include="..\..\Catalog\Tuilow.Catalog.Domain\Tuilow.Catalog.Domain.csproj" />
     <ProjectReference Include="..\..\Streaming\Tuilow.Streaming.Domain\Tuilow.Streaming.Domain.csproj" />
-    <ProjectReference Include="..\..\Streaming\Tuilow.Streaming.Application\Tuilow.Streaming.Application.csproj" />
   </ItemGroup>
 </Project>

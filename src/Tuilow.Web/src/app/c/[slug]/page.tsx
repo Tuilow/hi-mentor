@@ -156,6 +156,80 @@ function CheckoutModal({
   );
 }
 
+interface FreeEnrollData {
+  customerName: string;
+  customerEmail: string;
+}
+
+/**
+ * Achado B2 da avaliação de UX: até aqui, curso grátis mandava o visitante pra /registro —
+ * nome, sobrenome, e-mail, senha, confirmar senha, e ainda esperar um e-mail de confirmação —
+ * enquanto o curso PAGO tinha um checkout anônimo embutido na própria página (só nome/e-mail).
+ * Curso grátis devia ser o caminho de MENOR fricção da plataforma, não o de maior. Este modal
+ * espelha o CheckoutModal acima (mesmo visual, embutido na página, sem navegação extra), mas
+ * pede só nome e e-mail — nem CPF/telefone, que só fazem sentido quando há cobrança. A conta é
+ * localizada ou criada automaticamente pelo e-mail informado, sem senha, e o acesso chega por
+ * Magic Link — ver EnrollFreeCourseAnonymousCommandHandler (Learning.Application).
+ */
+function FreeEnrollModal({
+  title, onClose, onConfirm, loading,
+}: {
+  title: string;
+  onClose: () => void;
+  onConfirm: (data: FreeEnrollData) => void;
+  loading: boolean;
+}) {
+  const [form, setForm] = useState<FreeEnrollData>({ customerName: '', customerEmail: '' });
+  const [errors, setErrors] = useState<Partial<FreeEnrollData>>({});
+
+  const validate = () => {
+    const e: Partial<FreeEnrollData> = {};
+    if (!form.customerName.trim()) e.customerName = 'Nome obrigatório';
+    if (!form.customerEmail.includes('@')) e.customerEmail = 'E-mail inválido';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validate()) onConfirm(form);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-2xl animate-fade-in">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">{title}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Grátis</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">Nome completo *</label>
+            <input className="input-field" placeholder="João da Silva"
+              value={form.customerName}
+              onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))} />
+            {errors.customerName && <p className="text-red-400 text-xs mt-1">{errors.customerName}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">E-mail *</label>
+            <input type="email" className="input-field" placeholder="joao@email.com"
+              value={form.customerEmail}
+              onChange={e => setForm(f => ({ ...f, customerEmail: e.target.value }))} />
+            {errors.customerEmail && <p className="text-red-400 text-xs mt-1">{errors.customerEmail}</p>}
+            <p className="text-xs text-gray-400 mt-1">Seu acesso ao curso chega direto neste e-mail, sem precisar de senha.</p>
+          </div>
+          <button type="submit" disabled={loading} className="btn-primary w-full py-3 mt-2">
+            {loading ? 'Matriculando...' : 'Começar agora, grátis →'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Página de Vendas Pública (Kit de Divulgação) — não exige login. É para onde apontam o link
  * direto, o QR Code, o embed e o botão HTML gerados na aba "Divulgar" do dashboard do produto.
@@ -181,6 +255,12 @@ export default function PublicSalesPage() {
   // matrícula automática está em andamento ou já foi tentada nesta sessão da página.
   const [enrolling, setEnrolling] = useState(false);
   const autoEnrollAttemptedRef = useRef(false);
+  // Achado B2 da avaliação de UX: modal embutido de matrícula grátis (visitante SEM sessão) —
+  // mesmo padrão do checkoutOpen/createdOrder acima, só que sem pagamento. freeEnrollSent
+  // controla o card "verifique seu e-mail" pós-matrícula (equivalente ao createdOrder do pago).
+  const [freeEnrollOpen, setFreeEnrollOpen] = useState(false);
+  const [processingFreeEnroll, setProcessingFreeEnroll] = useState(false);
+  const [freeEnrollSent, setFreeEnrollSent] = useState(false);
   // Endpoint de simulação só existe no backend em Development (404 em produção) — este check
   // evita mostrar o atalho de sandbox à toa fora de ambiente de dev.
   const isDevEnv = process.env.NODE_ENV !== 'production';
@@ -227,10 +307,11 @@ export default function PublicSalesPage() {
   }, [isEnrolled, router, slug]);
 
   // Curso grátis: fluxo pedido é "a pessoa se loga e se matricula automaticamente no curso" —
-  // sem clique extra em "Matricular-se". Como (dashboard)/cursos/[slug]/page.tsx não é o ponto de
-  // entrada aqui, o returnUrl do cadastro/login (ver ctaHref abaixo) traz o visitante de volta
-  // para esta própria página; assim que a sessão estiver logada e a checagem de matrícula
-  // resolver "não matriculado", este efeito matricula e redireciona para o curso.
+  // sem clique extra em "Matricular-se". Cobre quem já chega logado nesta página pública (ex.:
+  // aluno com conta navegando por um link direto/QR Code) e, com a correção do achado B2, também
+  // quem acabou de completar o FreeEnrollModal enquanto já tinha uma sessão ativa noutra aba —
+  // em ambos os casos a checagem de matrícula acima resolve "não matriculado" e este efeito
+  // matricula e redireciona para o curso, sem exigir clique extra.
   useEffect(() => {
     if (
       isFree && isLoggedIn === true && !enrollmentLoading && !isEnrolled &&
@@ -263,8 +344,10 @@ export default function PublicSalesPage() {
     ?? (e as AxiosError<{ title?: string; detail?: string; message?: string }>).response?.data?.message
     ?? fallback;
 
-  // Matrícula automática do curso grátis — chamada tanto pelo efeito acima (volta de
-  // /registro já logado) quanto por um clique manual no CTA (usuário que já estava logado).
+  // Matrícula automática do curso grátis (visitante JÁ logado) — chamada tanto pelo efeito acima
+  // quanto por um clique manual no CTA como rede de segurança. Note que isto chama
+  // enrollmentsApi.enroll (endpoint autenticado, [Authorize]), não enrollFreeAnonymous — quem já
+  // tem sessão não precisa do fluxo anônimo do FreeEnrollModal, só matricular direto.
   const attemptAutoEnroll = async () => {
     if (!course) return;
     setEnrolling(true);
@@ -277,26 +360,42 @@ export default function PublicSalesPage() {
     }
   };
 
-  // Grátis continua exigindo conta (matrícula é um endpoint autenticado) — leva para o
-  // cadastro, que já volta pra cá (não para /cursos/slug direto) com returnUrl: é aqui que o
-  // efeito de matrícula automática acima dispara assim que a sessão estiver logada. Pago:
-  // checkout embutido, sem sair da página e sem precisar de conta prévia (o diferencial da
-  // Tuilow — ver PurchaseCourseCommandHandler/SubscribeToCourseCommandHandler).
-  // Usa `isFree` (que já descarta o caso de assinatura ativa), não `course.isFree` puro.
-  const ctaHref = course && isFree && isLoggedIn === false
-    ? `/registro?returnUrl=${encodeURIComponent(`/c/${slug}`)}`
-    : undefined;
-
+  // Achado B2 da avaliação de UX (CORRIGIDO): antes, grátis levava para /registro (cadastro
+  // completo com senha) enquanto pago tinha checkout anônimo embutido na página — o caminho que
+  // deveria ter MENOS fricção tinha mais. Agora os dois fluxos abrem um modal embutido na própria
+  // página, sem navegação extra: FreeEnrollModal (só nome/e-mail) para grátis, CheckoutModal
+  // (+ CPF/telefone, exigidos pelo pagamento) para pago. Usa `isFree` (que já descarta o caso de
+  // assinatura ativa), não `course.isFree` puro.
   const handleCtaClick = () => {
     if (!course) return;
     if (isFree) {
       // Já logado: o efeito acima normalmente já disparou a matrícula automática antes mesmo
       // do usuário ter chance de clicar; este clique manual é só uma rede de segurança.
-      if (isLoggedIn === true) attemptAutoEnroll();
+      if (isLoggedIn === true) {
+        attemptAutoEnroll();
+        return;
+      }
+      setFreeEnrollSent(false);
+      setFreeEnrollOpen(true);
       return;
     }
     setCreatedOrder(null);
     setCheckoutOpen(true);
+  };
+
+  const handleFreeEnroll = async (data: FreeEnrollData) => {
+    if (!course) return;
+    setProcessingFreeEnroll(true);
+    try {
+      await enrollmentsApi.enrollFreeAnonymous(course.id, data);
+      setFreeEnrollOpen(false);
+      setFreeEnrollSent(true);
+      toast.success('Matrícula confirmada! Verifique o e-mail informado: chegou um link de acesso direto (Magic Link). 🎉');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Erro ao se matricular.'));
+    } finally {
+      setProcessingFreeEnroll(false);
+    }
   };
 
   const handleCheckout = async (data: CheckoutData) => {
@@ -457,16 +556,23 @@ export default function PublicSalesPage() {
               ? `${formatPrice(activePlan.price)}${billingCycleSuffix[activePlan.billingCycle] ?? ''}`
               : formatPrice(course.price)}
           </p>
-          {ctaHref ? (
-            <a href={ctaHref} className="btn-primary px-8 py-3 text-base">{ctaText} →</a>
-          ) : (
-            <button onClick={handleCtaClick} className="btn-primary px-8 py-3 text-base">{ctaText} →</button>
-          )}
-          <p className="text-xs text-gray-400">Pagamento seguro via PIX, cartão ou boleto.</p>
+          <button onClick={handleCtaClick} className="btn-primary px-8 py-3 text-base">{ctaText} →</button>
+          <p className="text-xs text-gray-400">
+            {isFree ? 'Sem cartão, sem senha — só nome e e-mail.' : 'Pagamento seguro via PIX, cartão ou boleto.'}
+          </p>
           {(course.guaranteeDays || course.guaranteeText) && (
             <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
               🛡️ {course.guaranteeText || `Garantia de ${course.guaranteeDays} dias — satisfação ou seu dinheiro de volta`}
             </p>
+          )}
+
+          {freeEnrollSent && (
+            <div className="w-full max-w-sm mt-4 card border-emerald-200 bg-emerald-50/40 text-center">
+              <p className="text-sm font-medium text-gray-700">✅ Matrícula confirmada</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Enviamos um Magic Link para o e-mail informado — clique nele para entrar direto no curso, sem senha.
+              </p>
+            </div>
           )}
 
           {createdOrder && (
@@ -626,11 +732,7 @@ export default function PublicSalesPage() {
         )}
 
         <div className="text-center pb-6">
-          {ctaHref ? (
-            <a href={ctaHref} className="btn-primary px-8 py-3 text-base">{ctaText} →</a>
-          ) : (
-            <button onClick={handleCtaClick} className="btn-primary px-8 py-3 text-base">{ctaText} →</button>
-          )}
+          <button onClick={handleCtaClick} className="btn-primary px-8 py-3 text-base">{ctaText} →</button>
         </div>
       </div>
 
@@ -643,6 +745,15 @@ export default function PublicSalesPage() {
           onClose={() => setCheckoutOpen(false)}
           onConfirm={handleCheckout}
           loading={processingCheckout}
+        />
+      )}
+
+      {freeEnrollOpen && course && (
+        <FreeEnrollModal
+          title={`Matricular-se em ${course.title}`}
+          onClose={() => setFreeEnrollOpen(false)}
+          onConfirm={handleFreeEnroll}
+          loading={processingFreeEnroll}
         />
       )}
     </div>

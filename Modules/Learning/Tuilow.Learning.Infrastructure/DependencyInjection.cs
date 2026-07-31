@@ -24,6 +24,9 @@ public static class DependencyInjection
         services.AddScoped<IUserCourseAccessService, LearningCourseAccessService>();
         services.AddScoped<IUserContactLookup, IdentidadeAcessoUserContactLookup>();
         services.AddScoped<IMagicLinkIssuer, IdentidadeAcessoMagicLinkIssuer>();
+        // Achado B2 da avaliação de UX: matrícula anônima em curso grátis (localiza/cria a conta
+        // pelo e-mail, sem senha) — ver EnrollFreeCourseAnonymousCommandHandler.
+        services.AddScoped<IUserProvisioningService, IdentidadeAcessoUserProvisioningService>();
         return services;
     }
 }

@@ -27,42 +27,16 @@ interface PlayUrlResponse {
  * Vídeos hospedados no Cloudflare Stream (upload direto ou baixado do YouTube) NÃO entram aqui
  * — o backend já devolve um manifesto HLS (.m3u8), tratado como <video> comum (ver isHlsUrl
  * abaixo), não como iframe — assim dá pra salvar/retomar o progresso do aluno.
- *
- * Achado B10 da avaliação (2ª parte — a 1ª, sobre fechar a aba sem pausar, já foi corrigida
- * abaixo em flushOnExit): YouTube e Vimeo TÊM API de controle de embed via postMessage (YouTube
- * IFrame API / Vimeo Player.js), carregada sob demanda pelos loaders abaixo — dá pra ler
- * currentTime, retomar e salvar progresso periodicamente, como um <video> comum (ver useEffect
- * "Player de embed" mais abaixo). Google Drive continua sem API pública de progresso — o preview
- * embutido do Drive não expõe currentTime nem aceita comandos de seek de fora; nesse caso
- * mostramos um aviso na tela em vez de fingir que o progresso é salvo.
  */
-interface EmbedInfo {
-  provider: 'youtube' | 'vimeo' | 'drive';
-  embedId: string;
-  src: string;
-}
-
-function resolveEmbed(url: string): EmbedInfo | null {
+function toEmbedUrl(url: string): string | null {
   const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{6,})/);
-  if (youtubeMatch) {
-    const id = youtubeMatch[1];
-    // enablejsapi=1 + origin habilitam o controle via postMessage pela YouTube IFrame API
-    // (loadYouTubeIframeApi abaixo) — sem eles a API carrega mas o player recusa comandos.
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return { provider: 'youtube', embedId: id, src: `https://www.youtube.com/embed/${id}?enablejsapi=1&origin=${encodeURIComponent(origin)}` };
-  }
+  if (youtubeMatch) return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
 
   const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (vimeoMatch) {
-    const id = vimeoMatch[1];
-    return { provider: 'vimeo', embedId: id, src: `https://player.vimeo.com/video/${id}?api=1` };
-  }
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
 
   const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (driveMatch) {
-    const id = driveMatch[1];
-    return { provider: 'drive', embedId: id, src: `https://drive.google.com/file/d/${id}/preview` };
-  }
+  if (driveMatch) return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
 
   return null;
 }
@@ -70,61 +44,6 @@ function resolveEmbed(url: string): EmbedInfo | null {
 /** Manifesto HLS do Cloudflare Stream — toca numa <video> comum via hls.js (ver useEffect abaixo). */
 function isHlsUrl(url: string): boolean {
   return url.includes('.m3u8');
-}
-
-// ─── Loaders dos SDKs de embed (carregados sob demanda, uma única vez por sessão de página) ───
-// Script tag global em vez de pacote npm: evita adicionar dependência só para isto, e as duas
-// APIs (YouTube/Vimeo) são desenhadas justamente para serem carregadas assim, via <script> solto.
-
-let youTubeApiPromise: Promise<void> | null = null;
-function loadYouTubeIframeApi(): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve();
-  const w = window as unknown as { YT?: { Player?: unknown }; onYouTubeIframeAPIReady?: () => void };
-  if (w.YT?.Player) return Promise.resolve();
-  if (youTubeApiPromise) return youTubeApiPromise;
-  youTubeApiPromise = new Promise((resolve) => {
-    const previous = w.onYouTubeIframeAPIReady;
-    w.onYouTubeIframeAPIReady = () => {
-      previous?.();
-      resolve();
-    };
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    document.head.appendChild(script);
-  });
-  return youTubeApiPromise;
-}
-
-let vimeoApiPromise: Promise<void> | null = null;
-function loadVimeoPlayerApi(): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve();
-  const w = window as unknown as { Vimeo?: { Player?: unknown } };
-  if (w.Vimeo?.Player) return Promise.resolve();
-  if (vimeoApiPromise) return vimeoApiPromise;
-  vimeoApiPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://player.vimeo.com/api/player.js';
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Falha ao carregar o SDK do Vimeo Player.'));
-    document.head.appendChild(script);
-  });
-  return vimeoApiPromise;
-}
-
-// Tipagem mínima das duas APIs — só os métodos realmente usados abaixo, os SDKs completos não
-// têm @types oficiais leves o bastante pra valer a pena instalar só por causa deste player.
-interface YouTubePlayerLike {
-  getCurrentTime(): number;
-  getDuration(): number;
-  seekTo(seconds: number, allowSeekAhead: boolean): void;
-  destroy(): void;
-}
-interface VimeoPlayerLike {
-  getCurrentTime(): Promise<number>;
-  getDuration(): Promise<number>;
-  setCurrentTime(seconds: number): Promise<number>;
-  on(event: string, cb: (data: { seconds: number; duration: number }) => void): void;
-  destroy(): Promise<void>;
 }
 
 interface CourseDetail {
@@ -172,15 +91,6 @@ export default function LessonPlayerPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastSavedAtRef = useRef(0);
   const hasResumedRef = useRef(false);
-  // Achado B10 (2ª parte) — player de embed YouTube/Vimeo controlado via postMessage. embedFrameRef
-  // aponta pro <iframe> renderizado; ytPlayerRef/vimeoPlayerRef guardam a instância do SDK depois
-  // de inicializada (só uma delas fica preenchida por vez, conforme o provider da aula atual).
-  const embedFrameRef = useRef<HTMLIFrameElement | null>(null);
-  const ytPlayerRef = useRef<YouTubePlayerLike | null>(null);
-  const vimeoPlayerRef = useRef<VimeoPlayerLike | null>(null);
-  const embedSaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const embedLastSavedAtRef = useRef(0);
-  const embedHasResumedRef = useRef(false);
 
   // 1. Busca o curso para obter o courseId e a lista de aulas (sidebar)
   const { data: course } = useQuery<CourseDetail>({
@@ -219,13 +129,10 @@ export default function LessonPlayerPage() {
   const resumeSeconds = myLessonProgress?.watchedSeconds ?? 0;
 
   // Reseta o "já retomei este vídeo" ao trocar de aula — sem isso, ao navegar de uma aula pra
-  // outra o próximo <video> (ou player de embed) nunca seria posicionado (o ref ficava true da
-  // aula anterior).
+  // outra o próximo <video> nunca seria posicionado (o ref ficava true da aula anterior).
   useEffect(() => {
     hasResumedRef.current = false;
     lastSavedAtRef.current = 0;
-    embedHasResumedRef.current = false;
-    embedLastSavedAtRef.current = 0;
   }, [lessonId]);
 
   // Cloudflare Stream devolve um manifesto HLS (.m3u8), não um arquivo de vídeo direto — a
@@ -270,10 +177,9 @@ export default function LessonPlayerPage() {
   // mantém a requisição viva mesmo com a página sendo descartada — sem ele, o navegador cancelaria
   // um fetch/XHR comum no meio da saída da página.
   useEffect(() => {
-    // Extraído de dentro de flushOnExit (era só o corpo do <video>) para ser reaproveitado pelo
-    // player do YouTube também — ver ramo `yt` abaixo.
-    const sendBeacon = (watchedSeconds: number, totalSeconds: number) => {
-      if (!totalSeconds || !enrollmentProgress?.enrollmentId) return;
+    const flushOnExit = () => {
+      const video = videoRef.current;
+      if (!video || !video.duration || !enrollmentProgress?.enrollmentId) return;
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
       const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
       try {
@@ -285,8 +191,8 @@ export default function LessonPlayerPage() {
           },
           body: JSON.stringify({
             lessonId,
-            watchedSeconds: Math.floor(watchedSeconds),
-            totalSeconds: Math.floor(totalSeconds),
+            watchedSeconds: Math.floor(video.currentTime),
+            totalSeconds: Math.floor(video.duration),
             clientCapturedAt: new Date().toISOString(),
           }),
           keepalive: true,
@@ -294,28 +200,6 @@ export default function LessonPlayerPage() {
       } catch {
         /* keepalive/fetch podem não existir em navegadores muito antigos — ignora */
       }
-    };
-
-    const flushOnExit = () => {
-      const video = videoRef.current;
-      if (video && video.duration) {
-        sendBeacon(video.currentTime, video.duration);
-        return;
-      }
-      // YouTube: getCurrentTime()/getDuration() são síncronos (valor já mantido em cache local
-      // pela IFrame API, sem round-trip de postMessage) — dá pra ler e mandar o beacon mesmo na
-      // saída abrupta da aba, igual ao <video> nativo acima.
-      const yt = ytPlayerRef.current;
-      if (yt) {
-        try {
-          const current = yt.getCurrentTime();
-          const duration = yt.getDuration();
-          if (current && duration) sendBeacon(current, duration);
-        } catch { /* player pode já ter sido destruído nesse instante — ignora */ }
-      }
-      // Vimeo NÃO entra aqui: toda a API é assíncrona (Promise sobre postMessage), sem garantia
-      // de round-trip a tempo do fechamento da aba — fica só com os saves periódicos de
-      // timeupdate/pause do player de embed (ver useEffect "Player de embed" abaixo).
     };
 
     const handleVisibilityChange = () => {
@@ -360,122 +244,6 @@ export default function LessonPlayerPage() {
     qc.invalidateQueries({ queryKey: ['enrollment-progress', courseId] });
     qc.invalidateQueries({ queryKey: ['my-enrollments'] });
   };
-
-  const embed = playData ? resolveEmbed(playData.playbackUrl) : null;
-
-  // Achado B10 da avaliação (2ª parte): player de embed YouTube/Vimeo — mesmo papel dos 4
-  // handlers do <video> acima (retomar, salvar periodicamente, salvar em pause/ended), só que
-  // via SDK de cada plataforma em vez de eventos DOM nativos, porque o player de fato roda dentro
-  // de um iframe de outro domínio. Drive fica de fora (sem API de progresso — ver resolveEmbed).
-  useEffect(() => {
-    if (!embed || embed.provider === 'drive') return;
-    if (!embedFrameRef.current || !enrollmentProgress?.enrollmentId) return;
-
-    let cancelled = false;
-
-    const markCompletionSideEffects = () => {
-      qc.invalidateQueries({ queryKey: ['enrollment-progress', courseId] });
-      qc.invalidateQueries({ queryKey: ['my-enrollments'] });
-    };
-
-    if (embed.provider === 'youtube') {
-      loadYouTubeIframeApi().then(() => {
-        if (cancelled || !embedFrameRef.current) return;
-        const YT = (window as unknown as { YT: { Player: new (el: HTMLIFrameElement, opts: unknown) => YouTubePlayerLike; PlayerState: { PLAYING: number; PAUSED: number; ENDED: number } } }).YT;
-        const player = new YT.Player(embedFrameRef.current, {
-          events: {
-            onReady: () => {
-              if (embedHasResumedRef.current) return;
-              embedHasResumedRef.current = true;
-              if (resumeSeconds > 5) {
-                try {
-                  const duration = player.getDuration();
-                  if (!duration || resumeSeconds < duration - 5) player.seekTo(resumeSeconds, true);
-                } catch { /* player ainda não pronto pra seek — ignora, aula toca do início */ }
-              }
-            },
-            onStateChange: (e: { data: number }) => {
-              if (embedSaveIntervalRef.current) {
-                clearInterval(embedSaveIntervalRef.current);
-                embedSaveIntervalRef.current = null;
-              }
-              if (e.data === YT.PlayerState.PLAYING) {
-                // getCurrentTime/getDuration são síncronos — polling local, sem custo de rede
-                // extra; só bate na API quando passam PROGRESS_SAVE_INTERVAL_SECONDS (igual ao
-                // handleTimeUpdate do <video>).
-                embedSaveIntervalRef.current = setInterval(() => {
-                  try {
-                    const current = player.getCurrentTime();
-                    const duration = player.getDuration();
-                    if (current - embedLastSavedAtRef.current >= PROGRESS_SAVE_INTERVAL_SECONDS) {
-                      embedLastSavedAtRef.current = current;
-                      saveProgress(current, duration);
-                    }
-                  } catch { /* ignora tick perdido — o próximo intervalo tenta de novo */ }
-                }, 1000);
-              } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) {
-                try {
-                  const current = player.getCurrentTime();
-                  const duration = player.getDuration();
-                  embedLastSavedAtRef.current = current;
-                  saveProgress(current, duration);
-                  markCompletionSideEffects();
-                } catch { /* ignora — próxima interação salva de novo */ }
-              }
-            },
-          },
-        });
-        ytPlayerRef.current = player;
-      });
-    } else if (embed.provider === 'vimeo') {
-      loadVimeoPlayerApi().then(() => {
-        if (cancelled || !embedFrameRef.current) return;
-        const Vimeo = (window as unknown as { Vimeo: { Player: new (el: HTMLIFrameElement) => VimeoPlayerLike } }).Vimeo;
-        const player = new Vimeo.Player(embedFrameRef.current);
-        vimeoPlayerRef.current = player;
-
-        if (!embedHasResumedRef.current) {
-          embedHasResumedRef.current = true;
-          if (resumeSeconds > 5) {
-            player.getDuration()
-              .then((duration) => {
-                if (resumeSeconds < duration - 5) return player.setCurrentTime(resumeSeconds);
-              })
-              .catch(() => { /* SDK pode não estar pronto ainda — aula toca do início */ });
-          }
-        }
-
-        // timeupdate do Vimeo Player.js dispara ~4x/s — throttlado pro mesmo intervalo do resto
-        // do player, pra não bater na API de progresso a cada evento.
-        player.on('timeupdate', (data) => {
-          if (data.seconds - embedLastSavedAtRef.current >= PROGRESS_SAVE_INTERVAL_SECONDS) {
-            embedLastSavedAtRef.current = data.seconds;
-            saveProgress(data.seconds, data.duration);
-          }
-        });
-        const flushVimeo = (data: { seconds: number; duration: number }) => {
-          embedLastSavedAtRef.current = data.seconds;
-          saveProgress(data.seconds, data.duration);
-          markCompletionSideEffects();
-        };
-        player.on('pause', flushVimeo);
-        player.on('ended', flushVimeo);
-      });
-    }
-
-    return () => {
-      cancelled = true;
-      if (embedSaveIntervalRef.current) {
-        clearInterval(embedSaveIntervalRef.current);
-        embedSaveIntervalRef.current = null;
-      }
-      try { ytPlayerRef.current?.destroy(); } catch { /* iframe já pode ter sido desmontado */ }
-      try { vimeoPlayerRef.current?.destroy(); } catch { /* iframe já pode ter sido desmontado */ }
-      ytPlayerRef.current = null;
-      vimeoPlayerRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embed?.provider, embed?.embedId, enrollmentProgress?.enrollmentId, lessonId]);
 
   // Status do erro (403 = sem acesso pago a este curso, 401 = não logado). O motivo exato
   // (compra pendente vs. assinatura pendente) depende do modelo de monetização do PRODUTO, não
@@ -545,17 +313,17 @@ export default function LessonPlayerPage() {
             <>
               <div className="w-full aspect-video rounded-xl overflow-hidden bg-black">
                 {(() => {
-                  if (embed) {
-                    // YouTube/Vimeo importados sem download — tocam via iframe de embed, com
-                    // save/resume real por cima da API própria de cada plataforma (achado B10, 2ª
-                    // parte — ver useEffect "Player de embed" acima e resolveEmbed no topo do
-                    // arquivo). Drive não tem API de progresso, por isso o aviso abaixo do player.
-                    // Vídeos baixados e hospedados no Cloudflare Stream NÃO caem aqui — vão pelo
-                    // caso da <video> comum abaixo (manifesto HLS via hls.js).
+                  const embedUrl = toEmbedUrl(playData.playbackUrl);
+                  if (embedUrl) {
+                    // YouTube/Vimeo/Drive importados sem download — tocam via iframe de embed.
+                    // Não dá pra salvar/retomar posição aqui: o player fica isolado num outro
+                    // domínio (iframe) e não expõe currentTime sem integrar a API própria de
+                    // cada plataforma (YouTube IFrame API, Vimeo Player.js etc.). Vídeos baixados
+                    // e hospedados no Cloudflare Stream NÃO caíem aqui — vão pelo caso da
+                    // <video> comum abaixo (manifesto HLS via hls.js).
                     return (
                       <iframe
-                        ref={embedFrameRef}
-                        src={embed.src}
+                        src={embedUrl}
                         allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
                         allowFullScreen
                         className="w-full h-full border-0"
@@ -595,15 +363,6 @@ export default function LessonPlayerPage() {
                   );
                 })()}
               </div>
-
-              {/* Achado B10 da avaliação (2ª parte): Google Drive não tem API de progresso —
-                  avisa em vez de fingir que a posição é salva (ver resolveEmbed no topo do
-                  arquivo). YouTube/Vimeo não caem aqui: já têm save/resume real. */}
-              {embed?.provider === 'drive' && (
-                <p className="text-xs text-gray-400 mt-2">
-                  ℹ️ Vídeo hospedado no Google Drive: sua posição não pode ser salva automaticamente por aqui.
-                </p>
-              )}
 
               {/* Título e badge */}
               <div className="mt-4 flex items-start justify-between gap-3">

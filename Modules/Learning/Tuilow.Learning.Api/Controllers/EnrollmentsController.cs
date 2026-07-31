@@ -1,4 +1,5 @@
 using Tuilow.Learning.Application.Commands.CompleteLesson;
+using Tuilow.Learning.Application.Commands.EnrollFreeCourseAnonymous;
 using Tuilow.Learning.Application.Commands.EnrollStudent;
 using Tuilow.Learning.Application.Queries.GetContinueWatching;
 using Tuilow.Learning.Application.Queries.GetEnrollmentProgress;
@@ -24,6 +25,22 @@ public sealed class EnrollmentsController(ISender sender, ICurrentUserService cu
         var enrollmentId = await sender.Send(
             new EnrollStudentCommand(currentUser.UserId!.Value, request.CourseId), ct);
         return Ok(new { enrollmentId });
+    }
+
+    /// <summary>
+    /// Matrícula em curso grátis sem exigir cadastro completo prévio (achado B2 da avaliação de
+    /// UX) — mesmo nível de fricção do checkout anônimo de curso pago (só nome/e-mail, sem
+    /// senha): a conta é localizada ou criada automaticamente pelo e-mail informado, e o acesso
+    /// chega por Magic Link. Quando quem chama já está logado, o front-end manda o token da
+    /// sessão normalmente e o backend usa o UserId dela em vez do e-mail do formulário.
+    /// </summary>
+    [HttpPost("free")]
+    [AllowAnonymous]
+    public async Task<IActionResult> EnrollFree([FromBody] EnrollFreeRequest request, CancellationToken ct)
+    {
+        var result = await sender.Send(new EnrollFreeCourseAnonymousCommand(
+            currentUser.UserId, request.CourseId, request.CustomerName, request.CustomerEmail), ct);
+        return Ok(result);
     }
 
     /// <summary>Registra progresso em uma aula.</summary>
@@ -73,6 +90,9 @@ public sealed class EnrollmentsController(ISender sender, ICurrentUserService cu
 }
 
 public sealed record EnrollRequest(Guid CourseId);
+
+/// <summary>CustomerName/CustomerEmail são ignorados pelo handler quando o chamador já está logado (achado B2).</summary>
+public sealed record EnrollFreeRequest(Guid CourseId, string CustomerName, string CustomerEmail);
 
 /// <summary>ClientCapturedAt (achado M6) — ver doc de CompleteLessonCommand.</summary>
 public sealed record TrackProgressRequest(

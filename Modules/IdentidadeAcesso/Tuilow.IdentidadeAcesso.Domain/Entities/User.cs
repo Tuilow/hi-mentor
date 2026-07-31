@@ -267,8 +267,9 @@ public sealed class User : AggregateRoot
     /// <summary>
     /// Exclusão via painel do dono da plataforma: soft-delete (preserva a linha no banco para
     /// histórico financeiro/fiscal — ver PlatformFeeConfiguration, comissões, compras já feitas),
-    /// bloqueia login e revoga qualquer sessão ativa. Vídeos/cursos são tratados à parte por
-    /// DeleteUserCommandHandler (Streaming/Catalog), não é responsabilidade do agregado User.
+    /// bloqueia login e revoga qualquer sessão ativa. Cursos (arquivamento) continuam tratados por
+    /// DeleteUserCommandHandler (Catalog, Domain-to-Domain). Vídeos (achado M11) não são mais
+    /// apagados de dentro deste fluxo — o evento abaixo delega isso ao módulo Streaming.
     /// </summary>
     public void MarkDeleted()
     {
@@ -276,5 +277,12 @@ public sealed class User : AggregateRoot
         foreach (var rt in _refreshTokens.Where(t => t.IsActive))
             rt.Revoke();
         Touch();
+
+        // Achado M11 da auditoria de arquitetura: consumido por Streaming.Application.EventHandlers.
+        // UserDeletedEventHandler, que apaga os vídeos dos cursos deste criador (registro local +
+        // Cloudflare Stream) — sem isso, DeleteUserCommandHandler precisava referenciar
+        // Tuilow.Streaming.Application diretamente, a única referência Application-to-Application
+        // entre módulos do repositório.
+        AddDomainEvent(new UserDeletedDomainEvent(Id));
     }
 }
