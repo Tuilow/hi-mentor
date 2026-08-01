@@ -138,6 +138,25 @@ public sealed class EmailService(
 
     private async Task SendAsync(string to, string subject, string htmlBody, CancellationToken ct)
     {
+        // Achado de teste manual: sem Email:ApiKey configurada (nunca existiu em appsettings.json
+        // local — só sobrou Host/Port/Username/Password de uma implementação SMTP antiga, que este
+        // serviço não usa mais), a chamada HTTP à API do Mailgun ia com Authorization "api:"
+        // (chave vazia), o Mailgun respondia 401, e o catch abaixo só logava um erro — nenhuma
+        // exceção subia, então quem chama (ex.: CoursePurchaseConfirmedEventHandler) achava que
+        // tinha dado certo, e o Magic Link nunca chegava a lugar nenhum. Isso deixava fluxos de
+        // checkout anônimo (compra/assinatura/matrícula grátis) sem nenhuma forma prática de login
+        // em ambiente local, sem precisar configurar Mailgun de verdade. Mesmo princípio de
+        // Cloudflare:MockMode/Asaas — sem credencial real configurada, cai num modo local que não
+        // bloqueia o fluxo: loga o conteúdo (com qualquer link de acesso) no console em vez de
+        // tentar enviar.
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            logger.LogInformation(
+                "[EMAIL MOCK] Email:ApiKey não configurada — e-mail não enviado de verdade.\nPara: {To}\nAssunto: {Subject}\n{Body}",
+                to, subject, htmlBody);
+            return;
+        }
+
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, $"{_apiBaseUrl}/v3/{_domain}/messages");

@@ -25,10 +25,20 @@ public sealed class PurchaseCourseCommandHandler(
             throw new BusinessException("Este curso é gratuito — não é necessário comprá-lo, basta se matricular.");
 
         // Checkout anônimo: sem login, localiza ou cria a conta pelo e-mail informado. A conta
-        // nova é adicionada ao mesmo DbContext/transação da compra (SaveChangesAsync único no
-        // fim deste handler) — se o pagamento falhar antes disso, nada é persistido.
+        // nova é persistida logo abaixo (ver comentário no SaveChangesAsync seguinte) — se o
+        // pagamento falhar depois disso, só a compra fica pendente/inexistente; a conta em si
+        // já existe, igual a alguém que se registra e some antes de pagar.
         var studentId = request.StudentId
             ?? await userProvisioningService.FindOrCreateStudentAsync(request.CustomerEmail, request.CustomerName, ct);
+
+        // Bug encontrado em teste manual (mesmo em SubscribeToCourseCommandHandler): a FK real
+        // "FK_course_purchases_users_StudentId" existe só no Postgres (migration
+        // AddUserForeignKeys), sem relação equivalente configurada no EF — de propósito, pra não
+        // dar navegação C# entre módulos. Sem isso, o EF não garante que o User novo seja
+        // inserido antes do CoursePurchase na mesma SaveChanges, e o INSERT pode sair na ordem
+        // errada (viola a FK, 23503). Este SaveChanges garante a ordem; é no-op se o usuário já
+        // existia.
+        await uow.SaveChangesAsync(ct);
 
         if (await coursePurchaseRepository.HasConfirmedPurchaseAsync(studentId, request.CourseId, ct))
             throw new BusinessException("Você já comprou este curso.");

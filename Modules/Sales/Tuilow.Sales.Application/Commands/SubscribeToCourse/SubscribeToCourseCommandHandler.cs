@@ -31,6 +31,19 @@ public sealed class SubscribeToCourseCommandHandler(
         var userId = request.UserId
             ?? await userProvisioningService.FindOrCreateStudentAsync(request.CustomerEmail, request.CustomerName, ct);
 
+        // Bug encontrado em teste manual: "subscriptions.UserId" tem FK real no Postgres pra
+        // "users" (migration AddUserForeignKeys), mas de propósito nenhuma relação equivalente é
+        // configurada no EF (ver comentário da migration — módulos não devem ganhar navegação
+        // C# entre si). Sem isso, o EF não sabe que o User precisa ser inserido antes da
+        // Subscription quando os dois são novos na mesma SaveChanges, e a ordem dos INSERTs não é
+        // garantida — na prática, batia primeiro em "subscriptions" e violava a FK (23503). Um
+        // SaveChanges aqui, logo após resolver/criar o usuário, garante a ordem sem precisar
+        // configurar relação nenhuma no modelo. Não compromete a atomicidade na prática: se o
+        // usuário já existia, isso é um no-op (nada pendente pra salvar); se era novo, a conta
+        // fica criada mesmo que o pagamento falhe depois — mesmo resultado de alguém se
+        // registrar e abandonar o checkout, sem dado inconsistente.
+        await uow.SaveChangesAsync(ct);
+
         if (await subscriptionRepository.GetActiveByUserForCourseAsync(userId, request.CourseId, ct) is not null)
             throw new BusinessException("Você já tem uma assinatura ativa para este curso.");
 

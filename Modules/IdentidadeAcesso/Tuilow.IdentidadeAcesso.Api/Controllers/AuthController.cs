@@ -19,6 +19,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
+// Precisa vir explícito: IWebHostEnvironment (Microsoft.AspNetCore.Hosting, usado no tipo do
+// parâmetro `environment` abaixo) implementa Microsoft.Extensions.Hosting.IHostEnvironment, e é
+// nesse namespace que mora o método de extensão IsDevelopment() que faz sentido pra ele. Sem este
+// using, o compilador só enxerga Microsoft.AspNetCore.Hosting.HostingEnvironmentExtensions.IsDevelopment
+// — a sobrecarga OBSOLETA para a interface antiga IHostingEnvironment, incompatível com
+// IWebHostEnvironment — e a build falha com CS1929.
+using Microsoft.Extensions.Hosting;
 
 namespace Tuilow.IdentidadeAcesso.Api.Controllers;
 

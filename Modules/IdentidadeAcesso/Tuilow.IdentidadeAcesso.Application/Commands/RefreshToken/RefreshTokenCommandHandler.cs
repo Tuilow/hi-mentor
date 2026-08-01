@@ -26,7 +26,13 @@ public sealed class RefreshTokenCommandHandler(
 
         existingToken.Revoke(newRefreshTokenStr);
         user.AddRefreshToken(newRefreshTokenStr, newExpires, request.IpAddress);
-        userRepository.Update(user);
+
+        // Bug encontrado em teste manual: NÃO chama userRepository.Update(user) — o usuário já
+        // está rastreado pelo DbContext (veio de GetByRefreshTokenAsync na mesma unit of work).
+        // Chamar Update() forçava o novo RefreshToken (Guid não-default, criado por
+        // AddRefreshToken acima) para Modified em vez de Added, gerando UPDATE de 0 linhas →
+        // DbUpdateConcurrencyException. Mesma causa já documentada em PromoteUserCommandHandler/
+        // RemoveRoleCommandHandler para UserRoleAssignment — aqui pegou o RefreshToken.
         await uow.SaveChangesAsync(ct);
 
         var accessToken = jwtService.GenerateAccessToken(user);

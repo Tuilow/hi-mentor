@@ -46,6 +46,14 @@ public sealed class EnrollFreeCourseAnonymousCommandHandler(
         var studentId = request.UserId
             ?? await userProvisioningService.FindOrCreateStudentAsync(request.CustomerEmail, request.CustomerName, ct);
 
+        // Bug encontrado em teste manual no fluxo equivalente de Sales (PurchaseCourse/
+        // SubscribeToCourse): "enrollments.UserId" tem FK real no Postgres pra "users" (migration
+        // AddUserForeignKeys), sem relação equivalente configurada no EF — de propósito, pra não
+        // dar navegação C# entre módulos. Sem isso, o EF não garante que o User novo seja
+        // inserido antes do Enrollment quando os dois são novos na mesma SaveChanges (viola a FK,
+        // 23503). Este SaveChanges garante a ordem; é no-op se o usuário já existia.
+        await uow.SaveChangesAsync(ct);
+
         // Idempotente: um segundo clique/reenvio do formulário (ex.: duplo clique, aba
         // duplicada) não deve criar uma segunda matrícula nem falhar — só devolve a existente.
         var existingEnrollment = await enrollmentRepository.GetByUserAndCourseAsync(studentId, request.CourseId, ct);
