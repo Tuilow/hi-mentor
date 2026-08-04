@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Circle, Pause, Play, Square, RotateCcw, Download, Upload, Video as VideoIcon, MonitorUp, Users } from 'lucide-react';
-import { studioApi, coursesApi, videosApi } from '@/lib/api';
+import { API_URL, studioApi, coursesApi, videosApi } from '@/lib/api';
 import type { LessonScriptItem, ProductDetail } from '@/types';
 
 type Mode = 'webcam' | 'screen' | 'both';
@@ -282,7 +282,15 @@ function PostRecordingActions({ blob, recordedUrl, scriptId }: { blob: Blob; rec
           // Achado M10 da avaliação: o mock de upload de vídeo (MockTusController) passou a
           // exigir [Authorize(Roles="Creator,Admin")] nos métodos de escrita (Options/Head/
           // Patch) — sem enviar o token aqui, o upload passaria a falhar com 401.
-          headers: { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` },
+          // Achado de teste manual (Cloudflare Stream real -- o achado M10 original era so
+          // pro Mock): a URL de upload de verdade (upload.cloudflarestream.com) rejeita a
+          // requisicao inteira no preflight de CORS se vier um header Authorization -- o
+          // endpoint deles nunca esperou nem permite esse header (a autorizacao ja esta
+          // embutida no proprio uploadUrl de uso unico). So manda o token quando o upload
+          // e para o NOSSO backend (fluxo Mock, sem Cloudflare configurado).
+          headers: data.uploadUrl.startsWith(API_URL)
+            ? { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` }
+            : undefined,
           onError: reject,
           onSuccess: () => resolve(),
         });

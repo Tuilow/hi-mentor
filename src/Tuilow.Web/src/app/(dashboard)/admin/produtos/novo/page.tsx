@@ -10,7 +10,7 @@ import {
   BookOpen, Briefcase,
 } from 'lucide-react';
 import {
-  coursesApi, videosApi, materialsApi, creatorStudioApi, courseSubscriptionPlansApi, categoriesApi,
+  API_URL, coursesApi, videosApi, materialsApi, creatorStudioApi, courseSubscriptionPlansApi, categoriesApi,
 } from '@/lib/api';
 import { CategoryAutocomplete } from '@/components/ui/CategoryAutocomplete';
 import type {
@@ -330,7 +330,15 @@ function ProductWizard() {
           // Achado M10 da avaliação: o mock de upload de vídeo (MockTusController) passou a
           // exigir [Authorize(Roles="Creator,Admin")] nos métodos de escrita (Options/Head/
           // Patch) — sem enviar o token aqui, o upload passaria a falhar com 401.
-          headers: { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` },
+          // Achado de teste manual (Cloudflare Stream real -- o achado M10 original era so
+          // pro Mock): a URL de upload de verdade (upload.cloudflarestream.com) rejeita a
+          // requisicao inteira no preflight de CORS se vier um header Authorization -- o
+          // endpoint deles nunca esperou nem permite esse header (a autorizacao ja esta
+          // embutida no proprio uploadUrl de uso unico). So manda o token quando o upload
+          // e para o NOSSO backend (fluxo Mock, sem Cloudflare configurado).
+          headers: data.uploadUrl.startsWith(API_URL)
+            ? { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` }
+            : undefined,
           onError: reject,
           onSuccess: () => resolve(),
         });
