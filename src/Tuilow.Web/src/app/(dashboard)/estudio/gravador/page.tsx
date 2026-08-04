@@ -271,31 +271,44 @@ function PostRecordingActions({ blob, recordedUrl, scriptId }: { blob: Blob; rec
     try {
       const file = new File([blob], `gravacao-${Date.now()}.webm`, { type: 'video/webm' });
       const { data } = await videosApi.getUploadUrl(courseId);
-      const tus = await import('tus-js-client');
-      await new Promise<void>((resolve, reject) => {
-        const upload = new tus.Upload(file, {
-          uploadUrl: data.uploadUrl,
-          uploadLengthDeferred: true,
-          chunkSize: 50 * 1024 * 1024,
-          retryDelays: [0, 3000, 5000, 10000],
-          metadata: { filename: file.name, filetype: file.type },
-          // Achado M10 da avaliação: o mock de upload de vídeo (MockTusController) passou a
-          // exigir [Authorize(Roles="Creator,Admin")] nos métodos de escrita (Options/Head/
-          // Patch) — sem enviar o token aqui, o upload passaria a falhar com 401.
-          // Achado de teste manual (Cloudflare Stream real -- o achado M10 original era so
-          // pro Mock): a URL de upload de verdade (upload.cloudflarestream.com) rejeita a
-          // requisicao inteira no preflight de CORS se vier um header Authorization -- o
-          // endpoint deles nunca esperou nem permite esse header (a autorizacao ja esta
-          // embutida no proprio uploadUrl de uso unico). So manda o token quando o upload
-          // e para o NOSSO backend (fluxo Mock, sem Cloudflare configurado).
-          headers: data.uploadUrl.startsWith(API_URL)
-            ? { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` }
-            : undefined,
-          onError: reject,
-          onSuccess: () => resolve(),
+      const isMockUpload = data.uploadUrl.startsWith(API_URL);
+
+      if (isMockUpload) {
+        // MockTusController (sem Cloudflare configurado) exige [Authorize] nos métodos TUS —
+        // ver achado M10 da avaliação.
+        const tus = await import('tus-js-client');
+        await new Promise<void>((resolve, reject) => {
+          const upload = new tus.Upload(file, {
+            uploadUrl: data.uploadUrl,
+            uploadLengthDeferred: true,
+            chunkSize: 50 * 1024 * 1024,
+            retryDelays: [0, 3000, 5000, 10000],
+            metadata: { filename: file.name, filetype: file.type },
+            headers: { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` },
+            onError: reject,
+            onSuccess: () => resolve(),
+          });
+          upload.start();
         });
-        upload.start();
-      });
+      } else {
+        // Achado de teste manual: nessa conta da Cloudflare Stream, o upload resumable via
+        // TUS (HEAD/PATCH) retorna 400 pra qualquer uploadUrl gerada pelo
+        // /stream/direct_upload -- confirmado com curl puro, fora do navegador e sem CORS
+        // envolvido, então não é bug nosso (chamado aberto com o suporte da Cloudflare). A
+        // própria documentação deles diz que a mesma uploadUrl também aceita um POST comum
+        // multipart/form-data pra vídeos até 200MB, sem TUS -- é esse fallback usado aqui
+        // enquanto o TUS não for corrigido do lado deles.
+        if (file.size > 200 * 1024 * 1024) {
+          throw new Error('Vídeo maior que 200MB não é suportado no momento — o upload resumable está temporariamente indisponível. Tente um arquivo menor ou comprima o vídeo.');
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch(data.uploadUrl, { method: 'POST', body: formData });
+        if (!response.ok) {
+          throw new Error(`Upload para o Cloudflare Stream falhou (status ${response.status}).`);
+        }
+      }
       await videosApi.linkVideo(data.videoId, { courseId, moduleId, lessonId });
 
       if (scriptId) {
@@ -303,8 +316,13 @@ function PostRecordingActions({ blob, recordedUrl, scriptId }: { blob: Blob; rec
       }
 
       toast.success('Vídeo enviado e vinculado à aula!');
-    } catch {
-      toast.error('Não foi possível enviar o vídeo agora.');
+    } catch (err) {
+      const message = err instanceof Error
+        && (err.message.startsWith('Vídeo maior') || err.message.startsWith('Upload para o Cloudflare'))
+        ? err.message
+        : 'Não foi possível enviar o vídeo agora.';
+      toast.error(message);
+      console.error(err);
     } finally {
       setUploading(false);
     }
