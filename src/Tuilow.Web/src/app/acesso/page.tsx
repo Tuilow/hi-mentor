@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { authApi } from '@/lib/api';
+import { authApi, setAccessToken } from '@/lib/api';
 
 type Status = 'loading' | 'error';
 
@@ -28,7 +28,7 @@ function MagicLinkConsumer() {
 
     authApi.consumeMagicLink(token)
       .then(res => {
-        localStorage.setItem('access_token', res.data.accessToken);
+        setAccessToken(res.data.accessToken);
         router.push(redirect || '/dashboard');
       })
       .catch(() => setStatus('error'));

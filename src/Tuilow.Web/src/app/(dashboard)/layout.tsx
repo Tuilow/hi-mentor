@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { authApi, enrollmentsApi } from '@/lib/api';
+import { authApi, enrollmentsApi, clearAccessToken } from '@/lib/api';
 import { MyEnrollment } from '@/types';
 
 // "Cursos" e "Assinatura" foram removidos do menu (Sprint Item 5): a plataforma não é uma
@@ -71,7 +71,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } catch {
       // Sessão local será limpa de qualquer forma — ver comentário acima.
     } finally {
-      localStorage.removeItem('access_token');
+      clearAccessToken();
       router.push('/login');
     }
   };

@@ -9,14 +9,23 @@ import { NextRequest, NextResponse } from 'next/server';
  * aluno: sem esse gate, mover as rotas de lugar não muda nada sobre quem consegue alcançá-las.
  *
  * IMPORTANTE — isto é só um gate de UX (redireciona quem claramente não tem sessão), não a
- * autorização de verdade: o middleware só enxerga a PRESENÇA do cookie HttpOnly
- * "refresh_token" (não pode ler nem validar o JWT em si, que fica no header Authorization,
- * fora do alcance de cookies/middleware). A autorização real continua no backend, via
- * [Authorize] + validação de JWT em cada chamada de API — um cookie presente mas com refresh
- * token expirado ainda passa por aqui, mas cai em 401 nas chamadas reais e o interceptor do
- * axios (ver lib/api.ts) redireciona pra /login do mesmo jeito.
+ * autorização de verdade: a autorização real continua no backend, via [Authorize] + validação
+ * de JWT em cada chamada de API — um "has_session" presente mas com refresh token expirado
+ * ainda passa por aqui, mas cai em 401 nas chamadas reais e o interceptor do axios (ver
+ * lib/api.ts) redireciona pra /login do mesmo jeito.
+ *
+ * Achado de teste manual (deploy real: front no Vercel, API no Railway — domínios registráveis
+ * DE FATO diferentes): a versão original checava a PRESENÇA do cookie HttpOnly "refresh_token".
+ * Isso só funciona quando front e API dividem o mesmo domínio registrável — esse cookie é
+ * gravado pelo BACKEND com Domain = host da API, então o navegador nunca o envia em requisições
+ * pro Vercel (domínio diferente), e este middleware (que roda no domínio do front) sempre via
+ * "sem sessão", mesmo logo após um login bem-sucedido — resultado: loop de redirecionamento de
+ * volta pro /login. Trocado para "has_session", um cookie NÃO-HttpOnly gravado pelo próprio
+ * front via document.cookie (ver setAccessToken em lib/api.ts) assim que o login/refresh
+ * funciona — por ser gravado na origem do front, ele sempre acompanha as requisições que este
+ * middleware intercepta, não importa em qual domínio a API esteja.
  */
-const REFRESH_COOKIE = 'refresh_token';
+const SESSION_HINT_COOKIE = 'has_session';
 
 // Prefixos protegidos — qualquer rota que comece com um destes exige sessão.
 const PROTECTED_PREFIXES = [
@@ -50,7 +59,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const hasSession = request.cookies.has(REFRESH_COOKIE);
+  const hasSession = request.cookies.has(SESSION_HINT_COOKIE);
   if (hasSession) {
     return NextResponse.next();
   }

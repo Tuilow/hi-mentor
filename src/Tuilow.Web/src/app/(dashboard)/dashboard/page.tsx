@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { authApi, enrollmentsApi } from '@/lib/api';
+import { authApi, enrollmentsApi, setAccessToken } from '@/lib/api';
 import type { MyEnrollment, ContinueWatching } from '@/types';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -61,7 +61,7 @@ export default function DashboardPage() {
       // Nota: refresh token não é mais gravado aqui — ele só existe no cookie HttpOnly (achado
       // C1), nunca no corpo da resposta nem em localStorage.
       const { data } = await authApi.becomeCreator();
-      localStorage.setItem('access_token', data.accessToken);
+      setAccessToken(data.accessToken);
 
       // Invalida o cache em vez de recarregar a página inteira: sidebar e conteúdo atualizam
       // na hora com os novos recursos de criador (sem repetir toda a dança de autenticação de

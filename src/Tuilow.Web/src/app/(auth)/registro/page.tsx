@@ -9,7 +9,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-import { authApi } from '@/lib/api';
+import { authApi, setAccessToken } from '@/lib/api';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 
 // Mesmo padrão usado em outras páginas (ex: cursos/[slug]/page.tsx): o backend
@@ -72,7 +72,7 @@ function RegisterForm() {
     try {
       setGoogleLoading(true);
       const res = await authApi.googleLogin(credentialResponse.credential);
-      localStorage.setItem('access_token', res.data.accessToken);
+      setAccessToken(res.data.accessToken);
       toast.success('Conta criada com Google!');
       router.push(returnUrl || '/dashboard');
     } catch (err) {

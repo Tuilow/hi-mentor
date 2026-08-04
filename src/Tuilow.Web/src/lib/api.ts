@@ -67,6 +67,47 @@ api.interceptors.response.use(
   }
 );
 
+// ─── Sessão local (access token + sinalizador para o middleware) ─────────────────
+// Achado de teste manual (deploy real: front no Vercel, API no Railway — domínios registráveis
+// DE FATO diferentes, ver comentário em AuthController.BuildCookieOptions no backend): o
+// middleware.ts roda no domínio do FRONT (Edge Function do Vercel) e só enxerga cookies que o
+// navegador anexa às requisições feitas PRO FRONT. O cookie HttpOnly "refresh_token" tem Domain
+// = host da API (Railway) — o navegador NUNCA o envia em requisições para o Vercel, então o
+// middleware sempre via "sem sessão" e redirecionava de volta pro /login mesmo com o login tendo
+// funcionado de verdade (access_token gravado certinho, refresh_token certinho no cookie da API
+// — só que em domínio nenhum que o middleware consiga ler). Resultado observado: toast "Bem-vindo
+// de volta" aparece, mas a navegação pro /dashboard é imediatamente revertida pro /login pelo
+// middleware, num loop.
+//
+// A correção é este cookie aqui: gravado pelo PRÓPRIO navegador via document.cookie, na mesma
+// origem do front — por isso ele SEMPRE acompanha as requisições ao front, inclusive as que o
+// middleware intercepta, não importa em qual domínio a API esteja. Não substitui o refresh_token
+// nem é usado para autenticação de verdade (não é HttpOnly, não valida nada sozinho) — é só um
+// sinalizador de UX pro middleware decidir "deixa passar ou manda pro login". A autorização real
+// continua 100% no backend, via JWT no header Authorization + [Authorize] em cada endpoint.
+const SESSION_HINT_COOKIE = 'has_session';
+// 30 dias = mesma validade do refresh token (ver RefreshTokenCommandHandler/AuthTokens no
+// backend) — reemitido a cada login/refresh bem-sucedido, então na prática dura enquanto a
+// sessão durar de verdade.
+const SESSION_HINT_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+
+export const setAccessToken = (token: string) => {
+  localStorage.setItem('access_token', token);
+  if (typeof document !== 'undefined') {
+    // Secure só quando servido por HTTPS (produção) — em dev local (http://localhost) o
+    // navegador descartaria o cookie inteiro se ele viesse marcado Secure.
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${SESSION_HINT_COOKIE}=1; path=/; max-age=${SESSION_HINT_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
+  }
+};
+
+export const clearAccessToken = () => {
+  localStorage.removeItem('access_token');
+  if (typeof document !== 'undefined') {
+    document.cookie = `${SESSION_HINT_COOKIE}=; path=/; max-age=0`;
+  }
+};
+
 // ─── Token injection ──────────────────────────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
@@ -127,13 +168,13 @@ api.interceptors.response.use(
           { withCredentials: true }
         );
 
-        localStorage.setItem('access_token', data.accessToken);
+        setAccessToken(data.accessToken);
         processQueue(null, data.accessToken);
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(original);
       } catch (refreshError) {
         processQueue(refreshError as AxiosError, null);
-        localStorage.removeItem('access_token');
+        clearAccessToken();
         if (typeof window !== 'undefined') window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {
@@ -308,14 +349,6 @@ export const courseSubscriptionPlansApi = {
 
 export const enrollmentsApi = {
   enroll: (courseId: string) => api.post('/enrollments', { courseId }),
-  // Achado B2 da avaliação de UX: matrícula em curso grátis sem exigir /registro completo (nome,
-  // sobrenome, e-mail, senha, confirmar senha) antes — mesmo nível de fricção do checkout anônimo
-  // de curso pago (ver coursePurchasesApi.purchase abaixo), só nome/e-mail. Não exige login
-  // (endpoint [AllowAnonymous] no backend); quando já há um access_token salvo, o interceptor de
-  // request já anexa o Authorization normalmente e o backend usa o usuário da sessão em vez do
-  // e-mail do formulário.
-  enrollFreeAnonymous: (courseId: string, data: { customerName: string; customerEmail: string }) =>
-    api.post('/enrollments/free', { courseId, ...data }),
   trackProgress: (enrollmentId: string, data: unknown) =>
     api.post(`/enrollments/${enrollmentId}/progress`, data),
   getProgress: (courseId: string) => api.get(`/enrollments/courses/${courseId}`),

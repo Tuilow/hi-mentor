@@ -9,7 +9,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-import { authApi } from '@/lib/api';
+import { authApi, setAccessToken } from '@/lib/api';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 
 // Mesmo padrão usado em app/(auth)/registro/page.tsx — extrai a mensagem real que o back-end
@@ -65,7 +65,9 @@ function LoginForm() {
       const res = await authApi.login(data);
       // Achado C1: o refresh token não volta mais no corpo (vive só no cookie HttpOnly setado
       // pelo backend nesta mesma resposta) — access_token continua em localStorage por enquanto.
-      localStorage.setItem('access_token', res.data.accessToken);
+      // setAccessToken também grava o cookie "has_session" (ver lib/api.ts) que o middleware
+      // usa pra liberar as rotas protegidas — precisa existir ANTES do goHome() abaixo.
+      setAccessToken(res.data.accessToken);
       toast.success('Bem-vindo de volta!');
       await goHome();
     } catch (err) {
@@ -83,7 +85,7 @@ function LoginForm() {
     try {
       setGoogleLoading(true);
       const res = await authApi.googleLogin(credentialResponse.credential);
-      localStorage.setItem('access_token', res.data.accessToken);
+      setAccessToken(res.data.accessToken);
       toast.success('Bem-vindo!');
       await goHome();
     } catch {
