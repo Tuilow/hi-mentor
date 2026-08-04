@@ -49,10 +49,25 @@ public sealed class YouTubeDownloadWorker(
     private async Task ProcessAsync(YouTubeDownloadJob job, CancellationToken ct)
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"yt-{job.VideoId:N}.mp4");
+        string? cookiesFilePath = null;
         try
         {
+            // Achado de teste manual: o YouTube bloqueia downloads vindos de IP de datacenter
+            // (Railway, AWS etc.) com "Sign in to confirm you're not a bot", mesmo pra vídeos
+            // públicos comuns -- não dá pra contornar só ajustando flags do yt-dlp. Passar os
+            // cookies de uma sessão logada de verdade (exportados como cookies.txt formato
+            // Netscape, configurados em YtDlp:CookiesContent) convence o YouTube de que a
+            // requisição vem de um navegador autenticado. Precisam ser renovados periodicamente
+            // (expiram) -- sem cookies configurados, cai no comportamento antigo (sem --cookies).
+            var cookiesContent = configuration["YtDlp:CookiesContent"];
+            if (!string.IsNullOrWhiteSpace(cookiesContent))
+            {
+                cookiesFilePath = Path.Combine(Path.GetTempPath(), $"yt-cookies-{job.VideoId:N}.txt");
+                await File.WriteAllTextAsync(cookiesFilePath, cookiesContent, ct);
+            }
+
             logger.LogInformation("Baixando vídeo do YouTube para o Video {VideoId}: {Url}", job.VideoId, job.SourceUrl);
-            await DownloadWithYtDlpAsync(job.SourceUrl, tempFile, ct);
+            await DownloadWithYtDlpAsync(job.SourceUrl, tempFile, cookiesFilePath, ct);
 
             using var scope = scopeFactory.CreateScope();
             var streamingService = scope.ServiceProvider.GetRequiredService<IStreamingService>();
@@ -99,6 +114,15 @@ public sealed class YouTubeDownloadWorker(
                     logger.LogWarning(ex, "Não foi possível apagar o arquivo temporário {TempFile}.", tempFile);
                 }
             }
+
+            if (cookiesFilePath is not null && File.Exists(cookiesFilePath))
+            {
+                try { File.Delete(cookiesFilePath); }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Não foi possível apagar o arquivo temporário de cookies {CookiesFile}.", cookiesFilePath);
+                }
+            }
         }
     }
 
@@ -109,7 +133,8 @@ public sealed class YouTubeDownloadWorker(
     /// --merge-output-format. --max-filesize é uma rede de segurança contra vídeos absurdamente
     /// grandes consumindo todo o disco do container.
     /// </summary>
-    private static async Task DownloadWithYtDlpAsync(string url, string outputPath, CancellationToken ct)
+    private static async Task DownloadWithYtDlpAsync(
+        string url, string outputPath, string? cookiesFilePath, CancellationToken ct)
     {
         var psi = new ProcessStartInfo
         {
@@ -126,6 +151,13 @@ public sealed class YouTubeDownloadWorker(
         psi.ArgumentList.Add("--no-playlist");
         psi.ArgumentList.Add("--max-filesize");
         psi.ArgumentList.Add("2G");
+
+        if (!string.IsNullOrWhiteSpace(cookiesFilePath))
+        {
+            psi.ArgumentList.Add("--cookies");
+            psi.ArgumentList.Add(cookiesFilePath);
+        }
+
         psi.ArgumentList.Add("-o");
         psi.ArgumentList.Add(outputPath);
 
