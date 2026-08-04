@@ -349,6 +349,13 @@ export const courseSubscriptionPlansApi = {
 
 export const enrollmentsApi = {
   enroll: (courseId: string) => api.post('/enrollments', { courseId }),
+  // Matrícula em curso GRÁTIS sem exigir login prévio (achado B2 da avaliação de UX) — espelha
+  // coursePurchasesApi.purchase/subscriptionsApi.subscribeToCourse (checkout anônimo): só
+  // nome/e-mail, sem senha. Endpoint [AllowAnonymous] (POST /enrollments/free — ver
+  // EnrollmentsController.EnrollFree no backend); se o visitante já estiver logado, o backend usa
+  // o UserId da sessão em vez do e-mail do formulário (CustomerName/CustomerEmail são ignorados).
+  enrollFreeAnonymous: (courseId: string, data: { customerName: string; customerEmail: string }) =>
+    api.post('/enrollments/free', { courseId, ...data }),
   trackProgress: (enrollmentId: string, data: unknown) =>
     api.post(`/enrollments/${enrollmentId}/progress`, data),
   getProgress: (courseId: string) => api.get(`/enrollments/courses/${courseId}`),
