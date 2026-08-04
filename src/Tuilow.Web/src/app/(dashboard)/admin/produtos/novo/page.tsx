@@ -121,7 +121,6 @@ function ProductWizard() {
   const [videos, setVideos] = useState<LocalVideo[]>([]);
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
-  const [downloadVideo, setDownloadVideo] = useState(false);
 
   // Passo 3
   const [modules, setModules] = useState<ModuleDetail[]>([]);
@@ -159,9 +158,9 @@ function ProductWizard() {
     }).catch(() => { /* melhor deixar a lista vazia do que travar o assistente */ });
   }, [courseId]);
 
-  // Enquanto algum vídeo estiver "Baixando..."/"Processando" (checkbox de download do YouTube
-  // marcado), consulta a lista de novo a cada poucos segundos pra atualizar o status na tela —
-  // sem isso, o criador não teria nenhum feedback de quando o download termina.
+  // Enquanto algum vídeo estiver "Enviando..."/"Processando" (upload direto de arquivo em
+  // andamento), consulta a lista de novo a cada poucos segundos pra atualizar o status na tela —
+  // sem isso, o criador não teria nenhum feedback de quando o processamento termina.
   useEffect(() => {
     if (!courseId) return;
     const hasPending = videos.some(v => v.status === 'Uploading' || v.status === 'Processing');
@@ -295,18 +294,19 @@ function ProductWizard() {
     if (!importUrl.trim() || !courseId) return;
     setImporting(true);
     try {
-      const { data } = await videosApi.importExternal(courseId, importUrl.trim(), downloadVideo);
+      // Achado de teste manual: baixar o vídeo do YouTube pelo servidor (checkbox "baixar e
+      // hospedar" que existia aqui) esbarra num bloqueio do próprio YouTube contra downloads
+      // automatizados ("Sign in to confirm you're not a bot") — não tem correção estável do
+      // nosso lado (nem cookies nem proxy resolvem de forma confiável pra vários criadores
+      // diferentes), então a importação agora sempre guarda só a referência externa: o aluno
+      // assiste embutido, mas o player é o do YouTube mesmo (download=false no backend).
+      const { data } = await videosApi.importExternal(courseId, importUrl.trim());
       setVideos(v => [...v, {
         videoId: data.videoId, title: data.title ?? importUrl, source: data.source,
         durationSeconds: data.durationSeconds, status: data.status,
       }]);
       setImportUrl('');
-      setDownloadVideo(false);
-      toast.success(
-        data.status === 'Uploading'
-          ? 'Baixando o vídeo do YouTube — acompanhe o status na lista abaixo.'
-          : 'Vídeo importado com sucesso.'
-      );
+      toast.success('Vídeo importado com sucesso.');
     } catch {
       toast.error('Não foi possível importar esse vídeo. Verifique a URL.');
     } finally {
@@ -617,12 +617,9 @@ function ProductWizard() {
             </div>
 
             {/youtube\.com|youtu\.be/.test(importUrl) && (
-              <label className="flex items-start gap-2 text-sm text-gray-600 -mt-2">
-                <input type="checkbox" className="mt-0.5" checked={downloadVideo}
-                  onChange={e => setDownloadVideo(e.target.checked)} />
-                Baixar o vídeo e hospedar na plataforma (recomendado — o aluno assiste sem sair
-                daqui e sem ver sugestões do YouTube; pode levar alguns minutos)
-              </label>
+              <p className="text-sm text-gray-500 -mt-2">
+                O vídeo continua hospedado no YouTube — o aluno assiste embutido aqui, com o player do YouTube.
+              </p>
             )}
 
             <div className="flex items-center gap-2">
@@ -643,7 +640,7 @@ function ProductWizard() {
                     {(v.status === 'Uploading' || v.status === 'Processing') && (
                       <span className="badge ml-auto flex items-center gap-1 bg-amber-50 text-amber-700">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        {v.status === 'Uploading' ? 'Baixando do YouTube...' : 'Processando...'}
+                        {v.status === 'Uploading' ? 'Enviando...' : 'Processando...'}
                       </span>
                     )}
                     {v.status === 'Error' && (
