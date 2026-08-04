@@ -63,16 +63,27 @@ public sealed class AuthController(
     private CookieOptions BuildCookieOptions(DateTimeOffset expires)
     {
         var domain = configuration["Cookies:Domain"];
+        var isDev = environment.IsDevelopment();
         return new CookieOptions
         {
             HttpOnly = true,
             // Secure exige HTTPS — em Development (http://localhost) o cookie seria descartado
             // pelo navegador se marcado Secure.
-            Secure = !environment.IsDevelopment(),
-            // Lax (não None): www.tuilow.com.br e app.tuilow.com.br são subdomínios do MESMO
-            // site registrável, então são "same-site" entre si — None só seria necessário para
-            // domínios de fato diferentes.
-            SameSite = SameSiteMode.Lax,
+            Secure = !isDev,
+            // Achado de teste manual (deploy real): a suposição original era Lax porque a ideia
+            // era front e API ficarem em subdomínios do MESMO site registrável (ex.:
+            // www.tuilow.com.br / app.tuilow.com.br), onde Lax já basta. Mas o deploy atual usa
+            // tuilow.vercel.app (Vercel) e tuilow-production.up.railway.app (Railway) — dois
+            // domínios registráveis DE FATO diferentes (up.railway.app e vercel.app são entradas
+            // próprias na Public Suffix List). Nesse caso o navegador trata toda chamada
+            // fetch/XHR do front pra API como "cross-site" e um cookie Lax nunca é enviado nela
+            // — por isso o login parecia funcionar ("Bem-vindo de volta") mas o cookie
+            // refresh_token nunca chegava no navegador, e o middleware do front (que só checa a
+            // presença desse cookie) redirecionava de volta pro login. None exige Secure=true
+            // (already o caso fora de Development) e é o único valor que o navegador aceita
+            // enviar em requisições cross-site. Em Development, isDev=true → Secure=false → só
+            // Lax é aceitável (None sem Secure é rejeitado/descartado pelos navegadores).
+            SameSite = isDev ? SameSiteMode.Lax : SameSiteMode.None,
             Domain = string.IsNullOrWhiteSpace(domain) ? null : domain,
             Expires = expires,
             Path = "/"
