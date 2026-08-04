@@ -55,10 +55,17 @@ public sealed class CloudflareStreamWebhookController(
 
         if (evt is null) return BadRequest();
 
-        logger.LogInformation("Cloudflare Stream webhook: {Event} uid={Uid}", evt.Event, evt.Uid);
+        logger.LogInformation(
+            "Cloudflare Stream webhook: uid={Uid} readyToStream={ReadyToStream} status={Status}",
+            evt.Uid, evt.ReadyToStream, evt.Status?.State);
 
-        // Cloudflare envia "stream.video.finished" quando o processamento termina
-        if (evt.Event == "stream.video.finished")
+        // Achado de teste manual: o payload real do webhook do Cloudflare Stream NÃO tem um
+        // campo "event" (isso é de outros produtos Cloudflare, tipo Workers) -- o Stream manda
+        // o próprio objeto do vídeo direto no corpo, com "readyToStream" e "status.state". A
+        // checagem antiga (evt.Event == "stream.video.finished") nunca era verdadeira -- o
+        // vídeo nunca saía de "Processando" mesmo com o webhook chegando certinho e a
+        // assinatura validando (bug real, achado no teste manual em produção).
+        if (evt.ReadyToStream)
         {
             var video = await videoRepository.GetByCloudflareIdAsync(evt.Uid, ct);
             if (video is null)
@@ -67,15 +74,19 @@ public sealed class CloudflareStreamWebhookController(
                 return Ok(); // Retorna 200 para Cloudflare não retentar
             }
 
-            var duration = evt.ReadyToStream && evt.Duration.HasValue
-                ? (int)Math.Ceiling(evt.Duration.Value)
-                : 0;
+            var duration = evt.Duration.HasValue ? (int)Math.Ceiling(evt.Duration.Value) : 0;
 
             video.MarkReady(duration, evt.Thumbnail);
             videoRepository.Update(video);
             await uow.SaveChangesAsync(ct);
 
             logger.LogInformation("Vídeo {VideoId} marcado como pronto. Duração: {Duration}s", video.Id, duration);
+        }
+        else if (evt.Status?.State == "error")
+        {
+            logger.LogWarning(
+                "Cloudflare Stream reportou erro no processamento do vídeo uid={Uid}: {Reason}",
+                evt.Uid, evt.Status.ErrorReasonText);
         }
 
         return Ok();
@@ -134,9 +145,15 @@ public sealed class CloudflareStreamWebhookController(
 // ─── Cloudflare Stream event payload ──────────────────────────────────────────
 public sealed class CloudflareStreamEvent
 {
-    public string Event { get; init; } = string.Empty;
     public string Uid   { get; init; } = string.Empty;
     public bool ReadyToStream { get; init; }
     public double? Duration   { get; init; }
     public string? Thumbnail  { get; init; }
+    public CloudflareStreamStatus? Status { get; init; }
+}
+
+public sealed class CloudflareStreamStatus
+{
+    public string? State { get; init; }
+    public string? ErrorReasonText { get; init; }
 }
