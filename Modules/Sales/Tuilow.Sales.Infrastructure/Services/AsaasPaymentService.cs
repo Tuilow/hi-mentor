@@ -102,7 +102,23 @@ public sealed class AsaasPaymentService(
 
         var content = await response.Content.ReadAsStringAsync(ct);
         var doc = JsonDocument.Parse(content);
-        var id = doc.RootElement.GetProperty("id").GetString()!;
+
+        // Achado em teste manual (produção): a Asaas pode responder 2xx pra POST
+        // /customers com um corpo que não é o cliente esperado (ex.: conta em análise/
+        // restrição, campo obrigatório adicional só exigido em produção) -- sem essa
+        // checagem, GetProperty("id") lançava KeyNotFoundException genérica, sem logar o
+        // corpo da resposta, e a compra inteira derrubava com 500 sem pista nenhuma do
+        // motivo real. Agora loga o corpo bruto e lança um erro claro e sanitizado.
+        if (!doc.RootElement.TryGetProperty("id", out var idProp))
+        {
+            logger.LogError(
+                "Asaas CreateCustomer retornou {Status} sem campo 'id' no corpo: {Body}",
+                (int)response.StatusCode, content);
+            throw new ExternalServiceException(
+                "Asaas CreateCustomer: resposta inesperada (sem id do cliente).");
+        }
+
+        var id = idProp.GetString()!;
         logger.LogInformation("Customer Asaas criado: {Id}", id);
         return new AsaasCustomerResponse(id);
     }
