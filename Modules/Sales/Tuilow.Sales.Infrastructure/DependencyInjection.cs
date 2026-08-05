@@ -29,6 +29,21 @@ public static class DependencyInjection
                 // cobrança, assinatura), que virava uma busca vazia sem erro nenhum. Usa direto
                 // o endereço novo (sem /api no caminho, ver chamadas abaixo), que não redireciona.
                 var baseUrl = configuration["Asaas:BaseUrl"] ?? "https://api-sandbox.asaas.com/v3";
+
+                // Achado em teste manual (produção, HTTP 404 em POST /customers): o
+                // HttpClient do .NET combina BaseAddress + caminho relativo pelas regras de
+                // URI -- se o caminho relativo começa com "/", ele é tratado como um caminho
+                // ABSOLUTO a partir da raiz do host, descartando TODO o path do BaseAddress
+                // (inclusive o "/v3"). Resultado: BaseAddress "https://api.asaas.com/v3" +
+                // PostAsync("/customers") virava silenciosamente
+                // "https://api.asaas.com/customers" (sem /v3) -> Asaas respondia 404. Os
+                // caminhos relativos já foram corrigidos pra não começar com "/", e aqui
+                // garantimos que o BaseAddress sempre termine com "/" -- do contrário o
+                // último segmento do path base (o "v3") seria substituído em vez de mantido,
+                // não importa como a variável for digitada no Railway.
+                if (!baseUrl.EndsWith('/'))
+                    baseUrl += "/";
+
                 client.BaseAddress = new Uri(baseUrl);
                 client.DefaultRequestHeaders.Add("access_token", configuration["Asaas:ApiKey"]);
                 client.DefaultRequestHeaders.Add("User-Agent", "Tuilow/1.0");
