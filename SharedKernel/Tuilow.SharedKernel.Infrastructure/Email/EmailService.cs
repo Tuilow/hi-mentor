@@ -118,6 +118,20 @@ public sealed class EmailService(
         await SendAsync(to, $"Acesso liberado: {courseTitle} — Tuilow", body, ct);
     }
 
+    public async Task SendAccessLinkAsync(string to, string firstName, string magicLinkToken, CancellationToken ct = default)
+    {
+        var magicLinkUrl = $"{_frontendUrl}/acesso?token={magicLinkToken}&redirect=%2Fdashboard";
+        var body = $"""
+            <h2>Seu link de acesso — Tuilow</h2>
+            <p>Olá, {firstName}! Aqui está um novo link para você entrar na sua conta, sem precisar de senha.</p>
+            <a href="{magicLinkUrl}" style="background:#2563EB;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">
+                Acessar Minha Conta
+            </a>
+            <p style="color:#6B7280;font-size:13px;">Válido por 48 horas e uso único. Se você não pediu este link, ignore este e-mail.</p>
+            """;
+        await SendAsync(to, "Seu link de acesso — Tuilow", body, ct);
+    }
+
     public async Task SendCertificateAsync(string to, string firstName, string courseTitle, string certificateCode, CancellationToken ct = default)
     {
         // Achado A4 da avaliação: aponta para a página pública de verificação (/certificado/{code}

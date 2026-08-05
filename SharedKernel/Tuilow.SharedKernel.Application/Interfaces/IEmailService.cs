@@ -46,4 +46,15 @@ public interface IEmailService
     /// comportamento antigo, indo direto para /cursos/{courseSlug}.
     /// </summary>
     Task SendMagicLinkAccessAsync(string to, string firstName, string courseTitle, string courseSlug, string magicLinkToken, CancellationToken ct = default, string? channelHandle = null);
+
+    /// <summary>
+    /// Reenvio self-service de um Magic Link, disparado por /auth/resend-access-link — achado
+    /// em teste manual: o Magic Link do e-mail pós-compra (ver SendMagicLinkAccessAsync) expira
+    /// em 48h e é de uso único; quem perdia essa janela não tinha nenhum jeito self-service de
+    /// voltar a entrar sem senha (a conta nasce sem senha, ver User.RegisterFromPurchase). Não
+    /// amarrado a um curso específico (diferente de SendMagicLinkAccessAsync) porque o pedido de
+    /// reenvio só tem o e-mail — o link cai no /dashboard, de onde dá pra ver todos os cursos
+    /// matriculados.
+    /// </summary>
+    Task SendAccessLinkAsync(string to, string firstName, string magicLinkToken, CancellationToken ct = default);
 }

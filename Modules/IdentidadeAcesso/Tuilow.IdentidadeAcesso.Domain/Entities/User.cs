@@ -190,6 +190,21 @@ public sealed class User : AggregateRoot
             throw new InvalidOperationException("Token de redefinição inválido ou expirado.");
 
         ChangePassword(newPassword);
+
+        // Achado em teste manual: contas criadas por compra (RegisterFromPurchase) nascem
+        // PendingConfirmation e só saem desse status consumindo o Magic Link enviado por
+        // e-mail (ver ConsumeMagicLink) -- que expira em 48h e é de uso único. Sem este
+        // bloco, quem perdia essa janela ficava num beco sem saída: "esqueci minha senha"
+        // deixava definir uma senha nova, mas o login continuava bloqueado com "Confirme seu
+        // e-mail..." (ver LoginUserCommandHandler), sem nenhum jeito de sair dali sozinho.
+        // Completar a redefinição de senha só é possível recebendo e clicando o link enviado
+        // pro mesmo e-mail da conta — é prova de posse equivalente à do Magic Link, então
+        // conta como confirmação aqui também. Não regride uma conta já ativa por outro meio.
+        if (Status == UserStatus.PendingConfirmation)
+        {
+            Status = UserStatus.Active;
+            EmailConfirmedAt = DateTime.UtcNow;
+        }
     }
 
     public RefreshToken AddRefreshToken(string token, DateTime expiresAt, string? ip = null)

@@ -7,6 +7,7 @@ using Tuilow.IdentidadeAcesso.Application.Commands.LoginUser;
 using Tuilow.IdentidadeAcesso.Application.Commands.Logout;
 using Tuilow.IdentidadeAcesso.Application.Commands.RefreshToken;
 using Tuilow.IdentidadeAcesso.Application.Commands.RegisterUser;
+using Tuilow.IdentidadeAcesso.Application.Commands.ResendAccessLink;
 using Tuilow.IdentidadeAcesso.Application.Commands.ResetPassword;
 using Tuilow.IdentidadeAcesso.Application.Commands.UpdateProfile;
 using Tuilow.IdentidadeAcesso.Application.Common;
@@ -221,6 +222,21 @@ public sealed class AuthController(
     {
         await sender.Send(command, ct);
         return Ok(new { message = "Senha redefinida com sucesso." });
+    }
+
+    /// <summary>
+    /// Achado em teste manual: comprador que perde a janela de 48h do Magic Link do e-mail
+    /// pós-compra (ver CoursePurchaseConfirmedEventHandler) ficava sem nenhum jeito self-service
+    /// de entrar, já que a conta nasce sem senha (User.RegisterFromPurchase). Reenvia um novo
+    /// Magic Link de 48h pro e-mail informado, se existir conta com ele. Mesmo rate limit e
+    /// mensagem genérica de /auth/forgot-password — não revela se o e-mail existe.
+    /// </summary>
+    [HttpPost("resend-access-link")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ResendAccessLink([FromBody] ResendAccessLinkCommand command, CancellationToken ct)
+    {
+        await sender.Send(command, ct);
+        return Ok(new { message = "Se este e-mail existe, você receberá um novo link de acesso em breve." });
     }
 
     /// <summary>Retorna perfil do usuário autenticado.</summary>

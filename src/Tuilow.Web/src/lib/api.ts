@@ -212,6 +212,10 @@ export const authApi = {
   becomeCreator: () => api.post('/auth/become-creator'),
   // Magic Link — troca o token recebido por e-mail/WhatsApp por um login completo, sem senha.
   consumeMagicLink: (token: string) => api.post('/auth/magic-link/consume', { token }),
+  // Reenvio self-service pra quem perdeu a janela de 48h do Magic Link original (ver
+  // app/acesso/page.tsx, tela de link expirado) -- mesmo padrão de privacidade de
+  // forgotPassword, a resposta não revela se o e-mail existe.
+  resendAccessLink: (email: string) => api.post('/auth/resend-access-link', { email }),
   // Cookie-driven (achado C1) — o refresh token não é mais passado por parâmetro, ele viaja no
   // cookie HttpOnly "refresh_token" (ver withCredentials acima). Mantido aqui por simetria com
   // o restante do módulo; o interceptor 401 acima chama o endpoint diretamente via axios.
