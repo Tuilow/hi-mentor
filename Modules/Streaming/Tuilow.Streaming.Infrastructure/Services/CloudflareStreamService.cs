@@ -94,30 +94,49 @@ public sealed class CloudflareStreamService(
         }
 
         var keyId = configuration["Cloudflare:StreamSigningKeyId"]!;
-        var pem   = configuration["Cloudflare:StreamSigningKeyPem"]!;
+        var pem   = NormalizePem(configuration["Cloudflare:StreamSigningKeyPem"]!);
 
-        var now = DateTimeOffset.UtcNow;
-        var header  = JsonSerializer.Serialize(new { alg = "RS256", kid = keyId });
-        // nbf com 2 minutos de folga pra absorver clock skew entre este servidor e o Cloudflare.
-        var payload = JsonSerializer.Serialize(new
+        try
         {
-            sub = cloudflareVideoId,
-            kid = keyId,
-            exp = now.AddMinutes(expirationMinutes).ToUnixTimeSeconds(),
-            nbf = now.AddMinutes(-2).ToUnixTimeSeconds()
-        });
+            var now = DateTimeOffset.UtcNow;
+            var header  = JsonSerializer.Serialize(new { alg = "RS256", kid = keyId });
+            // nbf com 2 minutos de folga pra absorver clock skew entre este servidor e o Cloudflare.
+            var payload = JsonSerializer.Serialize(new
+            {
+                sub = cloudflareVideoId,
+                kid = keyId,
+                exp = now.AddMinutes(expirationMinutes).ToUnixTimeSeconds(),
+                nbf = now.AddMinutes(-2).ToUnixTimeSeconds()
+            });
 
-        var signingInput = $"{Base64UrlEncode(Encoding.UTF8.GetBytes(header))}." +
-                            $"{Base64UrlEncode(Encoding.UTF8.GetBytes(payload))}";
+            var signingInput = $"{Base64UrlEncode(Encoding.UTF8.GetBytes(header))}." +
+                               $"{Base64UrlEncode(Encoding.UTF8.GetBytes(payload))}";
 
-        using var rsa = RSA.Create();
-        rsa.ImportFromPem(pem);
-        var signature = rsa.SignData(
-            Encoding.UTF8.GetBytes(signingInput), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(pem);
+            var signature = rsa.SignData(
+                Encoding.UTF8.GetBytes(signingInput), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
-        var token = $"{signingInput}.{Base64UrlEncode(signature)}";
+            var token = $"{signingInput}.{Base64UrlEncode(signature)}";
 
-        return Task.FromResult($"https://videodelivery.net/{token}/manifest/video.m3u8");
+            return Task.FromResult($"https://videodelivery.net/{token}/manifest/video.m3u8");
+        }
+        catch (Exception ex)
+        {
+            // Achado de teste manual em produção: Cloudflare:StreamSigningKeyPem configurado com
+            // formato inválido (comum ao colar uma chave PEM multi-linha numa variável de
+            // ambiente) derrubava TODA reprodução de vídeo com 500, mesmo vídeos já prontos --
+            // um problema de configuração da assinatura nunca deveria tirar o vídeo do ar.
+            // Cai pra URL pública (mesmo fallback de quando a chave nem está configurada) e loga
+            // alto, em vez de derrubar a aula inteira.
+            logger.LogError(ex,
+                "Falha ao gerar URL assinada pra o vídeo {VideoId} -- Cloudflare:StreamSigningKeyPem " +
+                "parece inválido. Servindo URL PÚBLICA como fallback. Verifique o formato da chave " +
+                "no Railway (precisa manter as quebras de linha reais do PEM).", cloudflareVideoId);
+
+            return Task.FromResult(
+                $"https://videodelivery.net/{cloudflareVideoId}/manifest/video.m3u8");
+        }
     }
 
     public async Task DeleteVideoAsync(string cloudflareVideoId, CancellationToken ct = default)
@@ -188,6 +207,18 @@ public sealed class CloudflareStreamService(
         }
 
         return uid;
+    }
+
+    // Achado de teste manual: variáveis de ambiente nem sempre preservam quebra de linha real
+    // ao colar uma chave PEM multi-linha -- é comum chegar com "\n" literal (dois caracteres)
+    // em vez de quebra de linha de verdade, ou envolta em aspas. Normaliza os dois casos antes
+    // de tentar importar, senão RSA.ImportFromPem falha com "No supported key formats were found".
+    private static string NormalizePem(string pem)
+    {
+        pem = pem.Trim();
+        if (pem.Length >= 2 && pem[0] == '"' && pem[^1] == '"')
+            pem = pem[1..^1];
+        return pem.Replace("\\n", "\n");
     }
 
     private static string Base64UrlEncode(byte[] input) =>
