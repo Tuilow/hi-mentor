@@ -21,7 +21,14 @@ public static class DependencyInjection
 
         services.AddHttpClient<IPaymentService, AsaasPaymentService>(client =>
             {
-                var baseUrl = configuration["Asaas:BaseUrl"] ?? "https://sandbox.asaas.com";
+                // Achado em teste manual (produção): a Asaas migrou o endereço da API (ver
+                // changelog "Novo endereço em produção da nossa API") -- o formato antigo
+                // (asaas.com/api/v3/...) ainda "funciona", mas via REDIRECT HTTP pro endereço
+                // novo, e o HttpClient do .NET rebaixa POST pra GET ao seguir um redirect
+                // 301/302 -- destruía silenciosamente toda chamada de criação (cliente,
+                // cobrança, assinatura), que virava uma busca vazia sem erro nenhum. Usa direto
+                // o endereço novo (sem /api no caminho, ver chamadas abaixo), que não redireciona.
+                var baseUrl = configuration["Asaas:BaseUrl"] ?? "https://api-sandbox.asaas.com/v3";
                 client.BaseAddress = new Uri(baseUrl);
                 client.DefaultRequestHeaders.Add("access_token", configuration["Asaas:ApiKey"]);
                 client.DefaultRequestHeaders.Add("User-Agent", "Tuilow/1.0");

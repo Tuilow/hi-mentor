@@ -21,7 +21,7 @@ services:
       - Cloudflare__AccountId=${CF_ACCOUNT_ID}
       - Cloudflare__ApiToken=${CF_API_TOKEN}
       - Cloudflare__StreamSigningKey=${CF_STREAM_SIGNING_KEY}
-      - Asaas__BaseUrl=https://sandbox.asaas.com
+      - Asaas__BaseUrl=https://api-sandbox.asaas.com/v3
       - Asaas__ApiKey=${ASAAS_API_KEY}
       - Asaas__WebhookSecret=${ASAAS_WEBHOOK_SECRET}
       - Email__Host=${EMAIL_HOST}

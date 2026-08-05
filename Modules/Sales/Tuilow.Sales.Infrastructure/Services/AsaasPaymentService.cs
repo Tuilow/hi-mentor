@@ -54,7 +54,7 @@ public sealed class AsaasPaymentService(
     {
         // Tenta encontrar customer existente por e-mail
         var searchResponse = await httpClient.GetAsync(
-            $"/api/v3/customers?email={Uri.EscapeDataString(request.Email)}&limit=1", ct);
+            $"/customers?email={Uri.EscapeDataString(request.Email)}&limit=1", ct);
 
         if (searchResponse.IsSuccessStatusCode)
         {
@@ -94,7 +94,7 @@ public sealed class AsaasPaymentService(
         var json = JsonSerializer.Serialize(payloadDict);
         logger.LogDebug("Asaas CreateCustomer payload: {Json}", json);
 
-        var response = await httpClient.PostAsync("/api/v3/customers",
+        var response = await httpClient.PostAsync("/customers",
             new StringContent(json, Encoding.UTF8, "application/json"), ct);
 
         if (!response.IsSuccessStatusCode)
@@ -150,7 +150,7 @@ public sealed class AsaasPaymentService(
         var json = JsonSerializer.Serialize(payload);
         logger.LogDebug("Asaas CreateSubscription payload: {Json}", json);
 
-        var response = await httpClient.PostAsync("/api/v3/subscriptions",
+        var response = await httpClient.PostAsync("/subscriptions",
             new StringContent(json, Encoding.UTF8, "application/json"), ct);
 
         if (!response.IsSuccessStatusCode)
@@ -181,7 +181,7 @@ public sealed class AsaasPaymentService(
         var json = JsonSerializer.Serialize(payload);
         logger.LogDebug("Asaas CreateCharge payload: {Json}", json);
 
-        var response = await httpClient.PostAsync("/api/v3/payments",
+        var response = await httpClient.PostAsync("/payments",
             new StringContent(json, Encoding.UTF8, "application/json"), ct);
 
         if (!response.IsSuccessStatusCode)
@@ -205,7 +205,7 @@ public sealed class AsaasPaymentService(
         try
         {
             var response = await httpClient.GetAsync(
-                $"/api/v3/subscriptions/{asaasSubscriptionId}/payments?limit=1", ct);
+                $"/subscriptions/{asaasSubscriptionId}/payments?limit=1", ct);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -254,7 +254,7 @@ public sealed class AsaasPaymentService(
 
     public async Task CancelSubscriptionAsync(string asaasSubscriptionId, CancellationToken ct = default)
     {
-        var response = await httpClient.DeleteAsync($"/api/v3/subscriptions/{asaasSubscriptionId}", ct);
+        var response = await httpClient.DeleteAsync($"/subscriptions/{asaasSubscriptionId}", ct);
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
