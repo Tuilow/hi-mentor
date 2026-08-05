@@ -28,9 +28,36 @@ public sealed class CloudflareStreamService(
     /// atual. Gerar o par (id, pem) é feito uma vez via API do Cloudflare Stream
     /// (POST /accounts/{account_id}/stream/keys) e colado no appsettings/variável de ambiente.
     /// </summary>
-    private bool SigningConfigured =>
-        !string.IsNullOrWhiteSpace(configuration["Cloudflare:StreamSigningKeyId"])
-        && !string.IsNullOrWhiteSpace(configuration["Cloudflare:StreamSigningKeyPem"]);
+    // Achado de teste manual: antes só checava se as duas variáveis EXISTIAM, não se a chave
+    // PEM era válida -- com uma chave mal colada (ver NormalizePem), isso fazia todo vídeo NOVO
+    // ser criado na Cloudflare já com requireSignedURLs=true (GetDirectUploadUrlAsync usa esse
+    // mesmo flag), mas a geração da URL assinada falhava e caía pro link público -- que a
+    // Cloudflare rejeita quando o vídeo exige assinatura. Resultado: vídeo antigo (sem a
+    // exigência) tocava, vídeo novo (criado já com a exigência) não. Agora valida de verdade se
+    // dá pra importar a chave -- os dois lados (criação do vídeo e geração do link) ficam
+    // sempre consistentes, e o recurso volta a funcionar sozinho assim que a chave certa for
+    // colada no Railway, sem precisar mexer em nada na Cloudflare.
+    private bool SigningConfigured
+    {
+        get
+        {
+            var keyId  = configuration["Cloudflare:StreamSigningKeyId"];
+            var rawPem = configuration["Cloudflare:StreamSigningKeyPem"];
+            if (string.IsNullOrWhiteSpace(keyId) || string.IsNullOrWhiteSpace(rawPem))
+                return false;
+
+            try
+            {
+                using var rsa = RSA.Create();
+                rsa.ImportFromPem(NormalizePem(rawPem));
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
 
     public async Task<DirectUploadResult> GetDirectUploadUrlAsync(CancellationToken ct = default)
     {
