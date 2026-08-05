@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,12 +25,17 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function EsqueciSenhaPage() {
+function EsqueciSenhaForm() {
+  const searchParams = useSearchParams();
+  // Preenchido quando a pessoa vem do aviso de "e-mail já cadastrado" no formulário de
+  // registro (ver app/(auth)/registro/page.tsx) — poupa digitar o e-mail de novo.
+  const prefillEmail = searchParams.get('email') ?? '';
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { email: prefillEmail },
   });
 
   const onSubmit = async (data: FormData) => {
@@ -103,5 +109,13 @@ export default function EsqueciSenhaPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EsqueciSenhaPage() {
+  return (
+    <Suspense fallback={null}>
+      <EsqueciSenhaForm />
+    </Suspense>
   );
 }

@@ -42,12 +42,18 @@ function RegisterForm() {
   const returnUrl = searchParams.get('returnUrl');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  // Achado em teste manual: cadastro com e-mail já existente devolvia só um toast de erro
+  // genérico (o texto real do backend nem chegava a aparecer, ver fix no
+  // RegisterUserCommandHandler) e a pessoa ficava sem saber que já tinha conta. 422 é o único
+  // status possível nesse endpoint pra esse caso (erros de campo saem como 400).
+  const [duplicateEmail, setDuplicateEmail] = useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
   const onSubmit = async ({ confirmPassword: _, ...data }: FormData) => {
+    setDuplicateEmail(null);
     try {
       setLoading(true);
       await authApi.register(data);
@@ -58,6 +64,11 @@ function RegisterForm() {
       if (returnUrl) params.set('returnUrl', returnUrl);
       router.push(`/confirmar-email?${params.toString()}`);
     } catch (err) {
+      if (err instanceof AxiosError && err.response?.status === 422) {
+        setDuplicateEmail(data.email);
+        toast.error(errorMessage(err, 'Este e-mail já está cadastrado.'));
+        return;
+      }
       toast.error(errorMessage(err, 'Erro ao criar conta. Verifique os dados.'));
     } finally {
       setLoading(false);
@@ -126,6 +137,22 @@ function RegisterForm() {
             <span className="text-xs text-gray-400">ou cadastre-se com e-mail</span>
             <div className="flex-1 h-px bg-gray-100" />
           </div>
+
+          {duplicateEmail && (
+            <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+              <p className="mb-2">Este e-mail já tem uma conta na Tuilow.</p>
+              <div className="flex gap-2">
+                <Link href={`/login?email=${encodeURIComponent(duplicateEmail)}`}
+                  className="btn-primary px-4 py-2 text-xs">
+                  Entrar
+                </Link>
+                <Link href={`/esqueci-senha?email=${encodeURIComponent(duplicateEmail)}`}
+                  className="px-4 py-2 text-xs border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors">
+                  Esqueci minha senha
+                </Link>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

@@ -35,11 +35,15 @@ function LoginForm() {
   // Vindo da página de vendas pública (/c/[slug]) — depois de logar, volta direto pra lá em vez
   // de cair no dashboard genérico, sem o que o visitante perdia o produto que veio comprar.
   const returnUrl = searchParams.get('returnUrl');
+  // Preenchido quando a pessoa vem do aviso de "e-mail já cadastrado" no formulário de
+  // registro (ver app/(auth)/registro/page.tsx) — poupa digitar o e-mail de novo.
+  const prefillEmail = searchParams.get('email') ?? '';
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { email: prefillEmail },
   });
 
   // Criador loga e cai direto em "Meus Produtos" (era /dashboard genérico pra todo mundo, mas

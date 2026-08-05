@@ -1,7 +1,7 @@
 using Tuilow.IdentidadeAcesso.Domain.Entities;
 using Tuilow.IdentidadeAcesso.Domain.Enums;
-using Tuilow.IdentidadeAcesso.Domain.Exceptions;
 using Tuilow.IdentidadeAcesso.Domain.Interfaces;
+using Tuilow.SharedKernel.Application.Exceptions;
 using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 
@@ -16,8 +16,13 @@ public sealed class RegisterUserCommandHandler(
 {
     public async Task<RegisterUserResult> Handle(RegisterUserCommand request, CancellationToken ct)
     {
+        // Achado em teste manual: DuplicateEmailException (tipo do próprio Domain) não é
+        // reconhecida pelo switch do ExceptionHandlingMiddleware -- caía no bucket genérico
+        // ("Ocorreu um erro interno", 500), escondendo do usuário que o problema era só o
+        // e-mail já estar cadastrado. BusinessException já é tratada (422, mensagem repassada
+        // ao cliente como está) — mesmo padrão usado no resto do módulo.
         if (await userRepository.ExistsByEmailAsync(request.Email, ct))
-            throw new DuplicateEmailException(request.Email);
+            throw new BusinessException($"Já existe uma conta com o e-mail {request.Email}. Entre ou recupere sua senha.");
 
         // Todo novo usuário nasce com o role padrão Student (multi-role: outros
         // roles como Creator/ChannelMember são adicionados depois, sem remover este).
