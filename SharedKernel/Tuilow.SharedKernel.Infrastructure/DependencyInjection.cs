@@ -1,6 +1,7 @@
 using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.SharedKernel.Infrastructure.Clock;
 using Tuilow.SharedKernel.Infrastructure.Email;
+using Tuilow.SharedKernel.Infrastructure.Frontend;
 using Tuilow.SharedKernel.Infrastructure.WhatsApp;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,6 +16,10 @@ public static class DependencyInjection
         // IHttpClientFactory usado pelo EmailService para chamar a API HTTP do Mailgun.
         services.AddHttpClient();
         services.AddScoped<IEmailService, EmailService>();
+        // Monta URLs absolutas do frontend (ex.: link de Magic Link reemitido pelo painel
+        // administrativo) sem duplicar a leitura de "FrontendUrl" em cada modulo -- ver
+        // IFrontendUrlProvider.
+        services.AddSingleton<IFrontendUrlProvider, FrontendUrlProvider>();
         // Sem provedor configurado ainda — troque por uma implementação real quando houver
         // credencial (Twilio/Z-API/WhatsApp Business API). Ver comentário em IWhatsAppService.
         services.AddScoped<IWhatsAppService, NoOpWhatsAppService>();

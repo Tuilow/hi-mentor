@@ -17,6 +17,9 @@ public static class DependencyInjection
     {
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
+        // Auditoria da reemissao de link de acesso pelo painel administrativo ("Cursos e
+        // acessos") -- ver AdminCourseAccessAuditLog / ReissueCourseAccessLinkCommandHandler.
+        services.AddScoped<IAdminCourseAccessAuditLogRepository, AdminCourseAccessAuditLogRepository>();
 
         services.AddScoped<IJwtService, JwtService>();
         services.AddHttpContextAccessor();

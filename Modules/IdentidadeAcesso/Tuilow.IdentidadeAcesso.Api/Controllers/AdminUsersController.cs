@@ -1,9 +1,12 @@
 using Tuilow.IdentidadeAcesso.Application.Commands.DeleteUser;
 using Tuilow.IdentidadeAcesso.Application.Commands.ReactivateUser;
 using Tuilow.IdentidadeAcesso.Application.Commands.SuspendUser;
+using Tuilow.IdentidadeAcesso.Application.Commands.ReissueCourseAccessLink;
 using Tuilow.IdentidadeAcesso.Application.Queries.GetPlatformStats;
+using Tuilow.IdentidadeAcesso.Application.Queries.GetUserCoursesAndAccess;
 using Tuilow.IdentidadeAcesso.Application.Queries.ListUsers;
 using Tuilow.IdentidadeAcesso.Domain.Enums;
+using Tuilow.SharedKernel.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +22,7 @@ namespace Tuilow.IdentidadeAcesso.Api.Controllers;
 [Route("api/v1/admin/users")]
 [Authorize(Roles = "Admin")]
 [Produces("application/json")]
-public sealed class AdminUsersController(ISender sender) : ControllerBase
+public sealed class AdminUsersController(ISender sender, ICurrentUserService currentUser) : ControllerBase
 {
     /// <summary>Listagem paginada de usuários — busca por nome/e-mail, filtro por role e status.</summary>
     [HttpGet]
@@ -76,5 +79,31 @@ public sealed class AdminUsersController(ISender sender) : ControllerBase
     {
         await sender.Send(new DeleteUserCommand(userId), ct);
         return Ok(new { message = $"Usuário {userId} excluído." });
+    }
+
+    /// <summary>
+    /// Cursos comprados/matriculados por este usuário, com status de pagamento e de acesso --
+    /// usado pela seção "Cursos e acessos" do detalhe do usuário, para o suporte localizar
+    /// rapidamente uma compra e (se aplicável) reemitir o link de acesso. Nunca retorna um
+    /// token/link pronto -- ver ReissueCourseAccessLink.
+    /// </summary>
+    [HttpGet("{userId:guid}/courses")]
+    public async Task<IActionResult> GetUserCourses(Guid userId, CancellationToken ct)
+    {
+        var result = await sender.Send(new GetUserCoursesAndAccessQuery(userId), ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Reemite (gera um novo) Magic Link de acesso a um curso específico -- usado quando o
+    /// e-mail original de liberação de acesso não chegou ao aluno. Só funciona se o usuário já
+    /// tiver acesso liberado (matrícula ativa) a este curso; nunca concede acesso novo.
+    /// </summary>
+    [HttpPost("{userId:guid}/courses/{courseId:guid}/access-link")]
+    public async Task<IActionResult> ReissueCourseAccessLink(Guid userId, Guid courseId, CancellationToken ct)
+    {
+        var result = await sender.Send(
+            new ReissueCourseAccessLinkCommand(currentUser.UserId!.Value, userId, courseId), ct);
+        return Ok(result);
     }
 }

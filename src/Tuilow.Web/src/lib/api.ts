@@ -443,4 +443,10 @@ export const adminUsersApi = {
   suspend: (userId: string) => api.put(`/admin/users/${userId}/suspend`),
   reactivate: (userId: string) => api.put(`/admin/users/${userId}/reactivate`),
   delete: (userId: string) => api.delete(`/admin/users/${userId}`),
+  // "Cursos e acessos" no detalhe do usuário -- ver AdminUsersController.GetUserCourses.
+  // Nunca traz um link pronto (nenhum token fica exposto até o admin pedir a reemissão).
+  getCourses: (userId: string) => api.get(`/admin/users/${userId}/courses`),
+  // Reemite o link de acesso (Magic Link) a um curso específico -- ver ReissueCourseAccessLink.
+  reissueCourseAccessLink: (userId: string, courseId: string) =>
+    api.post(`/admin/users/${userId}/courses/${courseId}/access-link`),
 };

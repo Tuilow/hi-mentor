@@ -25,5 +25,15 @@
          só GetPlatformStatsQueryHandler ainda usa IVideoRepository, pra contar vídeos no painel. -->
     <ProjectReference Include="..\..\Catalog\Tuilow.Catalog.Domain\Tuilow.Catalog.Domain.csproj" />
     <ProjectReference Include="..\..\Streaming\Tuilow.Streaming.Domain\Tuilow.Streaming.Domain.csproj" />
+    <!--
+      Acoplamento legitimo (mesmo padrao acima -- Catalog/Streaming.Domain): o painel
+      administrativo "Cursos e acessos" (GetUserCoursesAndAccessQuery/ReissueCourseAccessLinkCommand)
+      precisa ler Enrollment (Learning, fonte de verdade do acesso liberado), CoursePurchase
+      (Sales, fonte de verdade do pagamento) e CreatorChannel (Channel, para replicar o mesmo
+      destino de redirecionamento usado pelo e-mail automatico de acesso liberado).
+    -->
+    <ProjectReference Include="..\..\Learning\Tuilow.Learning.Domain\Tuilow.Learning.Domain.csproj" />
+    <ProjectReference Include="..\..\Sales\Tuilow.Sales.Domain\Tuilow.Sales.Domain.csproj" />
+    <ProjectReference Include="..\..\Channel\Tuilow.Channel.Domain\Tuilow.Channel.Domain.csproj" />
   </ItemGroup>
 </Project>
