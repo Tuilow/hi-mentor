@@ -19,6 +19,9 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="9.0.4" />
+    <!-- ISecretProtector (marketplace de split): persiste as chaves mestras do Data Protection
+         API no Postgres via AppDbContext em vez do filesystem local (efemero no Railway). -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="9.0.4" />
   </ItemGroup>
   <ItemGroup>
     <!-- SharedKernel -->

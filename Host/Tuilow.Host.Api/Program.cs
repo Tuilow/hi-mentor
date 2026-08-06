@@ -19,6 +19,8 @@ using Tuilow.Channel.Api;
 using Tuilow.Host.Api.Data;
 using Tuilow.Host.Api.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -72,6 +74,13 @@ builder.Services.AddScoped<Tuilow.SharedKernel.Application.Interfaces.IUnitOfWor
 // Repositórios dos módulos pedem "DbContext" genérico no construtor — resolve pro AppDbContext concreto.
 builder.Services.AddScoped<Microsoft.EntityFrameworkCore.DbContext>(
     sp => sp.GetRequiredService<AppDbContext>());
+
+// Data Protection (ISecretProtector -- protege a API Key da conta Asaas externa de cada
+// creator no marketplace de split): chaves mestras persistidas no Postgres via AppDbContext
+// (IDataProtectionKeyContext), não no filesystem local -- Railway apaga o filesystem do
+// container a cada redeploy, o que tornaria qualquer segredo protegido irrecuperável.
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<AppDbContext>();
 
 // ─── CONTROLLERS (Controllers vivem nos projetos .Api de cada módulo) ──────────
 builder.Services.AddControllers()
@@ -150,6 +159,18 @@ if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Co
 {
     throw new InvalidOperationException(
         "Cloudflare:StreamWebhookSecret não configurado. Obrigatório fora de Development — configure o mesmo secret cadastrado no painel da Cloudflare ao criar o webhook do Stream.");
+}
+
+// ─── MARKETPLACE DE SPLIT (Asaas:PlatformWalletId obrigatório se o flag estiver ligado) ───
+// Sem a walletId da própria Tuilow, AsaasMarketplacePaymentService não consegue montar o
+// split de comissão em nenhuma cobrança marketplace — falha alto e cedo (startup) em vez de
+// deixar toda venda marketplace quebrar em runtime só quando alguém tentar comprar.
+if (builder.Configuration.GetValue("Asaas:MarketplaceSplitEnabled", false)
+    && string.IsNullOrWhiteSpace(builder.Configuration["Asaas:PlatformWalletId"]))
+{
+    throw new InvalidOperationException(
+        "Asaas:MarketplaceSplitEnabled está true, mas Asaas:PlatformWalletId não foi configurado — " +
+        "obrigatório para montar o split de comissão da Tuilow em cobranças do marketplace.");
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

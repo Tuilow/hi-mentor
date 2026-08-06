@@ -11,6 +11,7 @@ using PayoutEntities = Tuilow.Payout.Domain.Entities;
 using CreatorStudioEntities = Tuilow.CreatorStudio.Domain.Entities;
 using ChannelEntities = Tuilow.Channel.Domain.Entities;
 using MediatR;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -35,8 +36,12 @@ public sealed class AppDbContext(
     IMediator mediator,
     IServiceProvider serviceProvider,
     ILogger<AppDbContext> logger
-) : DbContext(options), IUnitOfWork
+) : DbContext(options), IUnitOfWork, IDataProtectionKeyContext
 {
+    // Chaves mestras do Data Protection API (ISecretProtector) -- persistidas no Postgres para
+    // sobreviver a redeploys em containers efemeros (Railway). Ver Program.cs -- AddDataProtection().PersistKeysToDbContext.
+    public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys => Set<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey>();
+
     // IdentidadeAcesso
     public DbSet<User> Users => Set<User>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
@@ -83,6 +88,10 @@ public sealed class AppDbContext(
     public DbSet<FinanceEntities.PlatformFeeConfiguration> PlatformFeeConfigurations => Set<FinanceEntities.PlatformFeeConfiguration>();
     public DbSet<FinanceEntities.CreatorWallet> CreatorWallets => Set<FinanceEntities.CreatorWallet>();
     public DbSet<FinanceEntities.WalletTransaction> WalletTransactions => Set<FinanceEntities.WalletTransaction>();
+
+    // Finance -- marketplace de split (creator como emissor da cobranca, ver CreatorAsaasAccount)
+    public DbSet<FinanceEntities.CreatorAsaasAccount> CreatorAsaasAccounts => Set<FinanceEntities.CreatorAsaasAccount>();
+    public DbSet<FinanceEntities.CreatorAsaasCustomer> CreatorAsaasCustomers => Set<FinanceEntities.CreatorAsaasCustomer>();
 
     // Payout — saques do criador (ciclo de 15 dias)
     public DbSet<PayoutEntities.PayoutRequest> PayoutRequests => Set<PayoutEntities.PayoutRequest>();
