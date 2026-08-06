@@ -24,6 +24,10 @@ namespace Tuilow.Finance.Infrastructure.Services;
 ///   pagamento sempre aponta para a walletId da própria Tuilow, nunca para a do creator) é
 ///   buscado em uma segunda chamada best-effort ao endpoint dedicado GET /v3/wallets; falha
 ///   nessa segunda chamada não bloqueia a conexão da conta.
+///
+/// CONFIRMADO EM PRODUÇÃO (2): o endpoint de criação de webhook é POST /v3/webhooks (PLURAL) --
+/// a documentação atual da Asaas ("Create new Webhook via API") é explícita: "To create a
+/// Webhook, use the endpoint: POST /v3/webhooks". O plural é o único documentado hoje.
 /// </summary>
 public sealed class AsaasAccountOnboardingService(
     IHttpClientFactory httpClientFactory,
@@ -160,7 +164,9 @@ public sealed class AsaasAccountOnboardingService(
             };
 
             var json = JsonSerializer.Serialize(payload);
-            var response = await client.PostAsync("webhook", new StringContent(json, Encoding.UTF8, "application/json"), ct);
+            // Endpoint correto e atualmente documentado pela Asaas é "webhooks" (PLURAL) -- o
+            // singular "webhook" retornava erro e por isso a conexão nunca completava o passo 2.
+            var response = await client.PostAsync("webhooks", new StringContent(json, Encoding.UTF8, "application/json"), ct);
 
             if (!response.IsSuccessStatusCode)
             {

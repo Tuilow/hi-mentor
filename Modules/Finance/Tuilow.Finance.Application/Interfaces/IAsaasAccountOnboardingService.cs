@@ -8,13 +8,15 @@ public sealed record AsaasAccountValidationResult(bool Success, string? AsaasAcc
 /// webhook de pagamentos apontando para a Tuilow. Como nao e uma subconta que a Tuilow
 /// administra, essa e a unica forma de saber quando uma cobranca criada nela e paga.
 ///
-/// IMPORTANTE (ponto de atencao do relatorio final, agora RESOLVIDO com uma chamada real em
-/// producao): GET /v3/myAccount para uma conta comum (nao subconta) nao retorna "id" nem
-/// "walletId" -- so dados cadastrais (status, cpfCnpj, name, endereco etc.). A implementacao
-/// (Finance.Infrastructure) usa "status" == APPROVED para validar a conta, "cpfCnpj" como
-/// AsaasAccountId (a Asaas nao expoe um id de conta nesse endpoint) e busca a walletId
-/// (informativa, ver CreatorAsaasAccount.WalletId) numa segunda chamada best-effort a
-/// GET /v3/wallets.
+/// IMPORTANTE (ponto de atencao do relatorio final, agora RESOLVIDO com chamadas reais em
+/// producao):
+/// - GET /v3/myAccount para uma conta comum (nao subconta) nao retorna "id" nem "walletId" -- so
+///   dados cadastrais (status, cpfCnpj, name, endereco etc.). A implementacao usa "status" ==
+///   APPROVED para validar a conta e "cpfCnpj" como AsaasAccountId (a Asaas nao expoe um id de
+///   conta nesse endpoint); a walletId (informativa, ver CreatorAsaasAccount.WalletId) e buscada
+///   numa segunda chamada best-effort a GET /v3/wallets.
+/// - o endpoint de registro de webhook e POST /v3/webhooks (PLURAL) -- o singular "/v3/webhook"
+///   nao e um endpoint valido e fazia esse passo falhar sempre.
 /// </summary>
 public interface IAsaasAccountOnboardingService
 {
