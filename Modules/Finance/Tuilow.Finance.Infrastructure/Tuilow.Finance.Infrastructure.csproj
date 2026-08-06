@@ -23,7 +23,7 @@
     <!-- Acoplamento legitimo (mesmo padrao ja usado em outros modulos, ver comentarios
          equivalentes em Sales/IdentidadeAcesso): o painel admin de contas Asaas
          (AdminListCreatorAsaasAccountsQuery) precisa mostrar nome/e-mail do creator, nao so o
-         Guid -- ver ICreatorDisplayInfoLookup. -->
+         Guid, ver ICreatorDisplayInfoLookup. -->
     <ProjectReference Include="..\..\IdentidadeAcesso\Tuilow.IdentidadeAcesso.Domain\Tuilow.IdentidadeAcesso.Domain.csproj" />
   </ItemGroup>
 </Project>
