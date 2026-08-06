@@ -1,20 +1,28 @@
+using Tuilow.Finance.Application.Interfaces;
 using Tuilow.Finance.Domain.Interfaces;
 using MediatR;
 
 namespace Tuilow.Finance.Application.Queries.AdminListCreatorAsaasAccounts;
 
-public sealed class AdminListCreatorAsaasAccountsQueryHandler(ICreatorAsaasAccountRepository repository)
-    : IRequestHandler<AdminListCreatorAsaasAccountsQuery, IReadOnlyCollection<AdminCreatorAsaasAccountItem>>
+public sealed class AdminListCreatorAsaasAccountsQueryHandler(
+    ICreatorAsaasAccountRepository repository,
+    ICreatorDisplayInfoLookup creatorDisplayInfoLookup
+) : IRequestHandler<AdminListCreatorAsaasAccountsQuery, IReadOnlyCollection<AdminCreatorAsaasAccountItem>>
 {
     public async Task<IReadOnlyCollection<AdminCreatorAsaasAccountItem>> Handle(AdminListCreatorAsaasAccountsQuery request, CancellationToken ct)
     {
-        var accounts = await repository.GetAllAsync(request.Skip, request.Take, ct);
+        var accounts = (await repository.GetAllAsync(request.Skip, request.Take, ct)).ToList();
+        var displayInfo = await creatorDisplayInfoLookup.GetManyAsync(accounts.Select(a => a.CreatorId), ct);
 
-        return accounts.Select(a => new AdminCreatorAsaasAccountItem(
-            a.Id, a.CreatorId, a.Status.ToString(), a.IsEnabledForSelling,
-            Mask(a.CpfCnpj), MaskWallet(a.WalletId), a.CommissionOverridePercentage,
-            a.LastValidatedAt, a.LastWebhookReceivedAt, a.LastValidationError
-        )).ToList();
+        return accounts.Select(a =>
+        {
+            displayInfo.TryGetValue(a.CreatorId, out var info);
+            return new AdminCreatorAsaasAccountItem(
+                a.Id, a.CreatorId, info?.Name ?? "(usuário não encontrado)", info?.Email ?? "—",
+                a.Status.ToString(), a.IsEnabledForSelling,
+                Mask(a.CpfCnpj), MaskWallet(a.WalletId), a.CommissionOverridePercentage,
+                a.LastValidatedAt, a.LastWebhookReceivedAt, a.LastValidationError);
+        }).ToList();
     }
 
     // Mantem so os 3 primeiros e 2 ultimos digitos visiveis -- o suficiente para o admin

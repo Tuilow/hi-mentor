@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<ICreatorAsaasCustomerRepository, CreatorAsaasCustomerRepository>();
         services.AddScoped<IAsaasAccountOnboardingService, AsaasAccountOnboardingService>();
         services.AddHttpClient("AsaasOnboarding");
+        services.AddScoped<ICreatorDisplayInfoLookup, IdentidadeAcessoCreatorDisplayInfoLookup>();
         return services;
     }
 }

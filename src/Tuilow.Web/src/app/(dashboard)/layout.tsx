@@ -22,13 +22,15 @@ const adminNavItems = [
   { href: '/admin/cursos',   label: 'Gerenciar Cursos', icon: '🎬' },
   { href: '/canal',          label: 'Meu Canal',       icon: '📡' },
   { href: '/estudio',        label: 'Estúdio do Criador', icon: '🎙️' },
+  { href: '/admin/financeiro', label: 'Financeiro',    icon: '💰' },
 ];
 
 // Painel do dono da plataforma — distinto da área "Administração" do Criador acima (que apesar
 // do nome é a área de gestão de produtos do próprio Criador, não do dono do Tuilow).
 const platformNavItems = [
-  { href: '/plataforma',          label: 'Visão Geral', icon: '📊' },
-  { href: '/plataforma/usuarios', label: 'Usuários',    icon: '👥' },
+  { href: '/plataforma',           label: 'Visão Geral', icon: '📊' },
+  { href: '/plataforma/usuarios',  label: 'Usuários',    icon: '👥' },
+  { href: '/plataforma/financeiro', label: 'Financeiro',  icon: '💳' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

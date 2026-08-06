@@ -437,6 +437,50 @@ export interface ListUsersParams {
   pageSize?: number;
 }
 
+// Marketplace de split (creator como emissor da cobrança) -- conectar/consultar a própria
+// conta Asaas do criador. Ver Finance.Api.Controllers.CreatorAsaasAccountController.
+export interface CreatorAsaasAccountStatus {
+  isConnected: boolean;
+  status: 'NotConnected' | 'PendingValidation' | 'Active' | 'Restricted' | 'Rejected' | 'Disabled';
+  canSell: boolean;
+  walletId: string | null;
+  commissionOverridePercentage: number | null;
+  lastValidatedAt: string | null;
+  lastValidationError: string | null;
+}
+
+export const financeAsaasAccountApi = {
+  getStatus: () => api.get<CreatorAsaasAccountStatus>('/finance/asaas-account'),
+  connect: (data: { apiKey: string; cpfCnpj?: string; legalName?: string }) =>
+    api.post('/finance/asaas-account/connect', data),
+};
+
+// Painel do dono da plataforma -- contas Asaas conectadas pelos criadores (marketplace de
+// split). Ver Finance.Api.Controllers.AdminFinanceController.
+export interface AdminCreatorAsaasAccountItem {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorEmail: string;
+  status: 'NotConnected' | 'PendingValidation' | 'Active' | 'Restricted' | 'Rejected' | 'Disabled';
+  isEnabledForSelling: boolean;
+  cpfCnpjMasked: string | null;
+  walletIdMasked: string | null;
+  commissionOverridePercentage: number | null;
+  lastValidatedAt: string | null;
+  lastWebhookReceivedAt: string | null;
+  lastValidationError: string | null;
+}
+
+export const adminFinanceApi = {
+  listAsaasAccounts: (params?: { skip?: number; take?: number }) =>
+    api.get<AdminCreatorAsaasAccountItem[]>('/admin/finance/asaas-accounts', { params }),
+  setAsaasAccountEnabled: (creatorAsaasAccountId: string, enabled: boolean) =>
+    api.put(`/admin/finance/asaas-accounts/${creatorAsaasAccountId}/enabled`, { enabled }),
+  setCommissionOverride: (creatorAsaasAccountId: string, percentage: number | null) =>
+    api.put(`/admin/finance/asaas-accounts/${creatorAsaasAccountId}/commission-override`, { percentage }),
+};
+
 export const adminUsersApi = {
   list: (params?: ListUsersParams) => api.get('/admin/users', { params }),
   getStats: () => api.get('/admin/users/stats'),
