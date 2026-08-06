@@ -17,11 +17,16 @@ public sealed record AsaasAccountValidationResult(bool Success, string? AsaasAcc
 ///   numa segunda chamada best-effort a GET /v3/wallets.
 /// - o endpoint de registro de webhook e POST /v3/webhooks (PLURAL) -- o singular "/v3/webhook"
 ///   nao e um endpoint valido e fazia esse passo falhar sempre.
+/// - RegisterWebhookAsync e IDEMPOTENTE: se a conta ja tiver um webhook cadastrado para a mesma
+///   url (Asaas:CreatorWebhookUrl), atualiza/reativa esse webhook (PUT /v3/webhooks/{id}) em vez
+///   de tentar criar um duplicado -- a Asaas rejeita dois webhooks com a mesma url na mesma
+///   conta, o que acontece por exemplo quando a mesma conta Asaas tambem e usada como conta
+///   propria da Tuilow no modelo legado.
 /// </summary>
 public interface IAsaasAccountOnboardingService
 {
     Task<AsaasAccountValidationResult> ValidateAndFetchAccountAsync(string apiKeyPlaintext, CancellationToken ct = default);
 
-    /// <summary>Registra (application/json, evento PAYMENT) o webhook de pagamentos na conta do creator, autenticado com webhookToken.</summary>
+    /// <summary>Registra (ou atualiza/reativa, se já existir para a mesma url) o webhook de pagamentos na conta do creator, autenticado com webhookToken.</summary>
     Task<bool> RegisterWebhookAsync(string apiKeyPlaintext, string webhookToken, CancellationToken ct = default);
 }

@@ -8,15 +8,16 @@ namespace Tuilow.Finance.Infrastructure.Services;
 
 /// <summary>
 /// Chama a API da Asaas usando a API Key que o PRÓPRIO creator informou (nunca a API Key da
-/// Tuilow) para: (1) validar a chave e confirmar que a conta está aprovada; (2) registrar nessa
-/// mesma conta um webhook de pagamentos apontando para a Tuilow.
+/// Tuilow) para: (1) validar a chave e confirmar que a conta está aprovada; (2) registrar (ou
+/// atualizar/reativar, se já existir) nessa mesma conta um webhook de pagamentos apontando para
+/// a Tuilow.
 ///
-/// CONFIRMADO EM PRODUÇÃO (resolve o ponto de atenção que havia aqui antes): GET /v3/myAccount
-/// NÃO retorna "id" nem "walletId" para uma conta comum (pessoa física ou jurídica fora do fluxo
-/// de subconta) -- o corpo real de resposta traz apenas dados cadastrais (object, personType,
-/// company, cpfCnpj, name, status, endereço etc., ver AsaasAccountValidationResult). Esses dois
-/// campos só aparecem documentados no retorno de POST /v3/accounts (criação de SUBCONTA), que não
-/// é o fluxo usado aqui (ver CreatorAsaasAccount). Por isso:
+/// CONFIRMADO EM PRODUÇÃO (1): GET /v3/myAccount NÃO retorna "id" nem "walletId" para uma conta
+/// comum (pessoa física ou jurídica fora do fluxo de subconta) -- o corpo real de resposta traz
+/// apenas dados cadastrais (object, personType, company, cpfCnpj, name, status, endereço etc.,
+/// ver AsaasAccountValidationResult). Esses dois campos só aparecem documentados no retorno de
+/// POST /v3/accounts (criação de SUBCONTA), que não é o fluxo usado aqui (ver
+/// CreatorAsaasAccount). Por isso:
 /// - o "sucesso" da validação passou a ser o campo "status" == "APPROVED";
 /// - como não existe um id de conta no retorno, usamos o cpfCnpj (único e sempre presente) como
 ///   AsaasAccountId;
@@ -28,6 +29,14 @@ namespace Tuilow.Finance.Infrastructure.Services;
 /// CONFIRMADO EM PRODUÇÃO (2): o endpoint de criação de webhook é POST /v3/webhooks (PLURAL) --
 /// a documentação atual da Asaas ("Create new Webhook via API") é explícita: "To create a
 /// Webhook, use the endpoint: POST /v3/webhooks". O plural é o único documentado hoje.
+///
+/// CONFIRMADO EM PRODUÇÃO (3): a Asaas não permite dois webhooks cadastrados com a MESMA url na
+/// MESMA conta -- se a conta do creator já tiver um webhook apontando para
+/// Asaas:CreatorWebhookUrl (de uma tentativa anterior, ou porque a mesma conta também é usada
+/// como conta própria da Tuilow no modelo legado), um POST /v3/webhooks novo falha. Por isso
+/// RegisterWebhookAsync agora é idempotente: procura um webhook existente com a mesma url (GET
+/// /v3/webhooks) e, se achar, faz PUT /v3/webhooks/{id} (reativando enabled/interrupted e
+/// trocando o authToken) em vez de tentar criar um duplicado.
 /// </summary>
 public sealed class AsaasAccountOnboardingService(
     IHttpClientFactory httpClientFactory,
@@ -164,14 +173,22 @@ public sealed class AsaasAccountOnboardingService(
             };
 
             var json = JsonSerializer.Serialize(payload);
-            // Endpoint correto e atualmente documentado pela Asaas é "webhooks" (PLURAL) -- o
-            // singular "webhook" retornava erro e por isso a conexão nunca completava o passo 2.
-            var response = await client.PostAsync("webhooks", new StringContent(json, Encoding.UTF8, "application/json"), ct);
+
+            // Idempotente: se a conta já tem um webhook cadastrado para essa mesma url (tentativa
+            // anterior, ou porque essa conta Asaas também é a conta própria da Tuilow no modelo
+            // legado), ATUALIZA/reativa esse webhook em vez de tentar criar um duplicado -- a
+            // Asaas rejeita um segundo webhook com a mesma url na mesma conta.
+            var existingId = await TryFindWebhookIdByUrlAsync(client, webhookUrl, ct);
+
+            var response = existingId is null
+                ? await client.PostAsync("webhooks", new StringContent(json, Encoding.UTF8, "application/json"), ct)
+                : await client.PutAsync($"webhooks/{existingId}", new StringContent(json, Encoding.UTF8, "application/json"), ct);
 
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync(ct);
-                logger.LogError("Falha ao registrar webhook na conta do creator [{Status}]: {Body}", (int)response.StatusCode, body);
+                logger.LogError("Falha ao {Operation} webhook na conta do creator [{Status}]: {Body}",
+                    existingId is null ? "registrar" : "atualizar", (int)response.StatusCode, body);
                 return false;
             }
 
@@ -181,6 +198,47 @@ public sealed class AsaasAccountOnboardingService(
         {
             logger.LogError(ex, "Falha ao registrar webhook na conta do creator.");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Procura, em GET /v3/webhooks, um webhook já cadastrado nesta conta cuja url bata com
+    /// webhookUrl (comparação tolerante a barra final). Best-effort: se a listagem falhar,
+    /// assume que não existe e deixa RegisterWebhookAsync tentar criar via POST normalmente.
+    /// </summary>
+    private async Task<string?> TryFindWebhookIdByUrlAsync(HttpClient client, string webhookUrl, CancellationToken ct)
+    {
+        try
+        {
+            var response = await client.GetAsync("webhooks?limit=100", ct);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var content = await response.Content.ReadAsStringAsync(ct);
+            var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
+
+            var items = root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("data", out var data)
+                && data.ValueKind == JsonValueKind.Array
+                    ? data
+                    : root;
+
+            if (items.ValueKind != JsonValueKind.Array) return null;
+
+            var normalizedTarget = webhookUrl.TrimEnd('/');
+            foreach (var item in items.EnumerateArray())
+            {
+                var url = item.TryGetProperty("url", out var urlEl) ? urlEl.GetString() : null;
+                if (url is not null && string.Equals(url.TrimEnd('/'), normalizedTarget, StringComparison.OrdinalIgnoreCase))
+                    return item.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao listar webhooks existentes da conta do creator (tentará criar um novo).");
+            return null;
         }
     }
 
