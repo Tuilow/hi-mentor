@@ -8,17 +8,22 @@ namespace Tuilow.Finance.Infrastructure.Services;
 
 /// <summary>
 /// Chama a API da Asaas usando a API Key que o PRÓPRIO creator informou (nunca a API Key da
-/// Tuilow) para: (1) validar a chave e descobrir o id da conta e a walletId associados a ela;
-/// (2) registrar nessa mesma conta um webhook de pagamentos apontando para a Tuilow.
+/// Tuilow) para: (1) validar a chave e confirmar que a conta está aprovada; (2) registrar nessa
+/// mesma conta um webhook de pagamentos apontando para a Tuilow.
 ///
-/// PONTO DE ATENÇÃO (ver IAsaasAccountOnboardingService): os dois endpoints usados aqui
-/// (GET /v3/myAccount e POST /v3/webhook) são os documentados atualmente pela Asaas para,
-/// respectivamente, consultar os dados da conta associada à API Key da chamada e configurar um
-/// webhook via API — mas a documentação pública consultada nesta sessão não confirma
-/// explicitamente o schema de resposta de "myAccount" nem o payload exato de "webhook" para
-/// este cenário (conta comum do creator, fora do fluxo de subconta). Antes de habilitar
-/// Asaas:MarketplaceSplitEnabled em produção, validar esta chamada com uma API Key real de
-/// Sandbox e ajustar os nomes de campo abaixo se necessário.
+/// CONFIRMADO EM PRODUÇÃO (resolve o ponto de atenção que havia aqui antes): GET /v3/myAccount
+/// NÃO retorna "id" nem "walletId" para uma conta comum (pessoa física ou jurídica fora do fluxo
+/// de subconta) -- o corpo real de resposta traz apenas dados cadastrais (object, personType,
+/// company, cpfCnpj, name, status, endereço etc., ver AsaasAccountValidationResult). Esses dois
+/// campos só aparecem documentados no retorno de POST /v3/accounts (criação de SUBCONTA), que não
+/// é o fluxo usado aqui (ver CreatorAsaasAccount). Por isso:
+/// - o "sucesso" da validação passou a ser o campo "status" == "APPROVED";
+/// - como não existe um id de conta no retorno, usamos o cpfCnpj (único e sempre presente) como
+///   AsaasAccountId;
+/// - o walletId (usado só informativamente em CreatorAsaasAccount.WalletId -- o split de
+///   pagamento sempre aponta para a walletId da própria Tuilow, nunca para a do creator) é
+///   buscado em uma segunda chamada best-effort ao endpoint dedicado GET /v3/wallets; falha
+///   nessa segunda chamada não bloqueia a conexão da conta.
 /// </summary>
 public sealed class AsaasAccountOnboardingService(
     IHttpClientFactory httpClientFactory,
@@ -56,22 +61,75 @@ public sealed class AsaasAccountOnboardingService(
             var content = await response.Content.ReadAsStringAsync(ct);
             var doc = JsonDocument.Parse(content);
 
-            var accountId = doc.RootElement.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
-            var walletId = doc.RootElement.TryGetProperty("walletId", out var walletEl) ? walletEl.GetString() : null;
-
-            if (string.IsNullOrEmpty(accountId) || string.IsNullOrEmpty(walletId))
+            // GET /v3/myAccount (conta comum) não retorna "id"/"walletId" -- ver comentário da
+            // classe. O sinal de conta válida/apta a vender é o campo "status".
+            var status = doc.RootElement.TryGetProperty("status", out var statusEl) ? statusEl.GetString() : null;
+            if (!string.Equals(status, "APPROVED", StringComparison.OrdinalIgnoreCase))
             {
-                logger.LogError("Asaas myAccount retornou 200 sem id/walletId: {Body}", content);
+                logger.LogWarning("Conta Asaas do creator não está aprovada (status={Status}): {Body}", status, content);
                 return new AsaasAccountValidationResult(false, null, null,
-                    "A Asaas não retornou os dados esperados da conta (id/walletId). Tente novamente ou contate o suporte.");
+                    status is null
+                        ? "A Asaas não retornou os dados esperados da conta. Tente novamente ou contate o suporte."
+                        : $"Sua conta na Asaas ainda não está aprovada (status atual: {status}). Finalize o cadastro/verificação na Asaas e tente conectar novamente.");
             }
 
-            return new AsaasAccountValidationResult(true, accountId, walletId, null);
+            var accountId = doc.RootElement.TryGetProperty("cpfCnpj", out var cpfEl) ? cpfEl.GetString() : null;
+            if (string.IsNullOrEmpty(accountId))
+            {
+                logger.LogError("Asaas myAccount retornou 200 aprovado sem cpfCnpj: {Body}", content);
+                return new AsaasAccountValidationResult(false, null, null,
+                    "A Asaas não retornou os dados esperados da conta. Tente novamente ou contate o suporte.");
+            }
+
+            var walletId = await TryFetchWalletIdAsync(client, ct);
+
+            return new AsaasAccountValidationResult(true, accountId, walletId ?? string.Empty, null);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao validar API Key de creator contra a Asaas.");
             return new AsaasAccountValidationResult(false, null, null, "Falha de comunicação com a Asaas. Tente novamente em instantes.");
+        }
+    }
+
+    /// <summary>
+    /// Busca o walletId da própria conta do creator em GET /v3/wallets (endpoint dedicado da
+    /// Asaas para "qual é a walletId da conta dona desta API Key"). Best-effort: como o WalletId
+    /// guardado em CreatorAsaasAccount é só informativo (o split nunca aponta para ele), qualquer
+    /// falha aqui é logada como warning e NÃO impede a conexão da conta.
+    /// </summary>
+    private async Task<string?> TryFetchWalletIdAsync(HttpClient client, CancellationToken ct)
+    {
+        try
+        {
+            var response = await client.GetAsync("wallets/", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct);
+                logger.LogWarning("Não foi possível obter walletId informativo da conta do creator [{Status}]: {Body}", (int)response.StatusCode, body);
+                return null;
+            }
+
+            var content = await response.Content.ReadAsStringAsync(ct);
+            var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
+
+            // Cobre tanto um objeto único quanto o formato de listagem paginada padrão da Asaas
+            // ({ object: "list", data: [...] }), já que a doc pública não detalha o schema exato.
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("data", out var data)
+                && data.ValueKind == JsonValueKind.Array)
+            {
+                if (data.GetArrayLength() == 0) return null;
+                root = data[0];
+            }
+
+            return root.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao buscar walletId informativo da conta do creator (não bloqueia a conexão).");
+            return null;
         }
     }
 
