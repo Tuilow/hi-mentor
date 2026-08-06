@@ -19,6 +19,19 @@ public static class DependencyInjection
         // WalletTransaction correspondente no módulo Finance.
         services.AddScoped<IWalletCreditChecker, FinanceWalletCreditChecker>();
 
+        // Marketplace de split (creator como emissor da cobrança, ver CreatorAsaasAccount) --
+        // mesma direção de acoplamento já usada acima para Finance.
+        services.AddScoped<IMarketplacePaymentService, AsaasMarketplacePaymentService>();
+        services.AddScoped<ICreatorPaymentAccountLookup, FinanceCreatorPaymentAccountLookup>();
+        services.AddSingleton<IMarketplaceFeatureFlag, ConfigMarketplaceFeatureFlag>();
+        services.AddScoped<IAsaasWebhookAuthenticator, AsaasWebhookAuthenticator>();
+
+        // Cliente HTTP nomeado para o marketplace -- diferente do AddHttpClient<IPaymentService,...>
+        // tipado acima (credencial fixa da Tuilow), a credencial aqui muda por chamada (API Key
+        // de cada creator), então o BaseAddress/access_token são montados por requisição em
+        // AsaasMarketplacePaymentService — aqui só registramos o mesmo pipeline de resiliência.
+        services.AddHttpClient("AsaasMarketplace").AddStandardResilienceHandler();
+
         services.AddHttpClient<IPaymentService, AsaasPaymentService>(client =>
             {
                 // Achado em teste manual (produção): a Asaas migrou o endereço da API (ver

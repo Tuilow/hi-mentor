@@ -13,6 +13,9 @@ public sealed class PurchaseCourseCommandHandler(
     ICoursePurchaseRepository coursePurchaseRepository,
     IUserProvisioningService userProvisioningService,
     IPaymentService paymentService,
+    IMarketplacePaymentService marketplacePaymentService,
+    ICreatorPaymentAccountLookup creatorPaymentAccountLookup,
+    IMarketplaceFeatureFlag marketplaceFeatureFlag,
     IUnitOfWork uow
 ) : IRequestHandler<PurchaseCourseCommand, PurchaseCourseResponse>
 {
@@ -43,6 +46,40 @@ public sealed class PurchaseCourseCommandHandler(
         if (await coursePurchaseRepository.HasConfirmedPurchaseAsync(studentId, request.CourseId, ct))
             throw new BusinessException("Você já comprou este curso.");
 
+        // Marketplace de split: só entra se o flag global estiver ligado E o criador do curso
+        // tiver uma conta Asaas própria conectada e validada (CanSell). Qualquer outro caso cai
+        // no modelo Legacy abaixo, sem nenhuma mudança de comportamento — criadores que ainda
+        // não conectaram uma conta continuam vendendo normalmente pela conta da Tuilow.
+        var marketplaceAccount = marketplaceFeatureFlag.IsEnabled
+            ? await creatorPaymentAccountLookup.GetMarketplaceAccountAsync(course.InstructorId, ct)
+            : null;
+
+        if (marketplaceAccount is { CanSell: true })
+        {
+            var commissionPercentage = await creatorPaymentAccountLookup
+                .GetEffectiveCommissionPercentageAsync(course.InstructorId, ct);
+
+            var marketplaceCustomer = await marketplacePaymentService.CreateOrGetCustomerAsync(
+                course.InstructorId, studentId,
+                new(request.CustomerName, request.CustomerEmail, request.CpfCnpj, request.Phone), ct);
+
+            var marketplaceCharge = await marketplacePaymentService.CreateChargeAsync(
+                course.InstructorId,
+                new(marketplaceCustomer.AsaasCustomerId, course.Price.Amount, $"Curso: {course.Title}", course.Id.ToString()),
+                commissionPercentage, ct);
+
+            var marketplacePurchase = CoursePurchaseEntity.CreateForMarketplace(
+                studentId, course.Id, course.InstructorId, course.Price.Amount,
+                marketplaceAccount.CreatorAsaasAccountId, marketplaceCustomer.AsaasCustomerId,
+                marketplaceCharge.AsaasPaymentId, commissionPercentage);
+
+            await coursePurchaseRepository.AddAsync(marketplacePurchase, ct);
+            await uow.SaveChangesAsync(ct);
+
+            return new PurchaseCourseResponse(marketplacePurchase.Id, marketplaceCharge.AsaasPaymentId, marketplaceCharge.InvoiceUrl);
+        }
+
+        // Legacy — cobrança na própria conta Asaas da Tuilow. Comportamento inalterado.
         var customer = await paymentService.CreateOrGetCustomerAsync(
             new(request.CustomerName, request.CustomerEmail, request.CpfCnpj, request.Phone), ct);
 

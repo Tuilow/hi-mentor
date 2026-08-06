@@ -12,6 +12,9 @@
     <!-- Troquei o envio de e-mail de SMTP (MailKit) para a API HTTP do Mailgun — ver comentário
          em Email/EmailService.cs. IHttpClientFactory vem deste pacote. -->
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
+    <!-- ISecretProtector (DataProtectionSecretProtector): so as interfaces IDataProtector/
+         IDataProtectionProvider; o provider concreto e registrado no Host via AddDataProtection(). -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.Abstractions" Version="9.0.4" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tuilow.SharedKernel.Application\Tuilow.SharedKernel.Application.csproj" />

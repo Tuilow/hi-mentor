@@ -2,6 +2,7 @@ using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.SharedKernel.Infrastructure.Clock;
 using Tuilow.SharedKernel.Infrastructure.Email;
 using Tuilow.SharedKernel.Infrastructure.Frontend;
+using Tuilow.SharedKernel.Infrastructure.Security;
 using Tuilow.SharedKernel.Infrastructure.WhatsApp;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,6 +24,12 @@ public static class DependencyInjection
         // Sem provedor configurado ainda — troque por uma implementação real quando houver
         // credencial (Twilio/Z-API/WhatsApp Business API). Ver comentário em IWhatsAppService.
         services.AddScoped<IWhatsAppService, NoOpWhatsAppService>();
+
+        // Data Protection: usado por ISecretProtector para proteger a API Key da conta Asaas
+        // externa de cada creator (marketplace de split). O provider (AddDataProtection) e
+        // registrado no Host (Program.cs), com as chaves persistidas no Postgres -- aqui so
+        // registramos o wrapper que os modulos consomem via ISecretProtector.
+        services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         return services;
     }
 }

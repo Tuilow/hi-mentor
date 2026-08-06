@@ -6,11 +6,17 @@ using Microsoft.Extensions.Logging;
 namespace Tuilow.Sales.Application.Commands.ProcessWebhook;
 
 /// <summary>
-/// Um único webhook do Asaas atende dois fluxos de pagamento do Sales:
-///   - Assinatura da plataforma (Subscription/SubscriptionPayment) — modelo legado.
-///   - Compra avulsa de curso (CoursePurchase) — modelo principal atual.
-/// O evento chega sem indicar de qual fluxo se trata; o discriminador é a presença (ou não)
-/// do campo "subscription" no payload — pagamentos avulsos nunca têm esse campo preenchido.
+/// Um único webhook do Asaas atende tres fluxos de pagamento do Sales:
+///   - Assinatura da plataforma (Subscription/SubscriptionPayment) — modelo legado, sempre na
+///     conta da propria Tuilow.
+///   - Compra avulsa de curso Legacy (CoursePurchase.PaymentModel == Legacy) — tambem na conta
+///     da propria Tuilow.
+///   - Compra avulsa de curso MarketplaceSplit — cobranca criada na conta Asaas do proprio
+///     creator; o webhook chega autenticado com o token daquela conta especifica (ver
+///     CreatorAsaasAccountId, resolvido pelo controller via IAsaasWebhookAuthenticator).
+/// O evento chega sem indicar de qual fluxo se trata; o discriminador principal e a presenca
+/// (ou nao) do campo "subscription" no payload — pagamentos avulsos nunca tem esse campo
+/// preenchido.
 /// </summary>
 public sealed class ProcessAsaasWebhookCommandHandler(
     ISubscriptionRepository subscriptionRepository,
@@ -23,13 +29,26 @@ public sealed class ProcessAsaasWebhookCommandHandler(
     {
         var payload = request.Payload;
 
+        // Eventos de divergencia de split (documentacao Asaas: PAYMENT_SPLIT_DIVERGENCE_BLOCK /
+        // _FINISHED) nao correspondem ao ciclo de vida normal de uma cobranca -- so registramos
+        // em log critico para o admin investigar manualmente (ver painel "Financeiro ->
+        // Creators/Contas Asaas"); nao ha estado de CoursePurchase para atualizar aqui.
+        if (payload.Event is "PAYMENT_SPLIT_DIVERGENCE_BLOCK" or "PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED")
+        {
+            logger.LogCritical(
+                "Evento de divergencia de split recebido da Asaas: {Event} para o pagamento {PaymentId} " +
+                "(CreatorAsaasAccountId {CreatorAsaasAccountId}) -- verificar manualmente no painel admin.",
+                payload.Event, payload.Payment.Id, request.CreatorAsaasAccountId);
+            return;
+        }
+
         if (!string.IsNullOrEmpty(payload.Payment.Subscription))
         {
             await HandleSubscriptionPaymentAsync(payload, ct);
             return;
         }
 
-        await HandleCoursePurchasePaymentAsync(payload, ct);
+        await HandleCoursePurchasePaymentAsync(payload, request.CreatorAsaasAccountId, ct);
     }
 
     // ─── Assinatura da plataforma (modelo legado) ──────────────────────────────
@@ -82,9 +101,9 @@ public sealed class ProcessAsaasWebhookCommandHandler(
         await uow.SaveChangesAsync(ct);
     }
 
-    // ─── Compra avulsa de curso (modelo principal) ─────────────────────────────
+    // ─── Compra avulsa de curso (Legacy ou MarketplaceSplit) ───────────────────
 
-    private async Task HandleCoursePurchasePaymentAsync(AsaasWebhookPayload payload, CancellationToken ct)
+    private async Task HandleCoursePurchasePaymentAsync(AsaasWebhookPayload payload, Guid? authenticatedCreatorAsaasAccountId, CancellationToken ct)
     {
         var purchase = await coursePurchaseRepository.GetByAsaasPaymentIdAsync(payload.Payment.Id, ct);
 
@@ -94,11 +113,28 @@ public sealed class ProcessAsaasWebhookCommandHandler(
             return;
         }
 
+        // Checagem de segurança: um webhook autenticado com o token de uma CreatorAsaasAccount
+        // só pode afetar compras vinculadas àquela MESMA conta -- protege contra o token de um
+        // creator sendo usado (por bug ou má-fé) para tentar confirmar/reembolsar a compra de
+        // outro. Webhooks da conta legada (authenticatedCreatorAsaasAccountId == null) só devem
+        // afetar compras Legacy (CreatorAsaasAccountId == null na compra).
+        if (purchase.CreatorAsaasAccountId != authenticatedCreatorAsaasAccountId)
+        {
+            logger.LogCritical(
+                "Webhook Asaas REJEITADO: pagamento {PaymentId} pertence à compra {PurchaseId} vinculada à " +
+                "conta {ExpectedAccountId}, mas o webhook foi autenticado com a conta {ActualAccountId} — " +
+                "possível uso indevido de token de webhook.",
+                payload.Payment.Id, purchase.Id, purchase.CreatorAsaasAccountId, authenticatedCreatorAsaasAccountId);
+            return;
+        }
+
         switch (payload.Event)
         {
             case "PAYMENT_RECEIVED":
             case "PAYMENT_CONFIRMED":
-                purchase.ConfirmPayment(); // idempotente — dispara CoursePurchaseConfirmedDomainEvent (Finance credita a carteira do criador)
+                purchase.ConfirmPayment(); // idempotente — dispara CoursePurchaseConfirmedDomainEvent (Finance credita a carteira do criador, só no modelo Legacy)
+                if (payload.Payment.NetValue is decimal netValue)
+                    purchase.RecordAsaasNetValue(netValue);
                 logger.LogInformation("Compra de curso confirmada: {PaymentId}", payload.Payment.Id);
                 break;
 
@@ -109,8 +145,8 @@ public sealed class ProcessAsaasWebhookCommandHandler(
                 break;
 
             case "PAYMENT_REFUNDED":
-                purchase.Refund(); // dispara CoursePurchaseRefundedDomainEvent (Finance estorna a carteira do criador)
-                logger.LogInformation("Compra de curso reembolsada: {PaymentId}", payload.Payment.Id);
+                purchase.Refund(); // dispara CoursePurchaseRefundedDomainEvent (Finance estorna a carteira do criador, só no modelo Legacy — a Asaas já reverteu o split sozinha em MarketplaceSplit)
+                logger.LogWarning("Compra de curso reembolsada: {PaymentId}", payload.Payment.Id);
                 break;
 
             default:

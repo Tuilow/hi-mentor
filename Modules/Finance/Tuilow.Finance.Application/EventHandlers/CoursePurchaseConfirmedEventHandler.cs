@@ -2,6 +2,7 @@ using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Catalog.Domain.ValueObjects;
 using Tuilow.Finance.Domain.Entities;
 using Tuilow.Finance.Domain.Interfaces;
+using Tuilow.Sales.Domain.Enums;
 using Tuilow.Sales.Domain.Events;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -9,14 +10,14 @@ using Microsoft.Extensions.Logging;
 namespace Tuilow.Finance.Application.EventHandlers;
 
 /// <summary>
-/// Reage à confirmação de uma compra de curso (evento publicado pelo módulo Sales) para:
-///   1. Consultar o percentual de comissão da plataforma vigente (PlatformFeeConfiguration);
-///   2. Calcular comissão (bruto x percentual) e valor líquido do criador;
-///   3. Criar a carteira do criador sob demanda, se ainda não existir;
-///   4. Registrar o crédito líquido no extrato da carteira (WalletTransaction) e atualizar saldos.
-///
-/// Este é o único ponto do sistema onde a retenção da comissão Tuilow é calculada — mantém a
-/// regra financeira isolada no contexto Finance, sem duplicar lógica em Sales/Catalog/Learning.
+/// Reage à confirmação de uma compra de curso (evento publicado pelo módulo Sales) para creditar
+/// a carteira interna do criador -- SOMENTE no modelo Legacy (PaymentModel.Legacy). Numa venda
+/// MarketplaceSplit o dinheiro nunca passa pela conta da Tuilow: a cobrança foi criada
+/// diretamente na conta Asaas do próprio criador, que já recebeu automaticamente seu valor
+/// líquido via split no momento do pagamento -- não há nada para creditar aqui, e tentar
+/// creditar mesmo assim duplicaria o valor (o creator receberia duas vezes: uma da Asaas
+/// diretamente, outra via saque quinzenal da carteira interna que nunca deveria existir para
+/// essa venda).
 /// </summary>
 public sealed class CoursePurchaseConfirmedEventHandler(
     ICreatorWalletRepository walletRepository,
@@ -30,6 +31,15 @@ public sealed class CoursePurchaseConfirmedEventHandler(
 
     public async Task Handle(CoursePurchaseConfirmedDomainEvent notification, CancellationToken ct)
     {
+        if (notification.PaymentModel == CoursePurchasePaymentModel.MarketplaceSplit)
+        {
+            logger.LogInformation(
+                "Compra {PurchaseId} confirmada no modelo MarketplaceSplit -- nada a creditar na carteira " +
+                "interna do criador {CreatorId} (o split da Asaas já entregou o valor líquido diretamente).",
+                notification.CoursePurchaseId, notification.CreatorId);
+            return;
+        }
+
         // Idempotente: essencial para o reprocessamento manual (achado C2/M1 da auditoria) não
         // creditar a carteira do criador duas vezes para a mesma compra — mesmo padrão de
         // Learning.IsEnrolledAsync (a outra reação a este mesmo evento).

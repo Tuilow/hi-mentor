@@ -1,6 +1,7 @@
 using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Finance.Domain.Enums;
 using Tuilow.Finance.Domain.Interfaces;
+using Tuilow.Sales.Domain.Enums;
 using Tuilow.Sales.Domain.Events;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -9,8 +10,10 @@ namespace Tuilow.Finance.Application.EventHandlers;
 
 /// <summary>
 /// Reage ao reembolso de uma compra de curso estornando o valor líquido que havia sido
-/// creditado ao criador. Se o lançamento original já havia sido liberado para saque
-/// (Available), debita de AvailableBalance; caso contrário, debita de PendingBalance.
+/// creditado ao criador -- SOMENTE no modelo Legacy. Numa venda MarketplaceSplit a própria
+/// Asaas reverte o split automaticamente quando a cobrança original é estornada/reembolsada
+/// (documentação oficial: "se uma cobrança é revertida, o split correspondente também é
+/// revertido"), então não existe nenhuma WalletTransaction para debitar aqui.
 /// </summary>
 public sealed class CoursePurchaseRefundedEventHandler(
     ICreatorWalletRepository walletRepository,
@@ -20,6 +23,15 @@ public sealed class CoursePurchaseRefundedEventHandler(
 {
     public async Task Handle(CoursePurchaseRefundedDomainEvent notification, CancellationToken ct)
     {
+        if (notification.PaymentModel == CoursePurchasePaymentModel.MarketplaceSplit)
+        {
+            logger.LogInformation(
+                "Reembolso da compra {PurchaseId} (MarketplaceSplit) -- nada a estornar na carteira interna " +
+                "do criador {CreatorId}; a própria Asaas reverte o split automaticamente.",
+                notification.CoursePurchaseId, notification.CreatorId);
+            return;
+        }
+
         var wallet = await walletRepository.GetByCreatorIdWithTransactionsAsync(notification.CreatorId, ct);
         if (wallet is null)
         {

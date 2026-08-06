@@ -1,4 +1,7 @@
+using Tuilow.Finance.Application.Commands.AdminSetCreatorAsaasAccountEnabled;
+using Tuilow.Finance.Application.Commands.AdminSetCreatorCommissionOverride;
 using Tuilow.Finance.Application.Commands.UpdatePlatformFee;
+using Tuilow.Finance.Application.Queries.AdminListCreatorAsaasAccounts;
 using Tuilow.Finance.Application.Queries.GetCreatorFinancialDashboard;
 using Tuilow.Finance.Application.Queries.GetCreatorSalesHistory;
 using Tuilow.Finance.Application.Queries.GetPlatformRevenue;
@@ -50,6 +53,35 @@ public sealed class AdminFinanceController(ISender sender, ICurrentUserService c
         var result = await sender.Send(new GetCreatorSalesHistoryQuery(creatorId, from, to), ct);
         return Ok(result);
     }
+
+    // ─── Marketplace de split — contas Asaas dos criadores ─────────────────────
+
+    /// <summary>Lista as contas Asaas conectadas pelos criadores (marketplace de split) — WalletId/CPF mascarados, API Key nunca exposta.</summary>
+    [HttpGet("asaas-accounts")]
+    public async Task<IActionResult> ListAsaasAccounts([FromQuery] int skip = 0, [FromQuery] int take = 50, CancellationToken ct = default)
+    {
+        var result = await sender.Send(new AdminListCreatorAsaasAccountsQuery(skip, take), ct);
+        return Ok(result);
+    }
+
+    /// <summary>Liga/desliga manualmente a capacidade de um criador vender via marketplace (ex.: suspeita de fraude).</summary>
+    [HttpPut("asaas-accounts/{creatorAsaasAccountId:guid}/enabled")]
+    public async Task<IActionResult> SetAsaasAccountEnabled(Guid creatorAsaasAccountId, [FromBody] SetEnabledRequest request, CancellationToken ct)
+    {
+        await sender.Send(new AdminSetCreatorAsaasAccountEnabledCommand(creatorAsaasAccountId, request.Enabled), ct);
+        return NoContent();
+    }
+
+    /// <summary>Define (ou remove, se Percentage vier nulo) um percentual de comissão específico para este criador.</summary>
+    [HttpPut("asaas-accounts/{creatorAsaasAccountId:guid}/commission-override")]
+    public async Task<IActionResult> SetCommissionOverride(Guid creatorAsaasAccountId, [FromBody] SetCommissionOverrideRequest request, CancellationToken ct)
+    {
+        await sender.Send(new AdminSetCreatorCommissionOverrideCommand(creatorAsaasAccountId, request.Percentage), ct);
+        return NoContent();
+    }
 }
+
+public sealed record SetEnabledRequest(bool Enabled);
+public sealed record SetCommissionOverrideRequest(decimal? Percentage);
 
 public sealed record UpdateFeeRequest(decimal Percentage, string? Notes = null);

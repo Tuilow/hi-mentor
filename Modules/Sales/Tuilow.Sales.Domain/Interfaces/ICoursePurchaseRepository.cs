@@ -25,4 +25,13 @@ public interface ICoursePurchaseRepository : IRepository<CoursePurchase>
     /// </summary>
     Task<IEnumerable<CoursePurchase>> GetConfirmedForReconciliationAsync(
         DateTime lookbackFloor, DateTime graceThreshold, CancellationToken ct = default);
+
+    /// <summary>
+    /// Soma bruto/comissao/liquido de todas as vendas MarketplaceSplit confirmadas num intervalo
+    /// -- usado para compor a receita total da plataforma junto com o total legado do modulo
+    /// Finance (GetPlatformRevenueQueryHandler), ja que vendas marketplace nunca passam pelo
+    /// CreatorWallet.
+    /// </summary>
+    Task<(decimal GrossTotal, decimal CommissionTotal, decimal CreatorNetTotal, int SalesCount)> GetMarketplaceTotalsAsync(
+        DateTime? from, DateTime? to, CancellationToken ct = default);
 }
