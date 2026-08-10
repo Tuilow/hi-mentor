@@ -37,6 +37,15 @@ namespace Tuilow.Finance.Infrastructure.Services;
 /// RegisterWebhookAsync agora é idempotente: procura um webhook existente com a mesma url (GET
 /// /v3/webhooks) e, se achar, faz PUT /v3/webhooks/{id} (reativando enabled/interrupted e
 /// trocando o authToken) em vez de tentar criar um duplicado.
+///
+/// CONFIRMADO EM PRODUÇÃO (4): "Asaas:CreatorWebhookUrl" e "Asaas:WebhookNotificationEmail" no
+/// appsettings.json são placeholders com STRING VAZIA (""), não chaves ausentes -- então, se a
+/// variável de ambiente correspondente (Asaas__CreatorWebhookUrl / Asaas__WebhookNotificationEmail)
+/// não estiver definida no ambiente de deploy, configuration[...] retorna "" (não null), e o
+/// antigo "?? valorPadrao" NUNCA disparava (só dispara quando a chave está ausente, não quando
+/// está vazia). Isso fazia a Tuilow mandar url/email em branco pro payload do webhook, e a Asaas
+/// respondia 400 (invalid_url / invalid_email). Por isso agora tratamos string vazia/whitespace
+/// como "não configurado" explicitamente.
 /// </summary>
 public sealed class AsaasAccountOnboardingService(
     IHttpClientFactory httpClientFactory,
@@ -152,14 +161,20 @@ public sealed class AsaasAccountOnboardingService(
         {
             using var client = CreateClient(apiKeyPlaintext);
 
-            var webhookUrl = configuration["Asaas:CreatorWebhookUrl"]
-                ?? throw new InvalidOperationException("Asaas:CreatorWebhookUrl não configurado.");
+            var webhookUrl = configuration["Asaas:CreatorWebhookUrl"];
+            if (string.IsNullOrWhiteSpace(webhookUrl))
+                throw new InvalidOperationException(
+                    "Asaas:CreatorWebhookUrl não configurado (variável de ambiente Asaas__CreatorWebhookUrl vazia ou ausente).");
+
+            var notificationEmail = configuration["Asaas:WebhookNotificationEmail"];
+            if (string.IsNullOrWhiteSpace(notificationEmail))
+                notificationEmail = "suporte@tuilow.com";
 
             var payload = new
             {
                 name = "Tuilow - Marketplace",
                 url = webhookUrl,
-                email = configuration["Asaas:WebhookNotificationEmail"] ?? "suporte@tuilow.com",
+                email = notificationEmail,
                 enabled = true,
                 interrupted = false,
                 apiVersion = 3,
