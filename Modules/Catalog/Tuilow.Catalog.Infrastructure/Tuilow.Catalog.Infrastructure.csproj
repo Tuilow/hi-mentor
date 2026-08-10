@@ -17,5 +17,9 @@
     <!-- Acoplamento legítimo: IInstructorLookup consulta o módulo IdentidadeAcesso (nome/avatar/
          bio do instrutor) para o bloco "Sobre o Professor" da página de vendas pública. -->
     <ProjectReference Include="..\..\IdentidadeAcesso\Tuilow.IdentidadeAcesso.Domain\Tuilow.IdentidadeAcesso.Domain.csproj" />
+    <!-- Acoplamento legítimo: ICreatorFinancialStatusLookup consulta o módulo Finance
+         (CreatorAsaasSubaccount) para saber se o instrutor pode publicar/vender (onboarding
+         financeiro aprovado) ver PublishCourseCommandHandler. -->
+    <ProjectReference Include="..\..\Finance\Tuilow.Finance.Domain\Tuilow.Finance.Domain.csproj" />
   </ItemGroup>
 </Project>

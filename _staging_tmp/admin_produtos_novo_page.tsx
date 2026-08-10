@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Sparkles, Upload, Link2, Plus, Video, Check, Loader2,
@@ -9,8 +10,9 @@ import {
   BookOpen, Briefcase,
 } from 'lucide-react';
 import {
-  coursesApi, videosApi, materialsApi, creatorStudioApi, courseSubscriptionPlansApi,
+  API_URL, coursesApi, videosApi, materialsApi, creatorStudioApi, courseSubscriptionPlansApi, categoriesApi,
 } from '@/lib/api';
+import { CategoryAutocomplete } from '@/components/ui/CategoryAutocomplete';
 import type {
   ProductDetail, PublicationChecklist, ModuleDetail, LessonDetail, ProductType,
 } from '@/types';
@@ -103,11 +105,22 @@ function ProductWizard() {
   const [fullDescription, setFullDescription] = useState('');
   const [generatingCopy, setGeneratingCopy] = useState(false);
 
+  // Sugestões de Categoria/Subcategoria (autocomplete) — lista curada + o que já existe em
+  // outros cursos (ver GetCategoriesQueryHandler). Falha silenciosa: sem a lista, os campos
+  // continuam funcionando como texto livre, só sem sugestões.
+  const { data: categoryOptions = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.list().then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+  const matchedCategory = categoryOptions.find(
+    c => c.name.toLowerCase() === category.trim().toLowerCase()
+  );
+
   // Passo 2
   const [videos, setVideos] = useState<LocalVideo[]>([]);
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
-  const [downloadVideo, setDownloadVideo] = useState(false);
 
   // Passo 3
   const [modules, setModules] = useState<ModuleDetail[]>([]);
@@ -145,9 +158,9 @@ function ProductWizard() {
     }).catch(() => { /* melhor deixar a lista vazia do que travar o assistente */ });
   }, [courseId]);
 
-  // Enquanto algum vídeo estiver "Baixando..."/"Processando" (checkbox de download do YouTube
-  // marcado), consulta a lista de novo a cada poucos segundos pra atualizar o status na tela —
-  // sem isso, o criador não teria nenhum feedback de quando o download termina.
+  // Enquanto algum vídeo estiver "Enviando..."/"Processando" (upload direto de arquivo em
+  // andamento), consulta a lista de novo a cada poucos segundos pra atualizar o status na tela —
+  // sem isso, o criador não teria nenhum feedback de quando o processamento termina.
   useEffect(() => {
     if (!courseId) return;
     const hasPending = videos.some(v => v.status === 'Uploading' || v.status === 'Processing');
@@ -164,10 +177,20 @@ function ProductWizard() {
     return () => clearInterval(interval);
   }, [courseId, videos]);
 
-  // Hidrata o assistente ao editar um rascunho existente
+  // Hidrata o assistente ao editar um rascunho existente. Busca o curso e o plano de assinatura
+  // em paralelo: quando o preço é "Assinatura", o preço do CURSO fica 0 (ver handleSavePricing
+  // mais abaixo, que sempre chama coursesApi.setPrice(courseId, 0) nesse modo) — então "isFree"
+  // sozinho não distingue Grátis de Assinatura, e a tela sempre reabria marcada como "Grátis"
+  // mesmo com uma assinatura ativa configurada. O plano é a fonte de verdade quando existe.
   useEffect(() => {
     if (!existingCourseId) return;
-    coursesApi.getByIdAdmin(existingCourseId).then(({ data }: { data: ProductDetail }) => {
+    Promise.all([
+      coursesApi.getByIdAdmin(existingCourseId),
+      courseSubscriptionPlansApi.getByCourse(existingCourseId),
+    ]).then(([courseRes, plansRes]) => {
+      const data = courseRes.data as ProductDetail;
+      const activePlan = plansRes.data[0];
+
       setName(data.title);
       setProductType(data.productType);
       setCategory(data.category ?? '');
@@ -175,8 +198,14 @@ function ProductWizard() {
       setShortDescription(data.shortDescription ?? '');
       setFullDescription(data.description);
       setModules(data.modules);
-      setPrice(data.price || 97);
-      setPricingMode(data.isFree ? 'free' : 'onetime');
+      if (activePlan) {
+        setPricingMode('subscription');
+        setPrice(activePlan.price);
+        setBillingCycle(activePlan.billingCycle);
+      } else {
+        setPrice(data.price || 97);
+        setPricingMode(data.isFree ? 'free' : 'onetime');
+      }
       setHeadline(data.salesPageHeadline ?? '');
       setSubheadline(data.salesPageSubheadline ?? '');
       setCtaText(data.salesPageCtaText ?? '');
@@ -265,18 +294,19 @@ function ProductWizard() {
     if (!importUrl.trim() || !courseId) return;
     setImporting(true);
     try {
-      const { data } = await videosApi.importExternal(courseId, importUrl.trim(), downloadVideo);
+      // Achado de teste manual: baixar o vídeo do YouTube pelo servidor (checkbox "baixar e
+      // hospedar" que existia aqui) esbarra num bloqueio do próprio YouTube contra downloads
+      // automatizados ("Sign in to confirm you're not a bot") — não tem correção estável do
+      // nosso lado (nem cookies nem proxy resolvem de forma confiável pra vários criadores
+      // diferentes), então a importação agora sempre guarda só a referência externa: o aluno
+      // assiste embutido, mas o player é o do YouTube mesmo (download=false no backend).
+      const { data } = await videosApi.importExternal(courseId, importUrl.trim());
       setVideos(v => [...v, {
         videoId: data.videoId, title: data.title ?? importUrl, source: data.source,
         durationSeconds: data.durationSeconds, status: data.status,
       }]);
       setImportUrl('');
-      setDownloadVideo(false);
-      toast.success(
-        data.status === 'Uploading'
-          ? 'Baixando o vídeo do YouTube — acompanhe o status na lista abaixo.'
-          : 'Vídeo importado com sucesso.'
-      );
+      toast.success('Vídeo importado com sucesso.');
     } catch {
       toast.error('Não foi possível importar esse vídeo. Verifique a URL.');
     } finally {
@@ -289,23 +319,52 @@ function ProductWizard() {
     setImporting(true);
     try {
       const { data } = await videosApi.getUploadUrl(courseId);
-      const tus = await import('tus-js-client');
-      await new Promise<void>((resolve, reject) => {
-        const upload = new tus.Upload(file, {
-          uploadUrl: data.uploadUrl,
-          uploadLengthDeferred: true,
-          chunkSize: 50 * 1024 * 1024,
-          retryDelays: [0, 3000, 5000, 10000],
-          metadata: { filename: file.name, filetype: file.type },
-          onError: reject,
-          onSuccess: () => resolve(),
+      const isMockUpload = data.uploadUrl.startsWith(API_URL);
+
+      if (isMockUpload) {
+        // MockTusController (sem Cloudflare configurado) exige [Authorize] nos métodos TUS —
+        // ver achado M10 da avaliação.
+        const tus = await import('tus-js-client');
+        await new Promise<void>((resolve, reject) => {
+          const upload = new tus.Upload(file, {
+            uploadUrl: data.uploadUrl,
+            uploadLengthDeferred: true,
+            chunkSize: 50 * 1024 * 1024,
+            retryDelays: [0, 3000, 5000, 10000],
+            metadata: { filename: file.name, filetype: file.type },
+            headers: { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` },
+            onError: reject,
+            onSuccess: () => resolve(),
+          });
+          upload.start();
         });
-        upload.start();
-      });
+      } else {
+        // Achado de teste manual: nessa conta da Cloudflare Stream, o upload resumable via
+        // TUS (HEAD/PATCH) retorna 400 pra qualquer uploadUrl gerada pelo
+        // /stream/direct_upload -- confirmado com curl puro, fora do navegador e sem CORS
+        // envolvido, então não é bug nosso (chamado aberto com o suporte da Cloudflare). A
+        // própria documentação deles diz que a mesma uploadUrl também aceita um POST comum
+        // multipart/form-data pra vídeos até 200MB, sem TUS -- é esse fallback usado aqui
+        // enquanto o TUS não for corrigido do lado deles.
+        if (file.size > 200 * 1024 * 1024) {
+          throw new Error('Vídeo maior que 200MB não é suportado no momento — o upload resumable está temporariamente indisponível. Tente um arquivo menor ou comprima o vídeo.');
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch(data.uploadUrl, { method: 'POST', body: formData });
+        if (!response.ok) {
+          throw new Error(`Upload para o Cloudflare Stream falhou (status ${response.status}).`);
+        }
+      }
       setVideos(v => [...v, { videoId: data.videoId, title: file.name, source: 'Upload' }]);
       toast.success('Vídeo enviado com sucesso.');
     } catch (err) {
-      toast.error('Erro no upload do vídeo.');
+      const message = err instanceof Error
+        && (err.message.startsWith('Vídeo maior') || err.message.startsWith('Upload para o Cloudflare'))
+        ? err.message
+        : 'Erro no upload do vídeo.';
+      toast.error(message);
       console.error(err);
     } finally {
       setImporting(false);
@@ -519,16 +578,20 @@ function ProductWizard() {
                 placeholder="Ex.: Curso de Excel para Iniciantes" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-600">Categoria</label>
-                <input className="input-field mt-1" value={category} onChange={e => setCategory(e.target.value)}
-                  placeholder="Ex.: Produtividade" />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Subcategoria</label>
-                <input className="input-field mt-1" value={subcategory} onChange={e => setSubcategory(e.target.value)}
-                  placeholder="Ex.: Excel" />
-              </div>
+              <CategoryAutocomplete
+                label="Categoria"
+                value={category}
+                onChange={setCategory}
+                options={categoryOptions.map(c => c.name)}
+                placeholder="Ex.: Produtividade"
+              />
+              <CategoryAutocomplete
+                label="Subcategoria"
+                value={subcategory}
+                onChange={setSubcategory}
+                options={matchedCategory?.subcategories ?? []}
+                placeholder="Ex.: Excel"
+              />
             </div>
             <button onClick={handleGenerateCopy} disabled={generatingCopy}
               className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-60">
@@ -571,12 +634,9 @@ function ProductWizard() {
             </div>
 
             {/youtube\.com|youtu\.be/.test(importUrl) && (
-              <label className="flex items-start gap-2 text-sm text-gray-600 -mt-2">
-                <input type="checkbox" className="mt-0.5" checked={downloadVideo}
-                  onChange={e => setDownloadVideo(e.target.checked)} />
-                Baixar o vídeo e hospedar na plataforma (recomendado — o aluno assiste sem sair
-                daqui e sem ver sugestões do YouTube; pode levar alguns minutos)
-              </label>
+              <p className="text-sm text-gray-500 -mt-2">
+                O vídeo continua hospedado no YouTube — o aluno assiste embutido aqui, com o player do YouTube.
+              </p>
             )}
 
             <div className="flex items-center gap-2">
@@ -597,7 +657,7 @@ function ProductWizard() {
                     {(v.status === 'Uploading' || v.status === 'Processing') && (
                       <span className="badge ml-auto flex items-center gap-1 bg-amber-50 text-amber-700">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        {v.status === 'Uploading' ? 'Baixando do YouTube...' : 'Processando...'}
+                        {v.status === 'Uploading' ? 'Enviando...' : 'Processando...'}
                       </span>
                     )}
                     {v.status === 'Error' && (
@@ -860,6 +920,11 @@ function OrganizationStep({
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
 
+  // Sem isso, dava pra avançar pro passo de Materiais (e dali até Publicação) com um produto
+  // sem nenhum módulo/aula — só ia falhar (silenciosamente pro usuário) lá na frente, no
+  // checklist de publicação. Exige pelo menos 1 módulo com pelo menos 1 aula dentro.
+  const canAdvance = modules.some(m => m.lessons.length > 0);
+
   return (
     <div className="space-y-5">
       <h2 className="font-bold text-gray-800 text-lg">3. Organização</h2>
@@ -939,13 +1004,19 @@ function OrganizationStep({
         </button>
       </div>
 
-      <div className="flex justify-between pt-2">
-        <button onClick={onBack} className="btn-ghost flex items-center gap-2">
-          <ChevronLeft className="w-4 h-4" /> Voltar
-        </button>
-        <button onClick={onNext} className="btn-primary flex items-center gap-2">
-          Avançar <ChevronRight className="w-4 h-4" />
-        </button>
+      <div className="flex flex-col items-end gap-1.5 pt-2">
+        <div className="flex justify-between w-full">
+          <button onClick={onBack} className="btn-ghost flex items-center gap-2">
+            <ChevronLeft className="w-4 h-4" /> Voltar
+          </button>
+          <button onClick={onNext} disabled={!canAdvance}
+            className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            Avançar <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        {!canAdvance && (
+          <p className="text-xs text-gray-400">Crie pelo menos um módulo com uma aula para continuar.</p>
+        )}
       </div>
     </div>
   );

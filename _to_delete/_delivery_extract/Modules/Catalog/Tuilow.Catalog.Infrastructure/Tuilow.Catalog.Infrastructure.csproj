@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tuilow.Catalog.Infrastructure</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tuilow.Catalog.Application\Tuilow.Catalog.Application.csproj" />
+    <!-- Acoplamento legítimo: IInstructorLookup consulta o módulo IdentidadeAcesso (nome/avatar/
+         bio do instrutor) para o bloco "Sobre o Professor" da página de vendas pública. -->
+    <ProjectReference Include="..\..\IdentidadeAcesso\Tuilow.IdentidadeAcesso.Domain\Tuilow.IdentidadeAcesso.Domain.csproj" />
+    <!-- Acoplamento legítimo: ICreatorFinancialStatusLookup consulta o módulo Finance
+         (CreatorAsaasSubaccount) para saber se o instrutor pode publicar/vender (onboarding
+         financeiro aprovado) -- ver PublishCourseCommandHandler. -->
+    <ProjectReference Include="..\..\Finance\Tuilow.Finance.Domain\Tuilow.Finance.Domain.csproj" />
+  </ItemGroup>
+</Project>

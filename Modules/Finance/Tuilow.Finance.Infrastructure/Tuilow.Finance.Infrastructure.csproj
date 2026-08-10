@@ -14,6 +14,9 @@
     <!-- IAsaasAccountOnboardingService: chama a API da Asaas com a API Key que o creator informa
          (IHttpClientFactory), le configuracao (Asaas:BaseUrl/CreatorWebhookUrl) e loga. -->
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
+    <!-- AsaasSubaccountClient (onboarding financeiro via subconta BaaS) mesmo pacote de
+         resiliencia ja usado em Sales.Infrastructure para o client "AsaasSubaccount". -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />

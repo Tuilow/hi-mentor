@@ -1,0 +1,221 @@
+using Tuilow.SharedKernel.Domain.Common;
+using Tuilow.Finance.Domain.Enums;
+
+namespace Tuilow.Finance.Domain.Entities;
+
+/// <summary>
+/// Onboarding financeiro do criador via subconta Asaas (BaaS) criada pela própria Tuilow —
+/// modelo que SUBSTITUI o fluxo legado de "cole sua API Key" (ver
+/// <see cref="CreatorAsaasAccount"/>, mantido intocado só para compatibilidade histórica: FK de
+/// <c>CoursePurchase.CreatorAsaasAccountId</c> em compras antigas e auditoria admin).
+///
+/// Diferença fundamental para <see cref="CreatorAsaasAccount"/>: aqui é a TUILOW quem cria a
+/// conta na Asaas (POST /v3/accounts, credencial da conta pai — "Asaas:ApiKey") em nome do
+/// criador — o criador nunca vê API Key, Wallet ID ou o termo "subconta". A documentação oficial
+/// da Asaas (verificada em docs.asaas.com) confirma que esse endpoint aceita tanto pessoa física
+/// (CPF + BirthDate) quanto pessoa jurídica (CNPJ + CompanyType), ao contrário do que o
+/// comentário de <see cref="CreatorAsaasAccount"/> presumia.
+///
+/// ApiKeyEncrypted é a API Key DA PRÓPRIA SUBCONTA (não a da Tuilow) — devolvida pela Asaas uma
+/// única vez na criação (nunca mais recuperável, só regenerável por um fluxo manual no painel da
+/// Asaas). Protegida via ISecretProtector, nunca sai de Infrastructure — Application/Api só
+/// enxergam Status/Wallet/Documentos/flags (mesma disciplina de CreatorAsaasAccount).
+/// </summary>
+public sealed class CreatorAsaasSubaccount : AggregateRoot
+{
+    public Guid CreatorId { get; private set; }
+
+    public CreatorOnboardingStatus Status { get; private set; } = CreatorOnboardingStatus.NotStarted;
+
+    // ─── Dados coletados do criador (StartCollectingData) — só os que a Asaas exige em POST /v3/accounts ───
+    public string LegalName { get; private set; } = string.Empty;
+    public string CpfCnpj { get; private set; } = string.Empty;
+    public DateOnly? BirthDate { get; private set; } // obrigatório só para pessoa física
+    public string? CompanyType { get; private set; } // obrigatório só para pessoa jurídica (MEI/LIMITED/INDIVIDUAL/ASSOCIATION)
+    public string Email { get; private set; } = string.Empty;
+    public string MobilePhone { get; private set; } = string.Empty;
+    public string? Phone { get; private set; }
+    public decimal IncomeValue { get; private set; } // faturamento/renda mensal — exigido pela Asaas
+    public string Address { get; private set; } = string.Empty;
+    public string AddressNumber { get; private set; } = string.Empty;
+    public string? AddressComplement { get; private set; }
+    public string Province { get; private set; } = string.Empty; // bairro
+    public string PostalCode { get; private set; } = string.Empty;
+
+    // ─── Resultado da criação da subconta na Asaas ───
+    public string? AsaasAccountId { get; private set; }
+    public string? WalletId { get; private set; }
+    public string? ApiKeyEncrypted { get; private set; }
+
+    /// <summary>Hash (SHA-256) do token de webhook de status de conta registrado nesta subconta — mesmo idioma de CreatorAsaasAccount.WebhookTokenHash.</summary>
+    public string? WebhookTokenHash { get; private set; }
+
+    public string? RejectionReason { get; private set; }
+    public DateTime? ApprovedAt { get; private set; }
+    public DateTime? LastDocumentsSyncedAt { get; private set; }
+
+    private readonly List<CreatorAsaasOnboardingDocument> _documents = [];
+    public IReadOnlyCollection<CreatorAsaasOnboardingDocument> Documents => _documents.AsReadOnly();
+
+    private CreatorAsaasSubaccount() { }
+
+    public static CreatorAsaasSubaccount Start(Guid creatorId) => new()
+    {
+        CreatorId = creatorId,
+        Status = CreatorOnboardingStatus.NotStarted
+    };
+
+    /// <summary>
+    /// Passo 1 da jornada ("Seus dados") — grava os dados pessoais/empresariais informados pelo
+    /// criador. Pode ser chamado de novo em NotStarted/CollectingData/Rejected (permite reenviar
+    /// dados corrigidos após uma rejeição), mas NUNCA depois que a subconta já foi criada
+    /// (AsaasAccountId preenchido) — nesse ponto os dados cadastrais só podem mudar diretamente
+    /// com a Asaas.
+    /// </summary>
+    public void StartCollectingData(
+        string legalName, string cpfCnpj, DateOnly? birthDate, string? companyType,
+        string email, string mobilePhone, string? phone, decimal incomeValue,
+        string address, string addressNumber, string? addressComplement, string province, string postalCode)
+    {
+        if (AsaasAccountId is not null)
+            throw new InvalidOperationException("A subconta já foi criada na Asaas — não é possível alterar os dados cadastrais por aqui.");
+
+        LegalName = legalName.Trim();
+        CpfCnpj = cpfCnpj.Trim();
+        BirthDate = birthDate;
+        CompanyType = companyType;
+        Email = email.Trim();
+        MobilePhone = mobilePhone.Trim();
+        Phone = phone?.Trim();
+        IncomeValue = incomeValue;
+        Address = address.Trim();
+        AddressNumber = addressNumber.Trim();
+        AddressComplement = addressComplement?.Trim();
+        Province = province.Trim();
+        PostalCode = postalCode.Trim();
+        RejectionReason = null;
+        Status = CreatorOnboardingStatus.CollectingData;
+        Touch();
+    }
+
+    /// <summary>
+    /// Persistido IMEDIATAMENTE ANTES de chamar POST /v3/accounts (ver
+    /// StartCreatorFinancialOnboardingCommandHandler) — se a chamada à Asaas travar/der timeout
+    /// depois deste ponto, o estado no banco já mostra "em andamento" em vez de silenciosamente
+    /// nada, o que evita uma segunda tentativa duplicar a subconta (ver
+    /// IAsaasSubaccountClient.CreateSubaccountAsync e nota de recuperação no relatório final).
+    /// </summary>
+    public void MarkAccountCreationPending()
+    {
+        if (Status is not (CreatorOnboardingStatus.CollectingData or CreatorOnboardingStatus.AccountCreationPending))
+            throw new InvalidOperationException($"Não é possível iniciar a criação da subconta a partir do estado {Status}.");
+
+        Status = CreatorOnboardingStatus.AccountCreationPending;
+        Touch();
+    }
+
+    /// <summary>Falha na chamada de criação (rede, validação, timeout) — volta para CollectingData preservando os dados já digitados, para o criador corrigir e reenviar. RejectionReason é reaproveitado aqui como "último erro", não como rejeição de KYC (ver RejectionReason ficar limpo assim que StartCollectingData for chamado de novo).</summary>
+    public void MarkAccountCreationFailed(string reason)
+    {
+        if (AsaasAccountId is not null)
+            return; // nunca reverte se a subconta já existe de fato — evita reabrir CollectingData sobre uma conta já criada
+        Status = CreatorOnboardingStatus.CollectingData;
+        RejectionReason = reason;
+        Touch();
+    }
+
+    /// <summary>Chamado uma única vez, logo após a Asaas responder 2xx a POST /v3/accounts — idempotente (ver AsaasAccountId != null como guarda no handler).</summary>
+    public void MarkAccountCreated(string asaasAccountId, string walletId, string apiKeyEncrypted, string webhookTokenHash)
+    {
+        if (AsaasAccountId is not null)
+            return; // idempotente — já criada, nunca sobrescreve (proteção contra chamada duplicada do handler)
+
+        AsaasAccountId = asaasAccountId;
+        WalletId = walletId;
+        ApiKeyEncrypted = apiKeyEncrypted;
+        WebhookTokenHash = webhookTokenHash;
+        Status = CreatorOnboardingStatus.AccountCreated;
+        Touch();
+    }
+
+    /// <summary>
+    /// Substitui a lista de documentos pela leitura mais recente de GET /v3/myAccount/documents
+    /// (reconciliação por AsaasDocumentId — atualiza os existentes, adiciona os novos; a Asaas
+    /// não remove documentos da lista, só muda status). Avança o estado automaticamente:
+    /// DocumentsPending se algum documento ainda está Pending, UnderReview se todos já foram
+    /// enviados (AwaitingApproval/Approved/Rejected).
+    /// </summary>
+    public void SyncDocuments(IReadOnlyCollection<(string AsaasDocumentId, string Type, string Title, string? Description, OnboardingDocumentStatus Status, string? OnboardingUrl)> incoming)
+    {
+        if (Status is CreatorOnboardingStatus.NotStarted or CreatorOnboardingStatus.CollectingData or CreatorOnboardingStatus.AccountCreationPending)
+            throw new InvalidOperationException($"Não é possível sincronizar documentos a partir do estado {Status} — a subconta ainda não foi criada.");
+
+        foreach (var item in incoming)
+        {
+            var existing = _documents.FirstOrDefault(d => d.AsaasDocumentId == item.AsaasDocumentId);
+            if (existing is not null)
+                existing.SyncFrom(item.Title, item.Description, item.Status, item.OnboardingUrl);
+            else
+                _documents.Add(CreatorAsaasOnboardingDocument.Create(
+                    Id, item.AsaasDocumentId, item.Type, item.Title, item.Description, item.Status, item.OnboardingUrl));
+        }
+
+        LastDocumentsSyncedAt = DateTime.UtcNow;
+
+        if (Status is CreatorOnboardingStatus.Approved or CreatorOnboardingStatus.Rejected or CreatorOnboardingStatus.Blocked)
+        {
+            Touch();
+            return; // estado final/administrativo não regride por causa de uma releitura de documentos
+        }
+
+        Status = _documents.Any(d => d.Status == OnboardingDocumentStatus.Pending)
+            ? CreatorOnboardingStatus.DocumentsPending
+            : CreatorOnboardingStatus.UnderReview;
+        Touch();
+    }
+
+    /// <summary>Aplicado pelo webhook ACCOUNT_STATUS_GENERAL_APPROVAL_APPROVED (ou por um refresh manual do admin).</summary>
+    public void MarkApproved()
+    {
+        if (Status == CreatorOnboardingStatus.Blocked) return; // bloqueio manual do admin tem precedência sobre evento da Asaas
+        Status = CreatorOnboardingStatus.Approved;
+        RejectionReason = null;
+        ApprovedAt = DateTime.UtcNow;
+        Touch();
+    }
+
+    /// <summary>Aplicado por qualquer evento ACCOUNT_STATUS_*_REJECTED. Reason em linguagem simples — nunca o código bruto da Asaas (ver GetMyFinancialOnboardingStatusQueryHandler).</summary>
+    public void MarkRejected(string reason)
+    {
+        if (Status == CreatorOnboardingStatus.Blocked) return;
+        Status = CreatorOnboardingStatus.Rejected;
+        RejectionReason = reason;
+        Touch();
+    }
+
+    public void MarkUnderReview()
+    {
+        if (Status is CreatorOnboardingStatus.Approved or CreatorOnboardingStatus.Blocked) return;
+        Status = CreatorOnboardingStatus.UnderReview;
+        Touch();
+    }
+
+    /// <summary>Ação administrativa (suspeita de fraude, pedido do próprio criador) — tem precedência sobre qualquer evento futuro da Asaas até ser desbloqueado.</summary>
+    public void Block(string reason)
+    {
+        Status = CreatorOnboardingStatus.Blocked;
+        RejectionReason = reason;
+        Touch();
+    }
+
+    /// <summary>Reverte um bloqueio manual — volta para o estado que os dados/documentos atuais indicariam (aprovado se já havia sido aprovado antes do bloqueio, senão em análise).</summary>
+    public void Unblock(bool wasApprovedBeforeBlock)
+    {
+        Status = wasApprovedBeforeBlock ? CreatorOnboardingStatus.Approved : CreatorOnboardingStatus.UnderReview;
+        RejectionReason = null;
+        Touch();
+    }
+
+    /// <summary>Apto a vender de verdade: aprovado pela Asaas E não bloqueado manualmente.</summary>
+    public bool CanSell => Status == CreatorOnboardingStatus.Approved;
+}

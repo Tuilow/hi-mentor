@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Tuilow.Finance.Infrastructure</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.4" />
+    <!-- IAsaasAccountOnboardingService: chama a API da Asaas com a API Key que o creator informa
+         (IHttpClientFactory), le configuracao (Asaas:BaseUrl/CreatorWebhookUrl) e loga. -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
+    <!-- AsaasSubaccountClient (onboarding financeiro via subconta BaaS) -- mesmo pacote de
+         resiliencia ja usado em Sales.Infrastructure para o client "AsaasSubaccount". -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tuilow.Finance.Application\Tuilow.Finance.Application.csproj" />
+    <!-- Acoplamento legitimo (mesmo padrao ja usado em outros modulos, ver comentarios
+         equivalentes em Sales/IdentidadeAcesso): o painel admin de contas Asaas
+         (AdminListCreatorAsaasAccountsQuery) precisa mostrar nome/e-mail do creator, nao so o
+         Guid, ver ICreatorDisplayInfoLookup. -->
+    <ProjectReference Include="..\..\IdentidadeAcesso\Tuilow.IdentidadeAcesso.Domain\Tuilow.IdentidadeAcesso.Domain.csproj" />
+  </ItemGroup>
+</Project>
