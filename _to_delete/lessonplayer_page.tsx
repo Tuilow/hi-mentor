@@ -6,13 +6,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { coursesApi, enrollmentsApi } from '@/lib/api';
 import Link from 'next/link';
 import Hls from 'hls.js';
-import { Lock, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui/design-system';
-
-// Redesign "Hi Mentor" (ago/2026): reskin visual seguindo hi-mentor/src/pages/PlayerPage.tsx —
-// só classNames/ícones foram trocados no JSX abaixo (estrutura do DOM idêntica à anterior);
-// TODA a lógica acima (refs, effects de HLS/YouTube/Vimeo, salvamento/retomada de progresso,
-// paywall) permanece exatamente a mesma, sem nenhuma alteração.
 
 interface PlayUrlResponse {
   lessonId: string;
@@ -505,14 +498,14 @@ export default function LessonPlayerPage() {
   return (
     <div className="max-w-6xl mx-auto">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-ink-3 mb-6">
-        <Link href="/cursos" className="hover:text-ink-2">Programas</Link>
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+        <Link href="/cursos" className="hover:text-gray-600">Cursos</Link>
         <span>›</span>
-        <Link href={`/cursos/${slug}`} className="hover:text-ink-2 truncate max-w-[200px]">
+        <Link href={`/cursos/${slug}`} className="hover:text-gray-600 truncate max-w-[200px]">
           {course?.title ?? slug}
         </Link>
         <span>›</span>
-        <span className="text-ink-2 truncate">{playData?.title ?? 'Aula'}</span>
+        <span className="text-gray-600 truncate">{playData?.title ?? 'Aula'}</span>
       </div>
 
       <div className="flex gap-6 flex-col lg:flex-row">
@@ -521,18 +514,16 @@ export default function LessonPlayerPage() {
         <div className="flex-1 min-w-0">
           {/* Paywall */}
           {isPaywalled && (
-            <div className="card flex flex-col items-center justify-center
+            <div className="card border-gray-200 flex flex-col items-center justify-center
                             py-16 text-center gap-4">
-              <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center">
-                <Lock size={28} className="text-amber-500" />
-              </div>
+              <div className="text-5xl">🔒</div>
               <div>
-                <h2 className="text-xl font-bold text-ink mb-2">
+                <h2 className="text-xl font-bold text-gray-800 mb-2">
                   Conteúdo pago
                 </h2>
-                <p className="text-ink-3 text-sm max-w-sm mx-auto leading-relaxed">
-                  Esta aula faz parte do conteúdo pago deste programa.
-                  Adquira acesso na página do programa para continuar assistindo.
+                <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                  Esta aula faz parte do conteúdo pago deste curso.
+                  Adquira acesso na página do curso para continuar assistindo.
                 </p>
               </div>
               <Link href={`/cursos/${slug}`} className="btn-primary mt-2">
@@ -543,16 +534,16 @@ export default function LessonPlayerPage() {
 
           {/* Loading */}
           {!isPaywalled && isLoading && (
-            <div className="w-full aspect-video bg-surface rounded-2xl animate-pulse flex
+            <div className="w-full aspect-video bg-white rounded-xl animate-pulse flex
                             items-center justify-center">
-              <p className="text-ink-3 text-sm">Carregando vídeo...</p>
+              <p className="text-gray-400 text-sm">Carregando vídeo...</p>
             </div>
           )}
 
           {/* Player */}
           {!isPaywalled && !isLoading && playData && (
             <>
-              <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black">
+              <div className="w-full aspect-video rounded-xl overflow-hidden bg-black">
                 {(() => {
                   if (embed) {
                     // YouTube/Vimeo importados sem download — tocam via iframe de embed, com
@@ -575,7 +566,7 @@ export default function LessonPlayerPage() {
                   if (playData.playbackUrl.includes('dropbox.com') || playData.playbackUrl.includes('onedrive') || playData.playbackUrl.includes('1drv.ms')) {
                     // Sem formato de embed universal — abre na plataforma original
                     return (
-                      <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-white/60">
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-gray-300">
                         <p className="text-sm">Este vídeo está hospedado externamente.</p>
                         <a href={playData.playbackUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
                           Abrir vídeo ↗
@@ -609,7 +600,7 @@ export default function LessonPlayerPage() {
                   avisa em vez de fingir que a posição é salva (ver resolveEmbed no topo do
                   arquivo). YouTube/Vimeo não caem aqui: já têm save/resume real. */}
               {embed?.provider === 'drive' && (
-                <p className="text-xs text-ink-3 mt-2">
+                <p className="text-xs text-gray-400 mt-2">
                   ℹ️ Vídeo hospedado no Google Drive: sua posição não pode ser salva automaticamente por aqui.
                 </p>
               )}
@@ -617,28 +608,26 @@ export default function LessonPlayerPage() {
               {/* Título e badge */}
               <div className="mt-4 flex items-start justify-between gap-3">
                 <div>
-                  <h1 className="text-xl font-bold text-ink" style={{ letterSpacing: '-0.02em' }}>{playData.title}</h1>
-                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                  <h1 className="text-xl font-bold text-gray-800">{playData.title}</h1>
+                  <div className="flex items-center gap-3 mt-1">
                     {playData.durationSeconds && (
-                      <p className="text-sm text-ink-3">
-                        {Math.floor(playData.durationSeconds / 60)}min{' '}
+                      <p className="text-sm text-gray-400">
+                        ⏱ {Math.floor(playData.durationSeconds / 60)}min{' '}
                         {playData.durationSeconds % 60}s
                       </p>
                     )}
                     {myLessonProgress?.isCompleted && (
-                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold">
-                        <CheckCircle2 size={13} /> Aula concluída
-                      </span>
+                      <span className="text-xs text-emerald-500 font-medium">✓ Aula concluída</span>
                     )}
                     {!myLessonProgress?.isCompleted && resumeSeconds > 5 && (
-                      <span className="text-xs text-ink-3">
+                      <span className="text-xs text-gray-400">
                         Retomando de {Math.floor(resumeSeconds / 60)}min {resumeSeconds % 60}s
                       </span>
                     )}
                   </div>
                 </div>
                 {playData.isPreview && (
-                  <Badge variant="active" className="shrink-0">Preview gratuito</Badge>
+                  <span className="badge-green flex-shrink-0">Preview gratuito</span>
                 )}
               </div>
             </>
@@ -646,22 +635,22 @@ export default function LessonPlayerPage() {
 
           {/* Erro genérico */}
           {!isPaywalled && error && !isLoading && (
-            <div className="card border-red-200 bg-red-50/40 text-center py-10">
-              <p className="text-red-600 font-semibold">Erro ao carregar o vídeo.</p>
-              <p className="text-sm text-ink-3 mt-1">Tente novamente em instantes.</p>
+            <div className="card border-red-900/40 bg-red-950/20 text-center py-10">
+              <p className="text-red-400 font-medium">Erro ao carregar o vídeo.</p>
+              <p className="text-sm text-gray-400 mt-1">Tente novamente em instantes.</p>
             </div>
           )}
 
           {/* Navegação entre aulas */}
           {(prevLesson || nextLesson) && (
-            <div className="flex items-center justify-between mt-6 pt-6 border-t border-line">
+            <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
               {prevLesson ? (
                 <Link
                   href={`/cursos/${slug}/${prevLesson.id}`}
-                  className="flex items-center gap-1.5 text-sm font-semibold text-ink-2
-                             hover:text-ink transition-colors group"
+                  className="flex items-center gap-2 text-sm text-gray-500
+                             hover:text-gray-800 transition-colors group"
                 >
-                  <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+                  <span className="group-hover:-translate-x-0.5 transition-transform">←</span>
                   <span className="truncate max-w-[180px]">{prevLesson.title}</span>
                 </Link>
               ) : <div />}
@@ -669,11 +658,11 @@ export default function LessonPlayerPage() {
               {nextLesson && (
                 <Link
                   href={`/cursos/${slug}/${nextLesson.id}`}
-                  className="flex items-center gap-1.5 text-sm font-semibold text-violet-600
-                             hover:text-violet-700 transition-colors group ml-auto"
+                  className="flex items-center gap-2 text-sm text-gray-500
+                             hover:text-gray-800 transition-colors group ml-auto"
                 >
                   <span className="truncate max-w-[180px]">{nextLesson.title}</span>
-                  <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                  <span className="group-hover:translate-x-0.5 transition-transform">→</span>
                 </Link>
               )}
             </div>
@@ -682,17 +671,17 @@ export default function LessonPlayerPage() {
 
         {/* ── Sidebar com lista de aulas ── */}
         <aside className="w-full lg:w-72 flex-shrink-0">
-          <div className="card p-0 overflow-hidden sticky top-6">
-            <div className="px-4 py-3.5 border-b border-line-light">
-              <p className="text-sm font-bold text-ink">Aulas do programa</p>
+          <div className="card border-gray-200 p-0 overflow-hidden sticky top-6">
+            <div className="px-4 py-3 border-b border-gray-200">
+              <p className="text-sm font-semibold text-gray-700">Aulas do curso</p>
             </div>
             <div className="overflow-y-auto max-h-[70vh]">
               {course?.modules
                 .sort((a, b) => a.order - b.order)
                 .map(module => (
-                  <div key={module.id} className="border-b border-line-light last:border-0">
-                    <div className="px-4 py-2.5 bg-surface-2">
-                      <p className="text-xs font-semibold text-ink-3 uppercase tracking-wider">
+                  <div key={module.id}>
+                    <div className="px-4 py-2 bg-gray-100/60 border-b border-gray-200">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                         {module.title}
                       </p>
                     </div>
@@ -708,28 +697,23 @@ export default function LessonPlayerPage() {
                             key={lesson.id}
                             href={`/cursos/${slug}/${lesson.id}`}
                             className={`
-                              flex items-start gap-3 px-4 py-2.5 transition-all
+                              flex items-start gap-3 px-4 py-3 border-b border-gray-200/50
+                              last:border-0 transition-colors
                               ${isCurrent
-                                ? 'bg-violet-50 border-l-2 border-l-violet-500'
-                                : 'hover:bg-subtle border-l-2 border-l-transparent'}
+                                ? 'bg-brand-600/20 border-l-2 border-l-brand-500'
+                                : 'hover:bg-gray-100/40'}
                             `}
                           >
-                            <span className="mt-0.5 shrink-0">
-                              {isCurrent
-                                ? <Play size={14} fill="currentColor" className="text-violet-600" />
-                                : isLocked
-                                  ? <Lock size={13} className="text-ink-4" />
-                                  : isCompleted
-                                    ? <CheckCircle2 size={14} className="text-emerald-500" />
-                                    : <Circle size={14} className="text-ink-4" />}
+                            <span className="text-base mt-0.5 flex-shrink-0">
+                              {isCurrent ? '▶' : isLocked ? '🔒' : isCompleted ? '✅' : '▷'}
                             </span>
                             <div className="min-w-0">
                               <p className={`text-xs font-medium leading-snug truncate
-                                ${isCurrent ? 'text-violet-700 font-semibold' : 'text-ink-2'}`}>
+                                ${isCurrent ? 'text-brand-600' : 'text-gray-700'}`}>
                                 {lesson.title}
                               </p>
                               {lesson.durationSeconds && (
-                                <p className="text-xs text-ink-4 mt-0.5">
+                                <p className="text-xs text-gray-400 mt-0.5">
                                   {Math.floor(lesson.durationSeconds / 60)}min
                                 </p>
                               )}
