@@ -7,6 +7,11 @@ import type { MyEnrollment, ContinueWatching } from '@/types';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
+const quickActions = [
+  { href: '/cursos',  icon: '📚', title: 'Explorar Cursos', desc: 'Encontre o curso ideal para você',   color: 'from-blue-50 to-blue-100/60' },
+  { href: '/assinatura', icon: '💎', title: 'Assinatura',   desc: 'Gerencie seu plano atual',            color: 'from-orange-50 to-rose-50' },
+];
+
 export default function DashboardPage() {
   const [becomingCreator, setBecomingCreator] = useState(false);
   const queryClient = useQueryClient();
@@ -145,6 +150,25 @@ export default function DashboardPage() {
             <p className="text-2xl font-bold gradient-text">{s.value}</p>
             <p className="text-xs text-gray-500 mt-1">{s.sub}</p>
           </div>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Acesso rápido</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {quickActions.map(action => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className={`card border-gray-200 hover:border-blue-200 bg-gradient-to-br ${action.color}
+                        transition-all duration-200 group cursor-pointer`}
+          >
+            <div className="text-2xl mb-3 group-hover:scale-110 transition-transform duration-200">
+              {action.icon}
+            </div>
+            <h3 className="font-semibold text-gray-800 group-hover:text-blue-700">{action.title}</h3>
+            <p className="text-xs text-gray-500 mt-1">{action.desc}</p>
+          </Link>
         ))}
       </div>
     </div>
