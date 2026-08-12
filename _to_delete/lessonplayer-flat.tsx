@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { coursesApi, enrollmentsApi, materialsApi } from '@/lib/api';
+import { coursesApi, enrollmentsApi } from '@/lib/api';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import Hls from 'hls.js';
 import {
   Lock, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight,
-  BookOpen, Download, MessageSquare, Paperclip, Loader2,
+  BookOpen, Download, MessageSquare,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/design-system';
 
@@ -20,14 +20,13 @@ import { Badge } from '@/components/ui/design-system';
 // TODA a lógica de reprodução/progresso abaixo (refs, effects de HLS/YouTube/Vimeo,
 // salvamento/retomada, paywall) permanece exatamente a mesma da 1ª rodada do redesign — só o
 // `return` final e um punhado de estado de UI nova (activeTab/journeyOpen/markingComplete) foram
-// adicionados. "Anotações"/"Discussão" não têm NENHUM modelo de dado no backend (sem entidade
-// Nota/Comentário) — seguem "Em breve" de verdade. "Materiais" JÁ tinha dado real no domínio
-// (Lesson.Attachments, endpoint de download protegido em MaterialsUploadController) desde a 1ª
-// rodada, mas o DTO que esta página consumia (CourseDetailResponse/LessonResponse,
-// GetCourseBySlugQueryHandler) ainda não devolvia a lista de anexos por aula — fechado agora:
-// LessonResponse ganhou `Attachments`, e esta aba lista os arquivos com download autenticado
-// (materialsApi.download, via blob — um <a href> comum não manda o Bearer token que
-// GetMaterial exige).
+// adicionados. "Materiais"/"Anotações"/"Discussão" não têm contrapartida real hoje — Materiais
+// JÁ EXISTE como dado real no domínio (Lesson.Attachments, endpoint de download protegido em
+// MaterialsUploadController), mas o DTO que esta página consome (CourseDetailResponse/
+// LessonResponse, GetCourseBySlugQueryHandler) ainda não devolve a lista de anexos por aula —
+// por isso, e não por falta de feature no backend, a aba fica "Em breve" nesta rodada (gap
+// pequeno e pontual, plausível de fechar numa próxima passada). Anotações/Discussão não têm
+// NENHUM modelo de dado no backend (sem entidade Nota/Comentário) — "Em breve" de verdade.
 // Sem player custom (barra de progresso/volume/velocidade toda refeita do zero): o protótipo tem
 // controles próprios, mas eles não funcionariam de forma uniforme para os 4 casos reais que este
 // player já suporta (arquivo de vídeo via <video>, iframe do YouTube, iframe do Vimeo, iframe do
@@ -176,18 +175,8 @@ interface CourseDetail {
       durationSeconds?: number;
       // Idem — LessonResponse.Description já existe no backend.
       description?: string;
-      // LessonResponse.Attachments — ver nota no topo do arquivo.
-      attachments?: LessonAttachment[];
     }>;
   }>;
-}
-
-interface LessonAttachment {
-  id: string;
-  title: string;
-  fileUrl: string;
-  fileType?: string;
-  fileSizeBytes?: number;
 }
 
 // GET /enrollments/courses/{courseId} — inclui o progresso salvo de CADA aula, usado aqui para
@@ -218,7 +207,6 @@ export default function LessonPlayerPage() {
   const [journeyOpen, setJourneyOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'descricao' | 'materiais' | 'anotacoes' | 'discussao'>('descricao');
   const [markingComplete, setMarkingComplete] = useState(false);
-  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastSavedAtRef = useRef(0);
   const hasResumedRef = useRef(false);
@@ -560,7 +548,6 @@ export default function LessonPlayerPage() {
   });
 
   const currentLessonDescription = allLessons.find(l => l.id === lessonId)?.description;
-  const currentLessonAttachments = allLessons.find(l => l.id === lessonId)?.attachments ?? [];
 
   // "Marcar como concluído" (protótipo PlayerPage.tsx) — não é um endpoint novo: reusa o mesmo
   // POST /enrollments/{id}/progress que o player já chama a cada 10s (saveProgress acima),
@@ -590,28 +577,6 @@ export default function LessonPlayerPage() {
       toast.error('Erro ao marcar aula como concluída.');
     } finally {
       setMarkingComplete(false);
-    }
-  };
-
-  // GET /materials/{storedName} exige login (achado M8) — um <a href> comum não manda o Bearer
-  // token, então baixa como blob pelo mesmo client autenticado e aciona o download via um <a>
-  // temporário com a URL de objeto, sem navegar a página pra longe do player.
-  const handleDownloadMaterial = async (attachment: LessonAttachment) => {
-    setDownloadingAttachmentId(attachment.id);
-    try {
-      const { data } = await materialsApi.download(attachment.fileUrl);
-      const blobUrl = URL.createObjectURL(data as Blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = attachment.title;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      toast.error('Não foi possível baixar este material agora.');
-    } finally {
-      setDownloadingAttachmentId(null);
     }
   };
 
@@ -832,13 +797,12 @@ export default function LessonPlayerPage() {
               )}
             </div>
 
-            {/* Abas — Anotações/Discussão sem contrapartida real hoje (ver nota no topo do
-                arquivo), marcadas com selo "Em breve" em vez de fingir que funcionam. Materiais
-                já lista os anexos reais da aula. */}
+            {/* Abas — Materiais/Anotações/Discussão sem contrapartida real hoje (ver nota no topo
+                do arquivo), marcadas com selo "Em breve" em vez de fingir que funcionam. */}
             <div className="flex gap-1 border-b border-line mb-5 overflow-x-auto">
               {([
                 ['descricao', 'Descrição', false],
-                ['materiais', 'Materiais', false],
+                ['materiais', 'Materiais', true],
                 ['anotacoes', 'Anotações', true],
                 ['discussao', 'Discussão', true],
               ] as const).map(([tab, label, soon]) => (
@@ -880,40 +844,12 @@ export default function LessonPlayerPage() {
             )}
 
             {activeTab === 'materiais' && (
-              <div className="max-w-lg">
-                {currentLessonAttachments.length === 0 ? (
-                  <div className="text-center py-10">
-                    <Paperclip size={28} className="mx-auto mb-3 text-ink-4" />
-                    <p className="font-semibold text-ink-2 mb-1">Nenhum material nesta aula</p>
-                    <p className="text-sm text-ink-3">
-                      Quando o professor anexar arquivos de apoio a esta aula, eles aparecem aqui.
-                    </p>
-                  </div>
-                ) : (
-                  <ul className="space-y-2">
-                    {currentLessonAttachments.map(attachment => (
-                      <li
-                        key={attachment.id}
-                        className="flex items-center gap-3 bg-subtle border border-line rounded-xl px-4 py-3"
-                      >
-                        <Paperclip size={16} className="shrink-0 text-ink-3" />
-                        <span className="flex-1 text-sm font-medium text-ink truncate">{attachment.title}</span>
-                        <button
-                          onClick={() => handleDownloadMaterial(attachment)}
-                          disabled={downloadingAttachmentId === attachment.id}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 disabled:opacity-50 shrink-0"
-                        >
-                          {downloadingAttachmentId === attachment.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Download size={14} />
-                          )}
-                          Baixar
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              <div className="max-w-lg text-center py-10">
+                <Download size={28} className="mx-auto mb-3 text-ink-4" />
+                <p className="font-semibold text-ink-2 mb-1">Em breve</p>
+                <p className="text-sm text-ink-3">
+                  Materiais de apoio desta aula vão aparecer aqui assim que a plataforma passar a exibi-los.
+                </p>
               </div>
             )}
 

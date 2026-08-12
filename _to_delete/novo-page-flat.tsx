@@ -434,10 +434,6 @@ function ProductWizard() {
       await coursesApi.addAttachment(courseId, moduleId, lessonId, {
         title: data.fileName, fileUrl: data.url, fileType: data.fileType, fileSizeBytes: data.fileSizeBytes,
       });
-      // Sem isso, o anexo era salvo no backend mas nunca aparecia na tela — `modules` só é
-      // atualizado a partir de refreshCourse (mesmo padrão de handleAddModule/handleAddLesson/
-      // handleLinkVideo acima), e o toast de sucesso sozinho não bastava pra mostrar o arquivo.
-      await refreshCourse(courseId);
       toast.success('Material anexado.');
     } catch {
       toast.error('Não foi possível enviar o material.');
@@ -1073,27 +1069,13 @@ function MaterialsStep({
             <p className="font-medium text-gray-700 text-sm mb-2">{m.title}</p>
             <ul className="space-y-2">
               {m.lessons.map((l: LessonDetail) => (
-                <li key={l.id} className="bg-gray-50 rounded-lg px-3 py-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="flex-1">{l.title}</span>
-                    <label className="btn-ghost text-xs flex items-center gap-1 cursor-pointer">
-                      <Paperclip className="w-3.5 h-3.5" /> Anexar
-                      <input type="file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,.jpg,.jpeg,.png,.xls,.xlsx,.csv"
-                        onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(m.id, l.id, f); }} />
-                    </label>
-                  </div>
-                  {!!l.attachments?.length && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {l.attachments.map(a => (
-                        <span
-                          key={a.id}
-                          className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded-full px-2.5 py-1 text-gray-600"
-                        >
-                          <Paperclip className="w-3 h-3 text-gray-400" /> {a.title}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                <li key={l.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                  <span className="flex-1">{l.title}</span>
+                  <label className="btn-ghost text-xs flex items-center gap-1 cursor-pointer">
+                    <Paperclip className="w-3.5 h-3.5" /> Anexar
+                    <input type="file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,.jpg,.jpeg,.png,.xls,.xlsx,.csv"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(m.id, l.id, f); }} />
+                  </label>
                 </li>
               ))}
             </ul>
