@@ -149,6 +149,6 @@ public sealed class CoursePurchase : AggregateRoot
         RefundedAt = DateTime.UtcNow;
         Touch();
 
-        AddDomainEvent(new CoursePurchaseRefundedDomainEvent(Id, CreatorId, Amount.Amount, PaymentModel));
+        AddDomainEvent(new CoursePurchaseRefundedDomainEvent(Id, StudentId, CourseId, CreatorId, Amount.Amount, PaymentModel));
     }
 }
