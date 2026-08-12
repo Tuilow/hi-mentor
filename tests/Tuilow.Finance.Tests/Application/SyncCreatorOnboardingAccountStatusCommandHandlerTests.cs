@@ -67,7 +67,7 @@ public class SyncCreatorOnboardingAccountStatusCommandHandlerTests
         // confirmado -- não há motivo para chamar a Asaas de novo em nenhuma das duas frentes.
         var (handler, repository, client, _, protector) = BuildHandler();
         var (creatorId, subaccount) = await SeedUnderReviewSubaccountAsync(repository, protector);
-        subaccount.ApplyAccountStatusSync("APPROVED");
+        subaccount.MarkApproved();
         subaccount.MarkPaymentWebhookRegistered();
 
         await handler.Handle(new SyncCreatorOnboardingAccountStatusCommand(creatorId), CancellationToken.None);
@@ -86,7 +86,14 @@ public class SyncCreatorOnboardingAccountStatusCommandHandlerTests
         // o veredito geral), o handler ainda deve registrar o webhook de pagamento que falta.
         var (handler, repository, client, _, protector) = BuildHandler();
         var (creatorId, subaccount) = await SeedUnderReviewSubaccountAsync(repository, protector);
-        subaccount.ApplyAccountStatusSync("APPROVED");
+        // MarkApproved() aqui, NUNCA ApplyAccountStatusSync("APPROVED") -- esta última também seta
+        // LastAccountStatusSyncedAt = DateTime.UtcNow como efeito colateral (ver CreatorAsaasSubaccount),
+        // o que dispararia o throttle de 20s do próprio handler.Handle() chamado logo abaixo (tempo real
+        // decorrido no teste é ~0ms) e faria o teste "passar" só porque nada rodou, não porque a
+        // reafirmação retroativa funcionou. MarkApproved() é o método usado pelo caminho real de
+        // aprovação (webhook ACCOUNT_STATUS_GENERAL_APPROVAL_APPROVED) e não toca o timestamp de
+        // throttle -- reproduz fielmente "subconta aprovada por webhook antes desta proteção existir".
+        subaccount.MarkApproved();
         var hashBefore = subaccount.WebhookTokenHash;
 
         await handler.Handle(new SyncCreatorOnboardingAccountStatusCommand(creatorId), CancellationToken.None);
@@ -111,7 +118,7 @@ public class SyncCreatorOnboardingAccountStatusCommandHandlerTests
         // autenticando com um token que o hash salvo não reconhece mais.
         var (handler, repository, client, _, protector) = BuildHandler();
         var (creatorId, subaccount) = await SeedUnderReviewSubaccountAsync(repository, protector);
-        subaccount.ApplyAccountStatusSync("APPROVED");
+        subaccount.MarkApproved();
         var hashBefore = subaccount.WebhookTokenHash;
         client.NextWebhookRegistrationShouldSucceed = false;
 
@@ -131,7 +138,7 @@ public class SyncCreatorOnboardingAccountStatusCommandHandlerTests
         // senão o webhook de status para de autenticar.
         var (handler, repository, client, _, protector) = BuildHandler();
         var (creatorId, subaccount) = await SeedUnderReviewSubaccountAsync(repository, protector);
-        subaccount.ApplyAccountStatusSync("APPROVED");
+        subaccount.MarkApproved();
         var hashBefore = subaccount.WebhookTokenHash;
         client.NextPaymentWebhookRegistrationShouldSucceed = false;
 
