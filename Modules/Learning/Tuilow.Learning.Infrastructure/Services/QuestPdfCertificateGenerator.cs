@@ -64,7 +64,13 @@ public sealed class QuestPdfCertificateGenerator : ICertificatePdfGenerator
                         // Wordmark "Hi Mentor" — mesmas cores de components/brand/Logo.tsx.
                         column.Item().AlignCenter().Row(row =>
                         {
-                            row.AutoItem().Width(34).Height(34).Background(Purple).CornerRadius(9)
+                            // Sem CornerRadius aqui — não existe como extensão de IContainer na versão do
+                            // QuestPDF restaurada pelo `dotnet restore` do usuário (erro de build real
+                            // reportado por ele: "'IContainer' does not contain a definition for
+                            // 'CornerRadius'"). Quadrado reto no lugar do quadrado arredondado do logo real
+                            // — diferença puramente cosmética, não vale arriscar outra tentativa às cegas
+                            // de API sem conseguir compilar neste ambiente.
+                            row.AutoItem().Width(34).Height(34).Background(Purple)
                                 .AlignCenter().AlignMiddle()
                                 .Text("Hi").FontSize(15).Bold().FontColor(Yellow);
                             row.AutoItem().PaddingLeft(8).AlignMiddle()
