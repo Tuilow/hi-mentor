@@ -1,7 +1,9 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Tuilow.SharedKernel.Application.Exceptions;
+using Tuilow.SharedKernel.Application.Interfaces;
 using Tuilow.Sales.Application.Interfaces;
 using Tuilow.Sales.Domain.Enums;
 using Microsoft.Extensions.Configuration;
@@ -12,10 +14,33 @@ namespace Tuilow.Sales.Infrastructure.Services;
 public sealed class AsaasPaymentService(
     HttpClient httpClient,
     IConfiguration configuration,
+    IFrontendUrlProvider frontendUrlProvider,
     ILogger<AsaasPaymentService> logger
 ) : IPaymentService
 {
     private readonly string _webhookSecret = configuration["Asaas:WebhookSecret"] ?? "";
+
+    // Achado 12/08/2026: depois de pagar por PIX/cartão (únicos métodos com confirmação
+    // imediata na Asaas), o cliente ficava numa tela genérica da própria Asaas, sem nenhum
+    // caminho de volta pro site nem aviso do que fazer a seguir. `callback.successUrl` faz a
+    // Asaas redirecionar automaticamente pra essa página nossa (ver
+    // docs.asaas.com/docs/redirecionamento-apos-o-pagamento) — que só avisa "verifique seu
+    // e-mail" (o Magic Link, mecanismo real de acesso pós-compra, é disparado pelo webhook de
+    // confirmação, não por este redirect, que pode chegar antes do webhook processar).
+    // IMPORTANTE (passo manual, fora do código): a Asaas só aceita essa URL se o domínio dela
+    // estiver cadastrado em "Configurações da conta → Informações" na própria Asaas. Até isso
+    // ser configurado, CreateChargeAsync/CreateSubscriptionAsync detectam a rejeição e repetem
+    // a chamada sem esse campo — a compra nunca quebra por causa de uma personalização opcional.
+    private readonly string _paymentSuccessUrl = frontendUrlProvider.BuildUrl("/pagamento-confirmado");
+
+    /// <summary>
+    /// Mensagens de erro da Asaas para callback/successUrl inválido mencionam esses termos —
+    /// checagem por substring (não regex) porque não vale depender do texto exato/idioma da
+    /// resposta, só evitar confundir com outros motivos de rejeição da cobrança.
+    /// </summary>
+    private static bool LooksLikeCallbackRejection(string body) =>
+        body.Contains("successUrl", StringComparison.OrdinalIgnoreCase)
+        || body.Contains("callback", StringComparison.OrdinalIgnoreCase);
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -45,6 +70,29 @@ public sealed class AsaasPaymentService(
         // (com o corpo de erro da Asaas) já foi logada acima para investigação interna.
         throw new ExternalServiceException(
             $"Asaas {operation}: {errorMessage ?? $"HTTP {(int)response.StatusCode}"}");
+    }
+
+    /// <summary>
+    /// Mesma lógica de <see cref="ThrowAsaasErrorAsync"/>, mas para quando o corpo da resposta
+    /// já foi lido antes (ex.: pra decidir se vale repetir a chamada sem `callback` — ver
+    /// CreateChargeAsync/CreateSubscriptionAsync). HttpContent só pode ser lido uma vez; ler de
+    /// novo aqui devolveria corpo vazio e escondería a mensagem de erro real do log.
+    /// </summary>
+    private void ThrowAsaasErrorFromBody(HttpStatusCode statusCode, string body, string operation)
+    {
+        logger.LogError("Asaas {Operation} falhou [{Status}]: {Body}", operation, (int)statusCode, body);
+
+        string? errorMessage = null;
+        try
+        {
+            var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0)
+                errorMessage = errors[0].GetProperty("description").GetString();
+        }
+        catch { /* ignora falha no parse */ }
+
+        throw new ExternalServiceException(
+            $"Asaas {operation}: {errorMessage ?? $"HTTP {(int)statusCode}"}");
     }
 
     // ─── Customer ─────────────────────────────────────────────────────────────
@@ -137,24 +185,44 @@ public sealed class AsaasPaymentService(
             _                       => "MONTHLY"
         };
 
-        var payload = new
+        Dictionary<string, object?> BuildSubscriptionPayload(bool includeCallback)
         {
-            customer    = request.CustomerId,
-            billingType = "UNDEFINED",  // Cliente escolhe PIX / Cartão / Boleto na hora do pagamento
-            value       = request.Value,
-            nextDueDate = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"),
-            cycle,
-            description = "Assinatura Tuilow"
-        };
+            var p = new Dictionary<string, object?>
+            {
+                ["customer"]    = request.CustomerId,
+                ["billingType"] = "UNDEFINED",  // Cliente escolhe PIX / Cartão / Boleto na hora do pagamento
+                ["value"]       = request.Value,
+                ["nextDueDate"] = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"),
+                ["cycle"]       = cycle,
+                ["description"] = "Assinatura Tuilow",
+            };
+            if (includeCallback)
+                p["callback"] = new Dictionary<string, object?> { ["successUrl"] = _paymentSuccessUrl, ["autoRedirect"] = true };
+            return p;
+        }
 
-        var json = JsonSerializer.Serialize(payload);
+        var json = JsonSerializer.Serialize(BuildSubscriptionPayload(includeCallback: true));
         logger.LogDebug("Asaas CreateSubscription payload: {Json}", json);
 
         var response = await httpClient.PostAsync("subscriptions",
             new StringContent(json, Encoding.UTF8, "application/json"), ct);
 
         if (!response.IsSuccessStatusCode)
-            await ThrowAsaasErrorAsync(response, "CreateSubscription", ct);
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            if (!LooksLikeCallbackRejection(errorBody))
+                ThrowAsaasErrorFromBody(response.StatusCode, errorBody, "CreateSubscription");
+
+            logger.LogWarning(
+                "Asaas rejeitou callback.successUrl em CreateSubscription (domínio provavelmente " +
+                "não cadastrado na conta) — repetindo sem callback. Corpo original: {Body}", errorBody);
+            var retryJson = JsonSerializer.Serialize(BuildSubscriptionPayload(includeCallback: false));
+            response = await httpClient.PostAsync("subscriptions",
+                new StringContent(retryJson, Encoding.UTF8, "application/json"), ct);
+
+            if (!response.IsSuccessStatusCode)
+                await ThrowAsaasErrorAsync(response, "CreateSubscription", ct);
+        }
 
         var content = await response.Content.ReadAsStringAsync(ct);
         var doc = JsonDocument.Parse(content);
@@ -168,24 +236,44 @@ public sealed class AsaasPaymentService(
 
     public async Task<AsaasChargeResponse> CreateChargeAsync(AsaasChargeRequest request, CancellationToken ct = default)
     {
-        var payload = new
+        Dictionary<string, object?> BuildChargePayload(bool includeCallback)
         {
-            customer          = request.CustomerId,
-            billingType       = "UNDEFINED", // Cliente escolhe PIX / Cartão / Boleto na hora do pagamento
-            value             = request.Value,
-            dueDate           = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"),
-            description       = request.Description,
-            externalReference = request.ExternalReference
-        };
+            var p = new Dictionary<string, object?>
+            {
+                ["customer"]          = request.CustomerId,
+                ["billingType"]       = "UNDEFINED", // Cliente escolhe PIX / Cartão / Boleto na hora do pagamento
+                ["value"]             = request.Value,
+                ["dueDate"]           = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"),
+                ["description"]       = request.Description,
+                ["externalReference"] = request.ExternalReference,
+            };
+            if (includeCallback)
+                p["callback"] = new Dictionary<string, object?> { ["successUrl"] = _paymentSuccessUrl, ["autoRedirect"] = true };
+            return p;
+        }
 
-        var json = JsonSerializer.Serialize(payload);
+        var json = JsonSerializer.Serialize(BuildChargePayload(includeCallback: true));
         logger.LogDebug("Asaas CreateCharge payload: {Json}", json);
 
         var response = await httpClient.PostAsync("payments",
             new StringContent(json, Encoding.UTF8, "application/json"), ct);
 
         if (!response.IsSuccessStatusCode)
-            await ThrowAsaasErrorAsync(response, "CreateCharge", ct);
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            if (!LooksLikeCallbackRejection(errorBody))
+                ThrowAsaasErrorFromBody(response.StatusCode, errorBody, "CreateCharge");
+
+            logger.LogWarning(
+                "Asaas rejeitou callback.successUrl em CreateCharge (domínio provavelmente não " +
+                "cadastrado na conta) — repetindo sem callback. Corpo original: {Body}", errorBody);
+            var retryJson = JsonSerializer.Serialize(BuildChargePayload(includeCallback: false));
+            response = await httpClient.PostAsync("payments",
+                new StringContent(retryJson, Encoding.UTF8, "application/json"), ct);
+
+            if (!response.IsSuccessStatusCode)
+                await ThrowAsaasErrorAsync(response, "CreateCharge", ct);
+        }
 
         var content = await response.Content.ReadAsStringAsync(ct);
         var doc = JsonDocument.Parse(content);

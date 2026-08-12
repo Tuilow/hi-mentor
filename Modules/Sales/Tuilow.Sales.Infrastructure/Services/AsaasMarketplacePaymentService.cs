@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using Tuilow.SharedKernel.Application.Exceptions;
@@ -32,9 +33,24 @@ public sealed class AsaasMarketplacePaymentService(
     ISecretProtector secretProtector,
     IConfiguration configuration,
     IUnitOfWork uow,
+    IFrontendUrlProvider frontendUrlProvider,
     ILogger<AsaasMarketplacePaymentService> logger
 ) : IMarketplacePaymentService
 {
+    // Mesma ideia de AsaasPaymentService.CreateChargeAsync (ver comentário lá), mas aqui a
+    // cobrança é criada na SUBCONTA do creator (API Key dele), não na conta da Tuilow -- então
+    // é a "Configurações da conta → Informações" DA SUBCONTA do creator que precisaria ter esse
+    // domínio cadastrado, algo que a Tuilow não controla (cada creator cadastra a própria conta).
+    // Por isso o fallback "repete sem callback" abaixo não é só uma rede de segurança teórica
+    // aqui -- é o caminho esperado até esse cadastro existir (ou pra sempre, se a Asaas não
+    // permitir usar um domínio de terceiro na subconta). Nunca compromete a venda por causa
+    // disso: na pior hipótese, essa cobrança específica simplesmente não redireciona sozinha.
+    private string PaymentSuccessUrl => frontendUrlProvider.BuildUrl("/pagamento-confirmado");
+
+    private static bool LooksLikeCallbackRejection(string body) =>
+        body.Contains("successUrl", StringComparison.OrdinalIgnoreCase)
+        || body.Contains("callback", StringComparison.OrdinalIgnoreCase);
+
     private string BaseUrl
     {
         get
@@ -120,26 +136,46 @@ public sealed class AsaasMarketplacePaymentService(
         var (_, apiKey) = await ResolveCredentialsAsync(creatorId, ct);
         var httpClient = CreateClient(apiKey);
 
-        var payload = new
+        Dictionary<string, object?> BuildChargePayload(bool includeCallback)
         {
-            customer = request.AsaasCustomerId,
-            billingType = "UNDEFINED", // Aluno escolhe PIX / Cartão / Boleto na hora do pagamento — mesmo padrão do modelo Legacy.
-            value = request.Value,
-            dueDate = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"),
-            description = request.Description,
-            externalReference = request.ExternalReference,
-            split = new object[]
+            var p = new Dictionary<string, object?>
             {
-                new { walletId = PlatformWalletId, percentualValue = commissionPercentage }
-            }
-        };
+                ["customer"] = request.AsaasCustomerId,
+                ["billingType"] = "UNDEFINED", // Aluno escolhe PIX / Cartão / Boleto na hora do pagamento — mesmo padrão do modelo Legacy.
+                ["value"] = request.Value,
+                ["dueDate"] = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"),
+                ["description"] = request.Description,
+                ["externalReference"] = request.ExternalReference,
+                ["split"] = new object[]
+                {
+                    new { walletId = PlatformWalletId, percentualValue = commissionPercentage }
+                },
+            };
+            if (includeCallback)
+                p["callback"] = new Dictionary<string, object?> { ["successUrl"] = PaymentSuccessUrl, ["autoRedirect"] = true };
+            return p;
+        }
 
-        var json = JsonSerializer.Serialize(payload);
+        var json = JsonSerializer.Serialize(BuildChargePayload(includeCallback: true));
         logger.LogDebug("Asaas CreateMarketplaceCharge payload (creator {CreatorId}): {Json}", creatorId, json);
 
         var response = await httpClient.PostAsync("payments", new StringContent(json, Encoding.UTF8, "application/json"), ct);
         if (!response.IsSuccessStatusCode)
-            await ThrowAsaasErrorAsync(response, "CreateMarketplaceCharge", ct);
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            if (!LooksLikeCallbackRejection(errorBody))
+                ThrowAsaasErrorFromBody(response.StatusCode, errorBody, "CreateMarketplaceCharge");
+
+            logger.LogWarning(
+                "Asaas rejeitou callback.successUrl em CreateMarketplaceCharge (creator {CreatorId}) -- " +
+                "provável domínio não cadastrado na subconta do creator -- repetindo sem callback. " +
+                "Corpo original: {Body}", creatorId, errorBody);
+            var retryJson = JsonSerializer.Serialize(BuildChargePayload(includeCallback: false));
+            response = await httpClient.PostAsync("payments", new StringContent(retryJson, Encoding.UTF8, "application/json"), ct);
+
+            if (!response.IsSuccessStatusCode)
+                await ThrowAsaasErrorAsync(response, "CreateMarketplaceCharge", ct);
+        }
 
         var content = await response.Content.ReadAsStringAsync(ct);
         var doc = JsonDocument.Parse(content);
@@ -202,5 +238,26 @@ public sealed class AsaasMarketplacePaymentService(
         catch { /* ignora falha no parse */ }
 
         throw new ExternalServiceException($"Asaas {operation}: {errorMessage ?? $"HTTP {(int)response.StatusCode}"}");
+    }
+
+    /// <summary>
+    /// Mesma lógica de <see cref="ThrowAsaasErrorAsync"/>, mas para quando o corpo já foi lido
+    /// antes (decidir se vale repetir sem `callback` -- ver CreateChargeAsync). HttpContent só
+    /// pode ser lido uma vez; ler de novo aqui devolveria corpo vazio e esconderia o erro real.
+    /// </summary>
+    private void ThrowAsaasErrorFromBody(HttpStatusCode statusCode, string body, string operation)
+    {
+        logger.LogError("Asaas {Operation} falhou [{Status}]: {Body}", operation, (int)statusCode, body);
+
+        string? errorMessage = null;
+        try
+        {
+            var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0)
+                errorMessage = errors[0].GetProperty("description").GetString();
+        }
+        catch { /* ignora falha no parse */ }
+
+        throw new ExternalServiceException($"Asaas {operation}: {errorMessage ?? $"HTTP {(int)statusCode}"}");
     }
 }
