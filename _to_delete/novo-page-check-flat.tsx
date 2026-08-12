@@ -330,7 +330,7 @@ function ProductWizard() {
     if (!courseId) return;
     setImporting(true);
     try {
-      const { data } = await videosApi.getUploadUrl(courseId, file.name);
+      const { data } = await videosApi.getUploadUrl(courseId);
       const isMockUpload = data.uploadUrl.startsWith(API_URL);
 
       if (isMockUpload) {
@@ -405,27 +405,13 @@ function ProductWizard() {
     }
   };
 
-  const handleAddLesson = async (moduleId: string, title: string, description?: string) => {
+  const handleAddLesson = async (moduleId: string, title: string) => {
     if (!courseId || !title.trim()) return;
     try {
-      await coursesApi.addLesson(courseId, moduleId, { title, description: description || undefined });
+      await coursesApi.addLesson(courseId, moduleId, { title });
       await refreshCourse(courseId);
     } catch {
       toast.error('Não foi possível adicionar a aula.');
-    }
-  };
-
-  // Editar uma aula já criada — usado principalmente para preencher a descrição depois que a
-  // aula já existe (achado 12/08/2026: a descrição só podia ser escrita no momento da criação,
-  // sem jeito de editar uma aula que já tinha vídeo vinculado, como as do exemplo do usuário).
-  const handleUpdateLesson = async (moduleId: string, lessonId: string, title: string, description: string) => {
-    if (!courseId || !title.trim()) return;
-    try {
-      await coursesApi.updateLesson(courseId, moduleId, lessonId, { title, description: description || undefined });
-      await refreshCourse(courseId);
-      toast.success('Aula atualizada.');
-    } catch {
-      toast.error('Não foi possível salvar a descrição da aula.');
     }
   };
 
@@ -724,7 +710,6 @@ function ProductWizard() {
             videos={videos}
             onAddModule={handleAddModule}
             onAddLesson={handleAddLesson}
-            onUpdateLesson={handleUpdateLesson}
             onLinkVideo={handleLinkVideo}
             onBack={() => setStep(2)}
             onNext={() => setStep(4)}
@@ -946,27 +931,19 @@ function ProductWizard() {
 
 // ─── Sub-componente: Organização (passo 3) ───────────────────────────────
 function OrganizationStep({
-  modules, videos, onAddModule, onAddLesson, onUpdateLesson, onLinkVideo, onBack, onNext,
+  modules, videos, onAddModule, onAddLesson, onLinkVideo, onBack, onNext,
 }: {
   courseId: string;
   modules: ModuleDetail[];
   videos: LocalVideo[];
   onAddModule: (title: string) => void;
-  onAddLesson: (moduleId: string, title: string, description?: string) => void;
-  onUpdateLesson: (moduleId: string, lessonId: string, title: string, description: string) => void;
+  onAddLesson: (moduleId: string, title: string) => void;
   onLinkVideo: (moduleId: string, lessonId: string, videoId: string) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
-  const [lessonDescriptionDrafts, setLessonDescriptionDrafts] = useState<Record<string, string>>({});
-  // Achado 12/08/2026: não havia NENHUM jeito de escrever a descrição de uma aula depois que ela
-  // já tinha sido criada (ex.: as 3 aulas do exemplo do usuário, já com vídeo vinculado) — o
-  // campo só existia no momento da criação (AddLesson já aceitava description, só o formulário
-  // do assistente nunca perguntava). editingLessonId controla qual aula tem o editor de
-  // descrição aberto no momento (um por vez, evita uma tela cheia de textareas abertas).
-  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
 
   // Sem isso, dava pra avançar pro passo de Materiais (e dali até Publicação) com um produto
   // sem nenhum módulo/aula — só ia falhar (silenciosamente pro usuário) lá na frente, no
@@ -1012,79 +989,33 @@ function OrganizationStep({
             )}
             <ul className="space-y-2 mb-3">
               {m.lessons.map((l: LessonDetail) => (
-                <li key={l.id} className="bg-gray-50 rounded-lg px-3 py-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="flex-1">{l.title}</span>
-                    {l.hasVideo ? (
-                      <span className="badge-green badge">Vídeo ✓</span>
-                    ) : videos.length === 0 ? (
-                      <span className="text-xs text-gray-400">Sem vídeos disponíveis</span>
-                    ) : (
-                      <select className="text-xs border border-gray-200 rounded-lg px-2 py-1"
-                        onChange={e => e.target.value && onLinkVideo(m.id, l.id, e.target.value)}
-                        defaultValue="">
-                        <option value="" disabled>Vincular vídeo</option>
-                        {videos.map(v => <option key={v.videoId} value={v.videoId}>{v.title}</option>)}
-                      </select>
-                    )}
-                    <button
-                      type="button"
-                      className="text-xs text-brand-600 hover:text-brand-700 font-medium shrink-0"
-                      onClick={() => {
-                        if (editingLessonId === l.id) {
-                          setEditingLessonId(null);
-                        } else {
-                          setEditingLessonId(l.id);
-                          setLessonDescriptionDrafts(d => ({ ...d, [l.id]: l.description ?? '' }));
-                        }
-                      }}
-                    >
-                      {l.description ? 'Editar descrição' : '+ Descrição'}
-                    </button>
-                  </div>
-                  {editingLessonId === l.id && (
-                    <div className="mt-2 space-y-2">
-                      <textarea
-                        className="input-field text-sm w-full"
-                        rows={3}
-                        placeholder="Descrição da aula — aparece na aba &quot;Descrição&quot; para quem estiver assistindo."
-                        value={lessonDescriptionDrafts[l.id] ?? ''}
-                        onChange={e => setLessonDescriptionDrafts(d => ({ ...d, [l.id]: e.target.value }))}
-                      />
-                      <div className="flex gap-2 justify-end">
-                        <button type="button" className="btn-ghost text-xs"
-                          onClick={() => setEditingLessonId(null)}>
-                          Cancelar
-                        </button>
-                        <button type="button" className="btn-secondary text-xs"
-                          onClick={() => {
-                            onUpdateLesson(m.id, l.id, l.title, lessonDescriptionDrafts[l.id] ?? '');
-                            setEditingLessonId(null);
-                          }}>
-                          Salvar descrição
-                        </button>
-                      </div>
-                    </div>
+                <li key={l.id} className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="flex-1">{l.title}</span>
+                  {l.hasVideo ? (
+                    <span className="badge-green badge">Vídeo ✓</span>
+                  ) : videos.length === 0 ? (
+                    <span className="text-xs text-gray-400">Sem vídeos disponíveis</span>
+                  ) : (
+                    <select className="text-xs border border-gray-200 rounded-lg px-2 py-1"
+                      onChange={e => e.target.value && onLinkVideo(m.id, l.id, e.target.value)}
+                      defaultValue="">
+                      <option value="" disabled>Vincular vídeo</option>
+                      {videos.map(v => <option key={v.videoId} value={v.videoId}>{v.title}</option>)}
+                    </select>
                   )}
                 </li>
               ))}
             </ul>
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <input className="input-field flex-1 text-sm" placeholder="Título da aula"
-                  value={lessonDrafts[m.id] ?? ''}
-                  onChange={e => setLessonDrafts(d => ({ ...d, [m.id]: e.target.value }))} />
-                <button className="btn-secondary text-sm" onClick={() => {
-                  onAddLesson(m.id, lessonDrafts[m.id] ?? '', lessonDescriptionDrafts[`new-${m.id}`] ?? '');
-                  setLessonDrafts(d => ({ ...d, [m.id]: '' }));
-                  setLessonDescriptionDrafts(d => ({ ...d, [`new-${m.id}`]: '' }));
-                }}>
-                  <Plus className="w-4 h-4" /> Adicionar aula
-                </button>
-              </div>
-              <input className="input-field flex-1 text-xs w-full" placeholder="Descrição da aula (opcional)"
-                value={lessonDescriptionDrafts[`new-${m.id}`] ?? ''}
-                onChange={e => setLessonDescriptionDrafts(d => ({ ...d, [`new-${m.id}`]: e.target.value }))} />
+            <div className="flex gap-2">
+              <input className="input-field flex-1 text-sm" placeholder="Título da aula"
+                value={lessonDrafts[m.id] ?? ''}
+                onChange={e => setLessonDrafts(d => ({ ...d, [m.id]: e.target.value }))} />
+              <button className="btn-secondary text-sm" onClick={() => {
+                onAddLesson(m.id, lessonDrafts[m.id] ?? '');
+                setLessonDrafts(d => ({ ...d, [m.id]: '' }));
+              }}>
+                <Plus className="w-4 h-4" /> Adicionar aula
+              </button>
             </div>
           </div>
         ))}
