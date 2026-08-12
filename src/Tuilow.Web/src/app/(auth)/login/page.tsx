@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { Rocket, Users, Sparkles } from 'lucide-react';
-import { authApi, setAccessToken } from '@/lib/api';
+import { authApi, enrollmentsApi, setAccessToken } from '@/lib/api';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import Logo from '@/components/brand/Logo';
 
@@ -49,9 +49,14 @@ function LoginForm() {
   });
 
   // Criador loga e cai direto em "Meus Produtos" (era /dashboard genérico pra todo mundo, mas
-  // pra quem já tem produto cadastrado o painel de aluno não é a tela útil no dia a dia). Aluno
-  // sem papel de Criador continua caindo em /dashboard, sem mudança nenhuma. returnUrl (voltar
-  // pra uma página de vendas específica) sempre tem prioridade sobre os dois casos.
+  // pra quem já tem produto cadastrado o painel de aluno não é a tela útil no dia a dia).
+  // Aluno sem papel de Criador E sem NENHUM programa (matrícula) vira mentor automaticamente
+  // aqui, no login -- mesma auto-promoção self-service do botão "Tornar-se mentor" em
+  // (dashboard)/dashboard/page.tsx (handleBecomeCreator), só que aplicada de cara em vez de
+  // esperar a pessoa cair numa tela de aluno vazia e clicar em algo. Quem já tem pelo menos um
+  // programa continua caindo em /dashboard normalmente, sem mudança nenhuma -- a regra só
+  // existe pra quem não tem absolutamente nada ainda. returnUrl (voltar pra uma página de
+  // vendas específica) sempre tem prioridade sobre os dois casos.
   const goHome = async () => {
     if (returnUrl) {
       router.push(returnUrl);
@@ -59,7 +64,28 @@ function LoginForm() {
     }
     try {
       const { data: profile } = await authApi.me();
-      router.push(profile?.roles?.includes('Creator') ? '/admin/produtos' : '/dashboard');
+      if (profile?.roles?.includes('Creator')) {
+        router.push('/admin/produtos');
+        return;
+      }
+
+      const { data: enrollments } = await enrollmentsApi.getMyEnrollments();
+      if (!enrollments || enrollments.length === 0) {
+        try {
+          // Mesmo padrão de handleBecomeCreator: o backend já devolve um access token novo (com
+          // o claim de role "Creator") e regrava o cookie HttpOnly de refresh token -- não chamar
+          // /auth/refresh-token depois disso.
+          const { data: becomeCreatorData } = await authApi.becomeCreator();
+          setAccessToken(becomeCreatorData.accessToken);
+          router.push('/admin/produtos');
+          return;
+        } catch {
+          // become-creator falhou (rede, etc.) -- não trava o login por causa disso, só cai no
+          // fluxo normal de aluno abaixo.
+        }
+      }
+
+      router.push('/dashboard');
     } catch {
       router.push('/dashboard');
     }
