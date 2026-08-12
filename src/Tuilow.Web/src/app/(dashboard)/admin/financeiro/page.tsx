@@ -3,10 +3,30 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Check, Clock, ExternalLink, ShieldCheck, Upload, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { financialOnboardingApi } from '@/lib/api';
-import type { CreatorFinancialOnboardingStatus, OnboardingStep, OnboardingDocument, StartFinancialOnboardingData } from '@/lib/api';
-import { Card, Button, Badge } from '@/components/ui/design-system';
+import {
+  Check, Clock, ExternalLink, ShieldCheck, Upload, AlertTriangle,
+  DollarSign, Percent, TrendingUp, ShoppingBag, RotateCcw, Wallet, CreditCard,
+} from 'lucide-react';
+import { financialOnboardingApi, financeApi } from '@/lib/api';
+import type {
+  CreatorFinancialOnboardingStatus, OnboardingStep, OnboardingDocument, StartFinancialOnboardingData,
+  CreatorFinancialDashboard, CreatorSaleItem, PlatformFeeInfo,
+} from '@/lib/api';
+import { Card, Button, Badge, StatCard, SectionHeader, EmptyState, Avatar } from '@/components/ui/design-system';
+
+const formatBRL = (value: number) =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+// Datas "DateOnly" do backend chegam como "yyyy-MM-dd" (sem hora/fuso) -- formata direto do
+// texto em vez de passar por `new Date(...)`, que aplicaria o fuso local e podia mostrar o dia
+// anterior (ex.: seria interpretado como meia-noite UTC, que em UTC-3 já é o dia anterior à noite).
+const formatDateOnly = (iso: string) => {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+const formatDateTime = (iso: string) =>
+  new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 const COMPANY_TYPES: { value: string; label: string }[] = [
   { value: 'MEI', label: 'MEI (Microempreendedor Individual)' },
@@ -94,6 +114,23 @@ export default function FinanceiroCriadorPage() {
     return <p className="text-ink-3 text-sm">Carregando...</p>;
   }
 
+  // Uma vez com a conta pronta (canSell), a tela vira o dashboard financeiro de verdade --
+  // largura maior que o stepper de onboarding (max-w-2xl) para caber os cards de KPI e a
+  // tabela de vendas confortavelmente.
+  if (status?.canSell) {
+    return (
+      <div className="max-w-6xl">
+        <div className="mb-1">
+          <h1 className="text-3xl font-bold text-ink mb-1" style={{ letterSpacing: '-0.03em' }}>Financeiro</h1>
+        </div>
+        <p className="text-sm text-ink-3 mb-8">
+          Tudo o que você vendeu, recebeu e teve estornado — de forma transparente, direto da Asaas.
+        </p>
+        <FinancialDashboard />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl">
       <div className="mb-1">
@@ -117,9 +154,7 @@ export default function FinanceiroCriadorPage() {
         {/* O status bruto do backend (não o array de steps, que só alimenta os chips acima)
             decide o que renderizar -- ver CreatorOnboardingStatus no backend para a lista
             completa de valores possíveis. */}
-        {status?.canSell ? (
-          <ReadyToSellCard />
-        ) : status?.status === 'NotStarted' || status?.status === 'CollectingData' ? (
+        {status?.status === 'NotStarted' || status?.status === 'CollectingData' ? (
           <DataStep previousData={status?.previousData ?? null} onSubmitted={invalidateStatus} />
         ) : status?.status === 'AccountCreationPending' ? (
           <ProcessingCard />
@@ -181,12 +216,196 @@ function StepIndicator({ steps }: { steps: OnboardingStep[] }) {
   );
 }
 
-function ReadyToSellCard() {
+/**
+ * Dashboard financeiro real do criador (feature 12/08/2026, pedido do usuário: "quando ele
+ * clique em financeiro, tenha o controle dele de vendas, estornos, porcentagem de ganho... quem
+ * já comprou e pagou aparecer para ele"). Consome os endpoints que já existiam no backend
+ * (GetCreatorFinancialDashboardQuery/GetCreatorSalesHistoryQuery) mas nunca tinham sido ligados
+ * ao frontend -- antes disso, esta tela só mostrava um card estático "conta pronta" pra qualquer
+ * criador já aprovado, sem nenhum número real.
+ *
+ * Duas seções de totais porque o criador pode ter vendas nos dois modelos de cobrança ao mesmo
+ * tempo (raro, mas possível numa transição): "MarketplaceSplit" (o modelo atual -- cobrança na
+ * própria conta Asaas do criador, dinheiro nunca passa pela Hi Mentor) e "Legacy" (carteira
+ * interna com ciclo de saque quinzenal, modelo antigo). Cada seção só aparece se o criador tiver
+ * pelo menos uma venda naquele modelo -- não expõe uma seção de saldo sempre zerada.
+ */
+function FinancialDashboard() {
+  const { data: dashboard, isLoading: loadingDashboard } = useQuery<CreatorFinancialDashboard>({
+    queryKey: ['creator-financial-dashboard'],
+    queryFn: () => financeApi.getDashboard().then(r => r.data),
+  });
+  const { data: sales, isLoading: loadingSales } = useQuery<CreatorSaleItem[]>({
+    queryKey: ['creator-sales-history'],
+    queryFn: () => financeApi.getSales().then(r => r.data),
+  });
+  const { data: fee } = useQuery<PlatformFeeInfo>({
+    queryKey: ['platform-fee'],
+    queryFn: () => financeApi.getCurrentFee().then(r => r.data),
+  });
+
+  if (loadingDashboard || !dashboard) {
+    return (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map(i => (
+          <Card key={i} className="h-24 animate-pulse">{null}</Card>
+        ))}
+      </div>
+    );
+  }
+
+  const hasMarketplace = dashboard.marketplaceSalesCount > 0 || dashboard.marketplaceRefundedCount > 0;
+  const hasLegacy = dashboard.totalSalesCount > 0 || dashboard.availableBalance > 0 || dashboard.pendingBalance > 0
+    || dashboard.totalWithdrawn > 0 || dashboard.totalRefundedCount > 0;
+
   return (
-    <Card className="bg-emerald-50/40 border-emerald-200 text-center py-12">
-      <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-3" />
-      <p className="font-bold text-ink mb-1">Sua conta financeira está pronta!</p>
-      <p className="text-ink-3 text-sm">Você já pode publicar e vender seus programas.</p>
+    <div className="space-y-8">
+      {fee && (
+        <Card className="bg-violet-50/40 border-violet-200 flex items-center gap-3" padding="sm">
+          <Percent className="w-5 h-5 text-violet-600 shrink-0" />
+          <p className="text-sm text-violet-800">
+            A Hi Mentor retém <strong>{fee.percentage}%</strong> de comissão sobre cada venda — o
+            restante é seu, de forma transparente e automática a cada cobrança.
+          </p>
+        </Card>
+      )}
+
+      {hasMarketplace && (
+        <section>
+          <SectionHeader title="Vendas na sua conta Asaas" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label="Total vendido (bruto)" value={formatBRL(dashboard.marketplaceGrossSales)}
+              icon={<DollarSign className="w-5 h-5 text-violet-600" />} />
+            <StatCard label="Comissão paga à Hi Mentor" value={formatBRL(dashboard.marketplaceCommissionPaid)}
+              icon={<Percent className="w-5 h-5 text-amber-600" />} iconBg="bg-amber-50" />
+            <StatCard label="Você recebeu (líquido)" value={formatBRL(dashboard.marketplaceNetEarned)}
+              icon={<TrendingUp className="w-5 h-5 text-emerald-600" />} iconBg="bg-emerald-50" />
+            <StatCard label="Vendas confirmadas" value={String(dashboard.marketplaceSalesCount)}
+              icon={<ShoppingBag className="w-5 h-5 text-violet-600" />} />
+          </div>
+          {dashboard.marketplaceRefundedCount > 0 && (
+            <div className="mt-4 max-w-sm">
+              <StatCard
+                label={`Estornado (${dashboard.marketplaceRefundedCount} venda${dashboard.marketplaceRefundedCount > 1 ? 's' : ''})`}
+                value={formatBRL(dashboard.marketplaceRefundedAmount)}
+                icon={<RotateCcw className="w-5 h-5 text-red-600" />} iconBg="bg-red-50"
+              />
+            </div>
+          )}
+          <p className="text-xs text-ink-3 mt-3">
+            Esse dinheiro é liquidado direto na sua própria conta Asaas — a Hi Mentor nunca fica
+            com ele em nenhum momento; os valores acima são só informativos, para você acompanhar.
+          </p>
+        </section>
+      )}
+
+      {hasLegacy && (
+        <section>
+          <SectionHeader title="Carteira Hi Mentor" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label="Saldo disponível" value={formatBRL(dashboard.availableBalance)}
+              icon={<Wallet className="w-5 h-5 text-emerald-600" />} iconBg="bg-emerald-50" />
+            <StatCard label="Saldo pendente" value={formatBRL(dashboard.pendingBalance)}
+              icon={<Clock className="w-5 h-5 text-amber-600" />} iconBg="bg-amber-50" />
+            <StatCard label="Já sacado" value={formatBRL(dashboard.totalWithdrawn)}
+              icon={<CreditCard className="w-5 h-5 text-violet-600" />} />
+            {dashboard.totalRefundedCount > 0 && (
+              <StatCard
+                label={`Estornado (${dashboard.totalRefundedCount})`}
+                value={formatBRL(dashboard.totalRefundedAmount)}
+                icon={<RotateCcw className="w-5 h-5 text-red-600" />} iconBg="bg-red-50"
+              />
+            )}
+          </div>
+          <p className="text-xs text-ink-3 mt-3">
+            Próxima liberação de saldo: <strong>{formatDateOnly(dashboard.nextReleaseDate)}</strong>{' '}
+            (ciclo atual {formatDateOnly(dashboard.currentCycleStart)} a {formatDateOnly(dashboard.currentCycleEnd)}).
+          </p>
+        </section>
+      )}
+
+      <section>
+        <SectionHeader title="Suas vendas" />
+        <SalesTable sales={sales} isLoading={loadingSales} />
+      </section>
+    </div>
+  );
+}
+
+const saleStatusBadge: Record<CreatorSaleItem['status'], { label: string; variant: 'active' | 'warning' | 'risk' | 'neutral' }> = {
+  Confirmed: { label: 'Pago', variant: 'active' },
+  Pending: { label: 'Aguardando pagamento', variant: 'warning' },
+  Failed: { label: 'Falhou', variant: 'neutral' },
+  Refunded: { label: 'Estornado', variant: 'risk' },
+};
+
+/** Extrato de vendas do criador — todo comprador que já pagou (ou tentou pagar) aparece aqui, com nome, curso, valor e status, sem esconder nada. */
+function SalesTable({ sales, isLoading }: { sales: CreatorSaleItem[] | undefined; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map(i => <Card key={i} className="h-16 animate-pulse" padding="sm">{null}</Card>)}
+      </div>
+    );
+  }
+
+  if (!sales?.length) {
+    return (
+      <EmptyState
+        icon={<ShoppingBag size={28} />}
+        title="Nenhuma venda ainda"
+        description="Assim que alguém comprar um dos seus programas, a venda aparece aqui — com comprador, valor e status."
+      />
+    );
+  }
+
+  return (
+    <Card padding="none" className="overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-line bg-subtle/50 text-left text-xs text-ink-3 font-semibold uppercase tracking-wide">
+              <th className="px-4 py-3">Comprador</th>
+              <th className="px-4 py-3">Programa</th>
+              <th className="px-4 py-3">Valor</th>
+              <th className="px-4 py-3">Comissão</th>
+              <th className="px-4 py-3">Você recebeu</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sales.map(sale => {
+              const badge = saleStatusBadge[sale.status];
+              return (
+                <tr key={sale.coursePurchaseId} className="border-b border-line-light last:border-0">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Avatar name={sale.studentName} size="xs" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-ink truncate">{sale.studentName}</p>
+                        <p className="text-xs text-ink-3 truncate">{sale.studentEmail}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-ink-2 max-w-[200px] truncate">{sale.courseTitle}</td>
+                  <td className="px-4 py-3 text-ink font-medium whitespace-nowrap">{formatBRL(sale.grossAmount)}</td>
+                  <td className="px-4 py-3 text-ink-3 whitespace-nowrap">
+                    {sale.commissionPercentage != null ? `${sale.commissionPercentage}%` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-ink font-medium whitespace-nowrap">
+                    {sale.creatorNetAmount != null ? formatBRL(sale.creatorNetAmount) : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={badge.variant}>{badge.label}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-ink-3 whitespace-nowrap">{formatDateTime(sale.createdAt)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }

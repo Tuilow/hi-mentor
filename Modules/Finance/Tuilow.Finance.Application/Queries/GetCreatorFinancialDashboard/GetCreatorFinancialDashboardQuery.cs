@@ -13,6 +13,11 @@ public sealed record CreatorFinancialDashboardResponse(
     decimal TotalNetEarned,
     decimal TotalWithdrawn,
     int TotalSalesCount,
+    // Feature 12/08/2026 ("controle de estornos" pedido pelo criador): totais agregados de
+    // reembolso, para o dashboard mostrar de cara "quanto foi estornado" sem precisar contar
+    // linha a linha na lista de vendas (ver GetCreatorSalesHistoryQuery para o detalhe por venda).
+    decimal TotalRefundedAmount,
+    int TotalRefundedCount,
     DateOnly CurrentCycleStart,
     DateOnly CurrentCycleEnd,
     DateOnly NextReleaseDate,
@@ -23,5 +28,7 @@ public sealed record CreatorFinancialDashboardResponse(
     decimal MarketplaceGrossSales,
     decimal MarketplaceCommissionPaid,
     decimal MarketplaceNetEarned,
-    int MarketplaceSalesCount
+    int MarketplaceSalesCount,
+    decimal MarketplaceRefundedAmount,
+    int MarketplaceRefundedCount
 );

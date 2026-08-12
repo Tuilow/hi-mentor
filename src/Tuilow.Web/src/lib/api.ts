@@ -595,6 +595,65 @@ export const financialOnboardingApi = {
   },
 };
 
+// Painel financeiro do próprio criador (dashboard + extrato de vendas) -- feature 12/08/2026:
+// "quando ele clique em financeiro, tenha o controle dele de vendas, estornos, porcentagem de
+// ganho... quem já comprou e pagou aparecer para ele". Backend já existia (GetCreatorFinancialDashboardQuery
+// /GetCreatorSalesHistoryQuery) mas nunca tinha sido consumido pelo frontend -- a tela só mostrava
+// o card estático "conta pronta" (ver ReadyToSellCard em admin/financeiro/page.tsx).
+export interface CreatorFinancialDashboard {
+  availableBalance: number;
+  pendingBalance: number;
+  totalGrossSales: number;
+  totalPlatformFeePaid: number;
+  totalNetEarned: number;
+  totalWithdrawn: number;
+  totalSalesCount: number;
+  totalRefundedAmount: number;
+  totalRefundedCount: number;
+  currentCycleStart: string;
+  currentCycleEnd: string;
+  nextReleaseDate: string;
+  // MarketplaceSplit -- informativo, não é saldo sacável (a Asaas já credita direto na conta do
+  // próprio criador, o dinheiro nunca passa pela Hi Mentor nesse modelo).
+  marketplaceGrossSales: number;
+  marketplaceCommissionPaid: number;
+  marketplaceNetEarned: number;
+  marketplaceSalesCount: number;
+  marketplaceRefundedAmount: number;
+  marketplaceRefundedCount: number;
+}
+
+export interface CreatorSaleItem {
+  coursePurchaseId: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  courseId: string;
+  courseTitle: string;
+  paymentModel: 'Legacy' | 'MarketplaceSplit';
+  status: 'Pending' | 'Confirmed' | 'Failed' | 'Refunded';
+  grossAmount: number;
+  platformFeeAmount: number | null;
+  commissionPercentage: number | null;
+  creatorNetAmount: number | null;
+  payoutStatus: 'Pending' | 'Available' | null;
+  confirmedAt: string | null;
+  refundedAt: string | null;
+  createdAt: string;
+}
+
+export interface PlatformFeeInfo {
+  percentage: number;
+  effectiveFrom: string;
+}
+
+export const financeApi = {
+  getDashboard: () => api.get<CreatorFinancialDashboard>('/finance/dashboard'),
+  getSales: (params?: { from?: string; to?: string }) =>
+    api.get<CreatorSaleItem[]>('/finance/sales', { params }),
+  getCurrentFee: () => api.get<PlatformFeeInfo>('/finance/fee'),
+};
+
 // Painel do dono da plataforma -- pipeline de onboarding financeiro via subconta (novo modelo).
 export interface AdminCreatorOnboardingItem {
   id: string;
