@@ -1,0 +1,83 @@
+using HiMentor.Sales.Application.Interfaces;
+using HiMentor.Sales.Domain.Interfaces;
+using HiMentor.Sales.Infrastructure.Repositories;
+using HiMentor.Sales.Infrastructure.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace HiMentor.Sales.Infrastructure;
+
+public static class DependencyInjection
+{
+    /// <summary>Registra repositórios e o cliente HTTP do Asaas. Chamar no Host.</summary>
+    public static IServiceCollection AddSalesInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<ICoursePurchaseRepository, CoursePurchaseRepository>();
+        services.AddScoped<IUserProvisioningService, IdentidadeAcessoUserProvisioningService>();
+        // A5: usado pelo job de reconciliação abaixo para saber se uma compra Confirmed já tem
+        // WalletTransaction correspondente no módulo Finance.
+        services.AddScoped<IWalletCreditChecker, FinanceWalletCreditChecker>();
+
+        // Marketplace de split (creator como emissor da cobrança, ver CreatorAsaasAccount) --
+        // mesma direção de acoplamento já usada acima para Finance.
+        services.AddScoped<IMarketplacePaymentService, AsaasMarketplacePaymentService>();
+        services.AddScoped<ICreatorPaymentAccountLookup, FinanceCreatorPaymentAccountLookup>();
+        services.AddSingleton<IMarketplaceFeatureFlag, ConfigMarketplaceFeatureFlag>();
+        services.AddScoped<IAsaasWebhookAuthenticator, AsaasWebhookAuthenticator>();
+
+        // Cliente HTTP nomeado para o marketplace -- diferente do AddHttpClient<IPaymentService,...>
+        // tipado acima (credencial fixa da HiMentor), a credencial aqui muda por chamada (API Key
+        // de cada creator), então o BaseAddress/access_token são montados por requisição em
+        // AsaasMarketplacePaymentService — aqui só registramos o mesmo pipeline de resiliência.
+        services.AddHttpClient("AsaasMarketplace").AddStandardResilienceHandler();
+
+        services.AddHttpClient<IPaymentService, AsaasPaymentService>(client =>
+            {
+                // Achado em teste manual (produção): a Asaas migrou o endereço da API (ver
+                // changelog "Novo endereço em produção da nossa API") -- o formato antigo
+                // (asaas.com/api/v3/...) ainda "funciona", mas via REDIRECT HTTP pro endereço
+                // novo, e o HttpClient do .NET rebaixa POST pra GET ao seguir um redirect
+                // 301/302 -- destruía silenciosamente toda chamada de criação (cliente,
+                // cobrança, assinatura), que virava uma busca vazia sem erro nenhum. Usa direto
+                // o endereço novo (sem /api no caminho, ver chamadas abaixo), que não redireciona.
+                var baseUrl = configuration["Asaas:BaseUrl"] ?? "https://api-sandbox.asaas.com/v3";
+
+                // Achado em teste manual (produção, HTTP 404 em POST /customers): o
+                // HttpClient do .NET combina BaseAddress + caminho relativo pelas regras de
+                // URI -- se o caminho relativo começa com "/", ele é tratado como um caminho
+                // ABSOLUTO a partir da raiz do host, descartando TODO o path do BaseAddress
+                // (inclusive o "/v3"). Resultado: BaseAddress "https://api.asaas.com/v3" +
+                // PostAsync("/customers") virava silenciosamente
+                // "https://api.asaas.com/customers" (sem /v3) -> Asaas respondia 404. Os
+                // caminhos relativos já foram corrigidos pra não começar com "/", e aqui
+                // garantimos que o BaseAddress sempre termine com "/" -- do contrário o
+                // último segmento do path base (o "v3") seria substituído em vez de mantido,
+                // não importa como a variável for digitada no Railway.
+                if (!baseUrl.EndsWith('/'))
+                    baseUrl += "/";
+
+                client.BaseAddress = new Uri(baseUrl);
+                client.DefaultRequestHeaders.Add("access_token", configuration["Asaas:ApiKey"]);
+                client.DefaultRequestHeaders.Add("User-Agent", "HiMentor/1.0");
+            })
+            // M2: sem isso, uma instabilidade momentânea da Asaas travava a requisição do
+            // comprador por até ~100s (timeout padrão do HttpClient) e nunca era refeita
+            // automaticamente. O handler de resiliência padrão do .NET já aplica um conjunto
+            // sensato: timeout por tentativa (10s) + retry com backoff exponencial e jitter (3
+            // tentativas) + circuit breaker (para de martelar a Asaas se ela já estiver fora do
+            // ar) + timeout total da requisição (30s).
+            .AddStandardResilienceHandler();
+
+        // B4: job periódico que efetiva PastDue -> Expired (assinatura) e expira compras Pending
+        // abandonadas — nenhum dos dois acontecia sozinho antes.
+        services.AddHostedService<SalesExpirationBackgroundService>();
+
+        // A5: job periódico de reconciliação Sales × Finance (venda Confirmed sem crédito na
+        // carteira do criador) — detecta e loga como crítico, não reprocessa sozinho (ver
+        // comentário em FinanceReconciliationBackgroundService sobre o motivo).
+        services.AddHostedService<FinanceReconciliationBackgroundService>();
+
+        return services;
+    }
+}

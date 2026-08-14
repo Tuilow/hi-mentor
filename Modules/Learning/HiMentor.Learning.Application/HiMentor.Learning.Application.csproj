@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.Learning.Application</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.Learning.Domain\HiMentor.Learning.Domain.csproj" />
+    <!-- Acoplamento legítimo: matrícula depende do agregado Course (Catalog) — mesmo padrão do código original. -->
+    <ProjectReference Include="..\..\Catalog\HiMentor.Catalog.Domain\HiMentor.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\HiMentor.SharedKernel.Application\HiMentor.SharedKernel.Application.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão de Finance -> Sales): Learning reage a eventos de
+      domínio publicados pelo módulo Sales (compra confirmada / pagamento de assinatura
+      confirmado) para liberar o acesso ao curso automaticamente.
+    -->
+    <ProjectReference Include="..\..\Sales\HiMentor.Sales.Domain\HiMentor.Sales.Domain.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão acima): ao liberar acesso após compra/assinatura
+      confirmada, os EventHandlers consultam o Canal do criador (Modules/Channel) para levar o
+      comprador direto para /canal/{handle} em vez de só para o curso individual.
+    -->
+    <ProjectReference Include="..\..\Channel\HiMentor.Channel.Domain\HiMentor.Channel.Domain.csproj" />
+  </ItemGroup>
+</Project>

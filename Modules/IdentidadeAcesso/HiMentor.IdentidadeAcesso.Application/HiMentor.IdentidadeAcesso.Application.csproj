@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.IdentidadeAcesso.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.IdentidadeAcesso.Domain\HiMentor.IdentidadeAcesso.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\HiMentor.SharedKernel.Application\HiMentor.SharedKernel.Application.csproj" />
+    <!-- Acoplamento legítimo: o painel do dono da plataforma (GetPlatformStatsQuery) precisa
+         contar cursos publicados e vídeos, e a exclusão de conta em cascata (DeleteUserCommand)
+         precisa enumerar e arquivar os cursos do criador excluído — mesma relação de negócio já
+         usada por Streaming.Application ao referenciar Catalog.Domain no DeleteVideoCommandHandler.
+         Achado M11 da auditoria (CORRIGIDO): a ProjectReference para Streaming.Application (usada
+         só para IStreamingService, dentro de DeleteUserCommandHandler) foi removida — a exclusão
+         em cascata de vídeos virou um domain event consumido pelo próprio módulo Streaming (ver
+         UserDeletedDomainEvent / UserDeletedEventHandler). Streaming.Domain continua referenciado:
+         só GetPlatformStatsQueryHandler ainda usa IVideoRepository, pra contar vídeos no painel. -->
+    <ProjectReference Include="..\..\Catalog\HiMentor.Catalog.Domain\HiMentor.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\Streaming\HiMentor.Streaming.Domain\HiMentor.Streaming.Domain.csproj" />
+    <!--
+      Acoplamento legitimo (mesmo padrao acima: Catalog/Streaming.Domain). O painel
+      administrativo "Cursos e acessos" (GetUserCoursesAndAccessQuery/ReissueCourseAccessLinkCommand)
+      precisa ler Enrollment (Learning, fonte de verdade do acesso liberado), CoursePurchase
+      (Sales, fonte de verdade do pagamento) e CreatorChannel (Channel, para replicar o mesmo
+      destino de redirecionamento usado pelo e-mail automatico de acesso liberado).
+    -->
+    <ProjectReference Include="..\..\Learning\HiMentor.Learning.Domain\HiMentor.Learning.Domain.csproj" />
+    <ProjectReference Include="..\..\Sales\HiMentor.Sales.Domain\HiMentor.Sales.Domain.csproj" />
+    <ProjectReference Include="..\..\Channel\HiMentor.Channel.Domain\HiMentor.Channel.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.Finance.Application</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.Finance.Domain\HiMentor.Finance.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\HiMentor.SharedKernel.Application\HiMentor.SharedKernel.Application.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão de Learning -> Sales): Finance reage a eventos de
+      domínio publicados pelo módulo Sales quando uma compra de curso é confirmada/reembolsada,
+      para calcular a comissão e creditar a carteira do criador.
+    -->
+    <ProjectReference Include="..\..\Sales\HiMentor.Sales.Domain\HiMentor.Sales.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.Payout.Application</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.Payout.Domain\HiMentor.Payout.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\HiMentor.SharedKernel.Application\HiMentor.SharedKernel.Application.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão de Learning -> Sales): um saque só existe em função do
+      saldo disponível na CreatorWallet do módulo Finance — Payout orquestra as duas entidades
+      na mesma transação (mesmo AppDbContext/UnitOfWork) sem duplicar a regra de saldo.
+    -->
+    <ProjectReference Include="..\..\Finance\HiMentor.Finance.Domain\HiMentor.Finance.Domain.csproj" />
+    <ProjectReference Include="..\..\Catalog\HiMentor.Catalog.Domain\HiMentor.Catalog.Domain.csproj" />
+  </ItemGroup>
+</Project>

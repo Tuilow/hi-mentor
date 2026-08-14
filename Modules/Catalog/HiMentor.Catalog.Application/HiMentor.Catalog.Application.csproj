@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.Catalog.Application</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.Catalog.Domain\HiMentor.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\HiMentor.SharedKernel.Application\HiMentor.SharedKernel.Application.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão já usado por Sales.Application -> Catalog.Domain, na
+      direção inversa): para resolver o estado real de comercialização de um curso (Grátis/Pago/
+      Assinatura — ver CourseCommercializationResolver), o Catalog precisa saber se existe um
+      Plan de assinatura ativo para o produto no módulo Sales, já que nesse modo Course.Price
+      é gravado como 0 por design.
+    -->
+    <ProjectReference Include="..\..\Sales\HiMentor.Sales.Domain\HiMentor.Sales.Domain.csproj" />
+  </ItemGroup>
+</Project>

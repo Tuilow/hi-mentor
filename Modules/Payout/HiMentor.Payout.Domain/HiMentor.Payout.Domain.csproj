@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.Payout.Domain</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\SharedKernel\HiMentor.SharedKernel.Domain\HiMentor.SharedKernel.Domain.csproj" />
+    <ProjectReference Include="..\..\Catalog\HiMentor.Catalog.Domain\HiMentor.Catalog.Domain.csproj" />
+  </ItemGroup>
+</Project>

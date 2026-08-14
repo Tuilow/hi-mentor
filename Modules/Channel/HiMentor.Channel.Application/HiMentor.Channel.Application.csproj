@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.Channel.Application</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.Channel.Domain\HiMentor.Channel.Domain.csproj" />
+    <ProjectReference Include="..\..\..\SharedKernel\HiMentor.SharedKernel.Application\HiMentor.SharedKernel.Application.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão de CreatorStudio.Application): o Canal do Criador é a
+      vitrine de todos os cursos publicados do criador — precisa ler Catalog (lista de cursos).
+      "O visitante já tem acesso?" (cadeado) não é mais checado aqui diretamente contra Learning
+      — passou a usar IUserCourseAccessService (SharedKernel.Application, acima), o único serviço
+      de acesso da plataforma; por isso a referência a Learning.Domain foi removida.
+    -->
+    <ProjectReference Include="..\..\Catalog\HiMentor.Catalog.Domain\HiMentor.Catalog.Domain.csproj" />
+    <!--
+      Acoplamento legítimo (mesmo padrão de Sales.Application -> Catalog.Domain, na direção
+      inversa): para saber se um curso está no modo "Assinatura" (Course.Price = 0 por design
+      nesse caso — ver Course.SetPrice), a vitrine precisa checar se existe um Plan ativo para
+      o produto no módulo Sales.
+    -->
+    <ProjectReference Include="..\..\Sales\HiMentor.Sales.Domain\HiMentor.Sales.Domain.csproj" />
+  </ItemGroup>
+</Project>

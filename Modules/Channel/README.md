@@ -1,6 +1,6 @@
 # Módulo Channel (stub)
 
-Contexto de plataforma NOVO (não existe no código legado `src/Tuilow.*`) — canais de criadores,
+Contexto de plataforma NOVO (não existe no código legado `src/HiMentor.*`) — canais de criadores,
 membros de canal (`ChannelOwner`, `ChannelMember`) e o vínculo com a role `ChannelMember` de
 `IdentidadeAcesso`. Estrutura de 4 camadas já criada (Domain/Application/Infrastructure/Api)
 seguindo o mesmo padrão de Catalog/Learning, mas ainda sem entidades — aguardando definição do

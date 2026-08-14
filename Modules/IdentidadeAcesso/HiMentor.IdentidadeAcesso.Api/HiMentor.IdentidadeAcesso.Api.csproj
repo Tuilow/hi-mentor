@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.IdentidadeAcesso.Api</RootNamespace>
+    <!--
+      Sdk normal (não Sdk.Web) de propósito: este projeto só expõe Controllers para o
+      Host montar via AddApplicationPart — não é um executável próprio, não tem Program.cs.
+      Sdk.Web forçaria OutputType=Exe e exigiria um entry point, o que não faz sentido aqui.
+      O FrameworkReference abaixo dá acesso aos tipos do ASP.NET Core (ControllerBase, etc.)
+      sem precisar do Sdk.Web.
+    -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.IdentidadeAcesso.Application\HiMentor.IdentidadeAcesso.Application.csproj" />
+    <ProjectReference Include="..\HiMentor.IdentidadeAcesso.Infrastructure\HiMentor.IdentidadeAcesso.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

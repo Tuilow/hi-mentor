@@ -1,4 +1,4 @@
-# 🎓 Tuilow — Plataforma de Cursos Online
+# 🎓 HiMentor — Plataforma de Cursos Online
 
 Uma plataforma moderna onde pessoas, profissionais, especialistas e empresas podem criar, publicar, vender e
 gerenciar cursos online. Backend em **monolito modular (.NET 9)** com DDD, CQRS e Domain Events; frontend em
@@ -9,20 +9,20 @@ gerenciar cursos online. Backend em **monolito modular (.NET 9)** com DDD, CQRS 
 ## 🏗️ Arquitetura
 
 O backend é um **monolito modular**: cada módulo de negócio tem suas próprias camadas Domain/Application/
-Infrastructure/Api, mas todos são hospedados por um único processo ASP.NET Core (`Host/Tuilow.Host.Api`) — sem
+Infrastructure/Api, mas todos são hospedados por um único processo ASP.NET Core (`Host/HiMentor.Host.Api`) — sem
 a complexidade operacional de microsserviços, mas com o desacoplamento de módulos independentes. A regra entre
 módulos é referenciar só a camada `Domain` uns dos outros (nunca `Application`); comunicação que não é uma
 simples leitura de dado passa por Domain Events (MediatR), despachados pelo `AppDbContext` depois que a
 transação já foi salva.
 
 ```
-Tuilow/
+HiMentor/
 ├── Host/
-│   └── Tuilow.Host.Api/            # Processo único: Program.cs compõe os módulos, AppDbContext, migrations
+│   └── HiMentor.Host.Api/            # Processo único: Program.cs compõe os módulos, AppDbContext, migrations
 ├── SharedKernel/
-│   ├── Tuilow.SharedKernel.Domain/         # AggregateRoot, IDomainEvent, VOs compartilhados
-│   ├── Tuilow.SharedKernel.Application/    # ICurrentUserService, IUnitOfWork, IRepository
-│   └── Tuilow.SharedKernel.Infrastructure/
+│   ├── HiMentor.SharedKernel.Domain/         # AggregateRoot, IDomainEvent, VOs compartilhados
+│   ├── HiMentor.SharedKernel.Application/    # ICurrentUserService, IUnitOfWork, IRepository
+│   └── HiMentor.SharedKernel.Infrastructure/
 ├── Modules/
 │   ├── IdentidadeAcesso/    # Usuários, autenticação, roles, Magic Link
 │   ├── Catalog/             # Cursos, módulos, aulas, categorias
@@ -37,9 +37,9 @@ Tuilow/
 │   └── Growth/              # Reservado — ainda stub, sem domínio implementado
 │       └── {Domain,Application,Infrastructure,Api}/   # cada módulo segue essa mesma estrutura interna
 ├── src/
-│   └── Tuilow.Web/          # Frontend Next.js 15 + React 19 + Tailwind
+│   └── HiMentor.Web/          # Frontend Next.js 15 + React 19 + Tailwind
 ├── tests/
-│   └── Tuilow.Application.Tests/   # Projeto reservado para testes automatizados (ver nota abaixo)
+│   └── HiMentor.Application.Tests/   # Projeto reservado para testes automatizados (ver nota abaixo)
 ├── scripts/
 │   └── init-db.sql                # Criação dos schemas PostgreSQL
 ├── docker-compose.yml
@@ -47,7 +47,7 @@ Tuilow/
 └── .gitignore
 ```
 
-Cada módulo em `Modules/` segue a mesma estrutura interna: `Tuilow.<Módulo>.Domain`, `.Application`,
+Cada módulo em `Modules/` segue a mesma estrutura interna: `HiMentor.<Módulo>.Domain`, `.Application`,
 `.Infrastructure` e `.Api` — quatro `.csproj` próprios, referenciados pelo Host.
 
 **Status de cada módulo** (ver `Program.cs` para a lista viva):
@@ -59,7 +59,7 @@ Cada módulo em `Modules/` segue a mesma estrutura interna: `Tuilow.<Módulo>.Do
 | Growth | Reservado — ainda sem domínio implementado, não registrado no Host |
 
 > Nota sobre `tests/`: não há atualmente um projeto de testes automatizados ativo referenciado em
-> `Tuilow.sln`. `Tuilow.Application.Tests` existe como pasta reservada. Um diretório legado do nome anterior
+> `HiMentor.sln`. `HiMentor.Application.Tests` existe como pasta reservada. Um diretório legado do nome anterior
 > à marca (`DogMaster.Domain.Tests`, sem `.csproj` nem código-fonte — só artefatos de build antigos) foi
 > movido para `tests/_to_delete/` para remoção manual.
 
@@ -89,7 +89,7 @@ Isso sobe: **API (porta 5000)**, **Frontend (porta 3000)**, **PostgreSQL (5432)*
 
 **Backend:**
 ```bash
-cd Host/Tuilow.Host.Api
+cd Host/HiMentor.Host.Api
 dotnet run
 # API disponível em http://localhost:5000 (ou a porta configurada no launchSettings/appsettings)
 # Swagger: http://localhost:5000/swagger
@@ -97,7 +97,7 @@ dotnet run
 
 **Frontend:**
 ```bash
-cd src/Tuilow.Web
+cd src/HiMentor.Web
 npm install
 cp .env.local.example .env.local
 npm run dev
@@ -110,14 +110,14 @@ O `AppDbContext` e as migrations vivem no próprio Host (ele referencia o `Domai
 módulo via `ApplyConfigurationsFromAssembly`), então não é preciso indicar um `--startup-project` separado:
 
 ```bash
-cd Host/Tuilow.Host.Api
+cd Host/HiMentor.Host.Api
 dotnet ef migrations add NomeDaMigration
 dotnet ef database update
 ```
 
 ### 5. Testes
 
-Não há hoje uma suíte de testes automatizados ativa no `Tuilow.sln` (ver nota na seção Arquitetura acima).
+Não há hoje uma suíte de testes automatizados ativa no `HiMentor.sln` (ver nota na seção Arquitetura acima).
 
 ---
 

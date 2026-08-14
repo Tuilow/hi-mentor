@@ -4,7 +4,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Host/Tuilow.Host.Api/Dockerfile
+      dockerfile: Host/HiMentor.Host.Api/Dockerfile
     image: tuilow-api:latest
     container_name: tuilow_api
     ports:
@@ -46,7 +46,7 @@ services:
 
   web:
     build:
-      context: ./src/Tuilow.Web
+      context: ./src/HiMentor.Web
       dockerfile: Dockerfile
     image: tuilow-web:latest
     container_name: tuilow_web

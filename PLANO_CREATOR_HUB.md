@@ -1,4 +1,4 @@
-# Tuilow Creator Hub — Plano de Produto e Arquitetura
+# HiMentor Creator Hub — Plano de Produto e Arquitetura
 
 > **⚠️ STATUS (atualizado — achado B11 da auditoria de arquitetura):** as 4 fases descritas
 > neste plano (seção 9) **já foram implementadas** desde que este documento foi escrito. As
@@ -69,7 +69,7 @@ Nenhuma dependência externa nova além da biblioteca de QR Code 100% client-sid
 
 ## 4. Modelagem de domínio (implementada)
 
-**`Channel.CreatorChannel`** (aggregate root) — implementado em `Modules/Channel/Tuilow.Channel.Domain/Entities/CreatorChannel.cs`:
+**`Channel.CreatorChannel`** (aggregate root) — implementado em `Modules/Channel/HiMentor.Channel.Domain/Entities/CreatorChannel.cs`:
 ```
 CreatorChannel
 ├── Id
@@ -97,7 +97,7 @@ Link direto, link de checkout, QR Code, embed e botão HTML continuam **derivado
 5. Acompanha, no dashboard, quantas visitas/leads/vendas a página pública gerou.
 
 **Visitante anônimo (topo de funil)**
-1. Chega via link, QR Code, embed ou anúncio em `tuilow.com/c/{slug}`.
+1. Chega via link, QR Code, embed ou anúncio em `himentor.com/c/{slug}`.
 2. Vê a página de vendas (vídeo, headline, benefícios, módulos, FAQ, professor).
 3. Clica em comprar → cria conta/login → completa o checkout (PIX/cartão/boleto).
 

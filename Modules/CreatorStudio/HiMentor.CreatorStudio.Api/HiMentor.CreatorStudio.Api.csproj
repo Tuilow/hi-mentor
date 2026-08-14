@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.CreatorStudio.Api</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.CreatorStudio.Application\HiMentor.CreatorStudio.Application.csproj" />
+    <ProjectReference Include="..\HiMentor.CreatorStudio.Infrastructure\HiMentor.CreatorStudio.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

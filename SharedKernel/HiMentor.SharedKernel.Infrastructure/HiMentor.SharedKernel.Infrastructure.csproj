@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HiMentor.SharedKernel.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+    <!-- Troquei o envio de e-mail de SMTP (MailKit) para a API HTTP do Mailgun — ver comentário
+         em Email/EmailService.cs. IHttpClientFactory vem deste pacote. -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.4" />
+    <!-- ISecretProtector (DataProtectionSecretProtector): so as interfaces IDataProtector/
+         IDataProtectionProvider; o provider concreto e registrado no Host via AddDataProtection(). -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.Abstractions" Version="9.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HiMentor.SharedKernel.Application\HiMentor.SharedKernel.Application.csproj" />
+  </ItemGroup>
+</Project>
